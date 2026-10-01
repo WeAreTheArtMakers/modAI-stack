@@ -21,7 +21,12 @@ def upgrade():
     op.create_table("document_versions", sa.Column("id", sa.Integer(), primary_key=True), sa.Column("document_id", sa.Integer(), sa.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False), sa.Column("version", sa.Integer(), nullable=False), sa.Column("content_hash", sa.String(64), nullable=False), sa.Column("file_size", sa.Integer(), nullable=False), sa.Column("status", sa.String(20), nullable=False, server_default="queued"), sa.Column("error", sa.Text()), sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()), sa.UniqueConstraint("document_id", "version"))
     for name, column_type, foreign_key in [("organization_id", sa.Integer(), "organizations.id"), ("workspace_id", sa.Integer(), "workspaces.id"), ("knowledge_base_id", sa.Integer(), "knowledge_bases.id")]:
         op.add_column("documents", sa.Column(name, column_type, sa.ForeignKey(foreign_key, ondelete="SET NULL"), nullable=True))
-    for name, column in [("content_hash", sa.String(64)), ("file_size", sa.Integer()), ("index_status", sa.String(20)), ("index_error", sa.Text()), ("updated_at", sa.DateTime(timezone=True)), ("active_version", sa.Integer())]: op.add_column("documents", sa.Column(name, column, nullable=True))
+    op.add_column("documents", sa.Column("content_hash", sa.String(64), nullable=True))
+    op.add_column("documents", sa.Column("file_size", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column("documents", sa.Column("index_status", sa.String(20), nullable=False, server_default="ready"))
+    op.add_column("documents", sa.Column("index_error", sa.Text(), nullable=True))
+    op.add_column("documents", sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()))
+    op.add_column("documents", sa.Column("active_version", sa.Integer(), nullable=False, server_default="1"))
     op.add_column("document_versions", sa.Column("stored_path", sa.String(1024), nullable=True))
     op.create_table("index_jobs", sa.Column("id", sa.String(36), primary_key=True), sa.Column("document_id", sa.Integer(), sa.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False), sa.Column("version", sa.Integer(), nullable=False), sa.Column("status", sa.String(20), nullable=False, server_default="queued"), sa.Column("attempts", sa.Integer(), nullable=False, server_default="0"), sa.Column("error", sa.Text()), sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()), sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()))
     op.create_index("ix_index_jobs_status", "index_jobs", ["status"])

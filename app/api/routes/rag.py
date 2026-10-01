@@ -3,9 +3,8 @@ from fastapi import APIRouter, Depends
 from app.api.deps import current_user
 from app.core.config import get_settings
 from app.models.schemas import RagRequest, RagResponse, Source
-from app.models.database import KnowledgeBase, Membership, Workspace
+from app.api.authorization import require_knowledge_base_access
 from app.db.session import get_db
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.llm.ollama import OllamaProvider
 from app.services.rag.pipeline import build_rag_prompt
@@ -20,12 +19,8 @@ async def query(req: RagRequest, user=Depends(current_user), db: AsyncSession = 
     kb_scope = None
     authorized_kb_ids: list[int] = []
     if req.knowledge_base_ids:
-        stmt = select(KnowledgeBase, Workspace).join(Workspace).join(Membership, Membership.workspace_id == Workspace.id).where(Membership.user_id == int(user["sub"]), KnowledgeBase.id.in_(req.knowledge_base_ids))
-        rows = (await db.execute(stmt)).all()
+        rows = [await require_knowledge_base_access(db, user, knowledge_base_id) for knowledge_base_id in set(req.knowledge_base_ids)]
         authorized_kb_ids = [row[0].id for row in rows]
-        if len(authorized_kb_ids) != len(set(req.knowledge_base_ids)):
-            from fastapi import HTTPException
-            raise HTTPException(403, "Knowledge base access required")
         scopes = {(row[1].organization_id, row[1].id) for row in rows}
         if len(scopes) != 1:
             from fastapi import HTTPException
