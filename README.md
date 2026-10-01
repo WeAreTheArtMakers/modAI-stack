@@ -10,6 +10,8 @@
 
 modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, semantik arama yapmayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Qdrant vektör aramayı destekler. Redis Compose içinde hazır tutulur ancak mevcut uygulama akışında henüz kullanılmamaktadır. Model sağlayıcı arayüzü sayesinde Ollama yerine vLLM eklenebilir.
 
+Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge Base oluşturulur. Knowledge Base erişimi Membership kayıtlarıyla kontrol edilir; kullanıcılar `admin`, `manager` veya `user` rolleriyle sınırlandırılır. Belge ve Qdrant erişimi bu kapsam bilgileriyle ilişkilendirilir.
+
 ## Kullanılan teknolojiler
 
 | Katman | Teknolojiler | Kullanım amacı |
@@ -60,6 +62,14 @@ Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını
 
 Gerçek JWT secret ve parolaları yalnızca `.env` içine yazın. `.env`, `.venv`, yerel veritabanı ve eğitim çıktıları Git’e alınmaz.
 
+Şema değişiklikleri için uzun vadeli migration aracı Alembic’tir:
+
+```bash
+alembic upgrade head
+```
+
+Eski geliştirme veritabanlarında migration çalıştırmadan önce yedek alın. `create_all()` yalnızca geriye dönük geliştirme kolaylığı olarak tutulur; üretimde şema yönetimi Alembic ile yapılmalıdır.
+
 ## API kullanımı
 
 ```bash
@@ -69,6 +79,8 @@ curl -X POST http://localhost:8000/chat -H "Authorization: Bearer $TOKEN" -H 'Co
 curl -X POST http://localhost:8000/documents/upload -H "Authorization: Bearer $TOKEN" -F file=@notlar.pdf
 curl -X POST http://localhost:8000/rag/query -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"question":"Belgede hangi konular anlatılıyor?"}'
 ```
+
+Knowledge Base listelemek için `GET /knowledge-bases`, yeni bir Knowledge Base oluşturmak için `POST /knowledge-bases?workspace_id=<id>` kullanılabilir. Belge yüklerken multipart form alanı olarak `knowledge_base_id` gönderilebilir. RAG sorgusunda `knowledge_base_ids` listesiyle seçili bilgi tabanları belirtilir.
 
 WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağlanıp metin gönderin. Sunucu token başına `type: "token"`, tamamlanınca `type: "complete"` olayı gönderir.
 
