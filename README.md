@@ -40,13 +40,19 @@ modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, s
 
 Ollama çağrıları yalnızca `app/services/llm/` katmanından yapılır. RAG context’i güvenilmeyen veri olarak sistem talimatlarından ayrılır.
 
+### Gerçek RAG akışı
+
+Belge yükleme akışı şöyledir: `upload → extract → chunk → embed → Qdrant upsert`. Embedding modeli lazy olarak yüklenir, tekrar kullanılır ve senkron model çağrısı `asyncio.to_thread()` ile event loop dışına taşınır. Her Qdrant payload’ında kullanıcı, belge, dosya adı, parça numarası ve metin bulunur.
+
+Sorgu akışı şöyledir: `question → embed → user_id filtreli similarity search → top-k context → Ollama → answer + sources`. Kullanıcı filtreleri sayesinde bir kullanıcı başka bir kullanıcının belge parçalarını arayamaz. Belge silme işlemi de sahiplik kontrolünden sonra PostgreSQL kaydını ve Qdrant vektörlerini birlikte kaldırır.
+
 ## Kurulum
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-ollama pull llama3.2:3b
+ollama pull modAIJet:latest
 uvicorn app.main:app --reload
 ```
 
