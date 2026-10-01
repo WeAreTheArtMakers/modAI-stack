@@ -34,4 +34,5 @@ jobs:
       - run: alembic upgrade head
       - run: python -m pytest -v
       - run: git diff --check
+      - run: cp .env.example .env
       - run: docker compose --env-file .env.example config
