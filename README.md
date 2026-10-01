@@ -1,53 +1,46 @@
 # modAI-stack
 
-<p align="center">
-  <img src="assets/modai-stack-logo.png" alt="modAI-stack logo" width="760">
-</p>
+<p align="center"><img src="assets/modai-stack-logo.png" alt="modAI-stack logosu" width="760"></p>
 
-> Yerel çalışan LLM’ler, gerçek zamanlı sohbet, RAG ve vektör aramayı tek bir modüler platformda birleştiren yapay zekâ uygulama altyapısı.
+> Yerel LLM, gerçek zamanlı sohbet, belge tabanlı RAG ve vektör aramayı birleştiren modüler yapay zekâ platformu.
 
 [GitHub deposu](https://github.com/WeAreTheArtMakers/modAI-stack)
 
-## Kısa açıklama
+## Proje hakkında
 
-modAI-stack; Ollama ile yerel model çalıştırmayı, FastAPI tabanlı asenkron API’yi, WebSocket üzerinden token akışını, belge yükleme ve RAG sorgularını bir araya getirir. Uygulama; PostgreSQL ile kalıcı verileri, Qdrant ile anlamsal aramayı, Redis ile geçici iş/rate-limit durumunu kullanır. LLM sağlayıcısı soyutlandığı için ileride Ollama yerine vLLM eklemek API ve iş mantığını değiştirmeden mümkündür.
+modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, semantik arama yapmayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Qdrant vektör aramayı, Redis ise geçici durum ve koordinasyonu destekler. Model sağlayıcı arayüzü sayesinde Ollama yerine vLLM eklenebilir.
 
 ## Kullanılan teknolojiler
 
-| Katman | Teknolojiler |
-| --- | --- |
-| Backend API | Python 3.11+, FastAPI, Pydantic, Uvicorn |
-| Asenkron çalışma | `asyncio`, bounded job queue, worker cancellation, timeout ve backpressure |
-| LLM serving | Ollama, provider abstraction; vLLM için genişletilebilir yapı |
-| RAG | Sentence Transformers embeddings, configurable chunking, güvenli context construction |
-| Vector database | Qdrant, cosine similarity, metadata filtering |
-| Relational database | PostgreSQL, SQLAlchemy async ORM, asyncpg |
-| Cache / coordination | Redis |
-| Gerçek zamanlı iletişim | WebSockets, token streaming, connection isolation |
-| Kimlik ve güvenlik | JWT, access/refresh token, bcrypt password hashing, RBAC, input validation |
-| Doküman işleme | PDF (`pypdf`), Markdown, TXT; dosya boyutu ve uzantı doğrulama |
-| Model adaptation | Hugging Face Transformers, Datasets, PEFT / LoRA |
-| Altyapı | Docker, Docker Compose, persistent volumes, health/readiness checks |
-| Test | pytest, pytest-asyncio, httpx |
+| Katman | Teknolojiler | Kullanım amacı |
+| --- | --- | --- |
+| Dil ve API | Python 3.11+, FastAPI, Pydantic, Uvicorn | Asenkron REST API ve doğrulama |
+| Asenkron mimari | `asyncio`, bounded queue, worker, timeout, cancellation | Eşzamanlılık ve backpressure |
+| LLM | Ollama, `LLMProvider` | Yerel model ve sağlayıcı soyutlaması |
+| RAG | Sentence Transformers, metin parçalama | Belge kaynaklı yanıt üretimi |
+| Vektör arama | Qdrant, cosine similarity, metadata filtreleri | Embedding saklama ve arama |
+| Kalıcı veri | PostgreSQL, SQLAlchemy Async ORM, asyncpg | Kullanıcı, belge, oturum ve mesajlar |
+| Geçici veri | Redis | Rate limit, iş durumu ve koordinasyon |
+| Gerçek zamanlı iletişim | WebSocket | Token akışı ve canlı sohbet |
+| Güvenlik | JWT, access/refresh token, bcrypt, RBAC | Kimlik doğrulama ve yetkilendirme |
+| Belge işleme | `pypdf`, Markdown, TXT | Dosyadan metin çıkarma |
+| Model uyarlama | Transformers, Datasets, PEFT / LoRA | Adapter eğitimi |
+| Altyapı | Docker, Docker Compose, kalıcı volume | Yerel servis kurulumu |
+| Test | pytest, pytest-asyncio, httpx | Birim ve entegrasyon testleri |
 
----
-
-# Local AI Realtime RAG Platform
-
-Local-first interview project demonstrating an async FastAPI backend around Ollama, PostgreSQL, Redis, Qdrant, JWT, WebSockets, document ingestion, and PEFT/LoRA.
-
-## Architecture
+## Mimari
 
 ```text
-Client -> FastAPI REST/WebSocket -> auth + bounded jobs -> provider interface -> Ollama
-                                      |                         |
-                               PostgreSQL                  RAG pipeline -> Qdrant
-                                      Redis (job state/rate limiting)
+İstemci -> FastAPI REST/WebSocket -> JWT/RBAC -> LLMProvider -> Ollama
+                                      |              |
+                                      |              └-> RAG -> Embedding -> Qdrant
+                                      └-> SQLAlchemy -> PostgreSQL
+                                          Redis: geçici durum, rate limit, koordinasyon
 ```
 
-The application never calls Ollama outside `app/services/llm`; replacing it with a `VLLMProvider` preserves API and RAG business logic. Qdrant is similarly isolated. Retrieved text is explicitly labeled untrusted in the prompt and cannot override system instructions.
+Ollama çağrıları yalnızca `app/services/llm/` katmanından yapılır. RAG context’i güvenilmeyen veri olarak sistem talimatlarından ayrılır.
 
-## Run locally
+## Kurulum
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -57,56 +50,54 @@ ollama pull llama3.2:3b
 uvicorn app.main:app --reload
 ```
 
-For infrastructure, `docker compose up --build` starts API, PostgreSQL, Redis, and Qdrant. Ollama can remain on the host; set `OLLAMA_BASE_URL=http://host.docker.internal:11434` in Docker environments. Add real secrets only to `.env`, never source control.
+Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını çalıştırın. API `http://localhost:8000`, Qdrant `http://localhost:6333`, host PostgreSQL bağlantısı `localhost:55432` adresindedir. Docker içindeki API, Mac üzerinde Ollama’ya `host.docker.internal:11434` adresinden bağlanır.
 
-## API examples
+Gerçek JWT secret ve parolaları yalnızca `.env` içine yazın. `.env`, `.venv`, yerel veritabanı ve eğitim çıktıları Git’e alınmaz.
 
-```bash
-curl -X POST localhost:8000/auth/register -H 'Content-Type: application/json' \
-  -d '{"email":"user@example.com","password":"correct-horse-battery"}'
-curl -X POST localhost:8000/chat -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' -d '{"prompt":"Explain embeddings"}'
-curl -X POST localhost:8000/documents/upload -H "Authorization: Bearer $TOKEN" -F file=@notes.pdf
-curl -X POST localhost:8000/rag/query -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' -d '{"question":"What does the document say?"}'
-```
-
-Connect to `ws://localhost:8000/ws/chat?token=<access-token>` and send a text prompt. The server emits `{type: "token"}` messages followed by `{type: "complete"}`. Disconnects and provider failures are contained per connection.
-
-## Design notes
-
-Async I/O keeps database, network, and streaming operations from blocking other requests. Timeouts, bounded queues, semaphores, and cancellation are the controls needed for backpressure and concurrency; Redis is the intended shared store for rate limits and transient job state, while PostgreSQL remains the source of truth. Qdrant provides cosine similarity search and metadata filtering without coupling retrieval to SQL. In production, add Alembic migrations, distributed rate limiting, structured JSON logs/metrics, object storage for originals, and separate worker deployment.
-
-The current upload route persists extracted text and the RAG endpoint demonstrates the safe prompt boundary; production wiring should add the embedding model, Qdrant collection/upsert/delete operations, and background ingestion job using `JobQueue`.
-
-## Testing and training
+## API kullanımı
 
 ```bash
-pytest
-python training/train_lora.py
+curl -X POST http://localhost:8000/auth/register -H 'Content-Type: application/json' -d '{"email":"user@example.com","password":"correct-horse-battery"}'
+export TOKEN="<access-token>"
+curl -X POST http://localhost:8000/chat -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"prompt":"Embedding nedir?"}'
+curl -X POST http://localhost:8000/documents/upload -H "Authorization: Bearer $TOKEN" -F file=@notlar.pdf
+curl -X POST http://localhost:8000/rag/query -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"question":"Belgede hangi konular anlatılıyor?"}'
 ```
 
-LoRA is adapter training, not an Ollama Modelfile. Prompt/system settings alter inference instructions; RAG injects query-time knowledge; LoRA learns adapter parameters; full fine-tuning updates all model weights. See `training/README.md`.
+WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağlanıp metin gönderin. Sunucu token başına `type: "token"`, tamamlanınca `type: "complete"` olayı gönderir.
 
-## Technical Interview Discussion
+## Güvenlik ve veri gizliliği
 
-1. RAG is preferable for changing/private documents because knowledge can be updated without retraining.
-2. A Modelfile configures serving/prompt behavior; LoRA changes learned adapter weights.
-3. `asyncio` overlaps network waits and streams tokens efficiently.
-4. Blocking inference must move behind an async client or worker/process; otherwise the event loop stalls every request.
-5. WebSockets provide low-latency bidirectional token streaming.
-6. Use connection limits, bounded queues, per-request cancellation, horizontal workers, and a distributed rate limiter.
-7. Route requests across model replicas/GPUs and batch where the serving engine supports it.
-8. Implement `VLLMProvider` against the same `LLMProvider` contract.
-9. Backpressure occurs at WebSocket send buffers, bounded job queues, model concurrency, and Qdrant/database pools.
-10. Treat retrieved content as untrusted and separate it from system instructions, as the pipeline does.
-11. Qdrant is purpose-built for vector search, payload filters, and operational persistence.
-12. Inspect chunking, embedding model, top-k, score distribution, and a labeled retrieval evaluation set.
-13. Fail gracefully, expose readiness failure, retry boundedly, and use cached/queued work where appropriate.
-14. Return a safe provider-unavailable error and keep health/readiness distinct from API liveness.
-15. Estimate parameter memory plus KV cache, activations, and runtime overhead; validate empirically with the target quantization.
-16. Authentication establishes identity; authorization checks role/resource permissions.
-17. Redis holds ephemeral coordination/rate state; PostgreSQL stores durable users, documents, sessions, and messages.
-18. Validate inputs, enforce upload limits, expire JWTs, rate-limit expensive endpoints, and avoid leaking errors.
-19. Emit request ID, endpoint, status, retrieval latency, LLM latency, and token/queue metrics without sensitive content.
-20. Add migrations, secrets management, TLS, object storage, observability, autoscaling workers, backups, and failure drills.
+- Parolalar bcrypt ile hash’lenir; düz metin parola saklanmaz.
+- Access ve refresh JWT’leri süreli üretilir; rollerle yetkilendirme desteklenir.
+- Dosya boyutu ve uzantısı doğrulanır; yüklenen dosyalar çalıştırılmaz.
+- JWT secret, bağlantı bilgileri ve parolalar ortam değişkenlerinden okunur.
+- Token, parola, stack trace ve hassas belge içeriği loglanmaz veya istemciye döndürülmez.
+
+## Test ve LoRA eğitimi
+
+`python -m pytest -v` ile testleri, `python training/train_lora.py` ile PEFT/LoRA adapter eğitimini çalıştırın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
+
+## Bilinen sınırlamalar
+
+Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve güvenli RAG prompt sınırını gösterir. Üretim için embedding üretimi, Qdrant upsert/silme, arka plan indeksleme worker’ı ve gerçek dağıtık rate-limit middleware’i ayrıca bağlanmalıdır. Üretime geçişte Alembic, merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme ve yük testleri eklenmelidir.
+
+## Teknik mülakat notları
+
+1. **RAG neden fine-tuning yerine kullanılır?** Değişken belgeler yeniden eğitim olmadan güncellenir ve kaynak gösterilebilir.
+2. **LoRA ile Modelfile farkı nedir?** Modelfile sunum/prompt ayarıdır; LoRA öğrenilmiş adapter ağırlığıdır.
+3. **`asyncio` ne sağlar?** Ağ ve veritabanı beklemelerinde event loop başka istekleri işleyebilir.
+4. **LLM event loop’u bloklarsa?** Tüm istekler yavaşlar; asenkron istemci veya ayrı worker gerekir.
+5. **WebSocket neden kullanılır?** Token’ları yanıt bitmeden düşük gecikmeyle aktarır.
+6. **Bin bağlantı nasıl ölçeklenir?** Bounded queue, semaphore, iptal, yatay worker ve dağıtık rate limit kullanılır.
+7. **Ollama nasıl vLLM olur?** Aynı `LLMProvider` sözleşmesini uygulayan yeni sağlayıcı yazılır.
+8. **Backpressure nerede oluşur?** WebSocket buffer’ında, iş kuyruğunda, model concurrency limitinde ve veritabanı havuzlarında.
+9. **RAG injection nasıl önlenir?** Context güvenilmeyen veri olarak sistem talimatlarından ayrılır.
+10. **Qdrant neden seçildi?** Vektör arama ve metadata filtreleri için amaca yönelik bir servistir.
+11. **Kötü retrieval nasıl incelenir?** Chunk, embedding, top-k, skor dağılımı ve etiketli test seti ölçülür.
+12. **Qdrant veya model kapanırsa?** Readiness başarısız olur, sınırlı retry uygulanır ve güvenli hata döndürülür.
+13. **Authentication ve authorization farkı?** İlki kimliği, ikincisi erişim yetkisini doğrular.
+14. **Redis ve PostgreSQL ayrımı?** Redis geçici koordinasyon; PostgreSQL kalıcı kaynak verisidir.
+15. **API nasıl korunur?** Doğrulama, upload limiti, süreli JWT, rate limit ve güvenli hata yanıtı kullanılır.
+16. **Gecikme nasıl izlenir?** İstek, retrieval, LLM ve kuyruk süreleri hassas içerik olmadan ölçülür.
+17. **Üretime geçişte ne eklenir?** Migration, secret yönetimi, TLS, gözlemlenebilirlik, autoscaling, yedekleme ve arıza testleri.
