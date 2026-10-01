@@ -1,0 +1,53 @@
+import asyncio
+import logging
+from sqlalchemy import select
+from app.core.config import get_settings
+from app.db.session import SessionLocal
+from app.models.database import Document, DocumentVersion, IndexJob
+from app.services.documents.parser import extract_text
+from app.services.jobs.redis_queue import RedisIndexQueue
+from app.services.rag.chunker import chunk_text
+from app.services.rag.embeddings import get_embedding_service
+from app.services.qdrant import qdrant_service
+from app.services.storage import storage
+logger = logging.getLogger(__name__)
+async def process_job(job_id: str) -> None:
+    async with SessionLocal() as db:
+        job = await db.get(IndexJob, job_id)
+        if not job or job.status in {"ready", "cancelled"}: return
+        queue = RedisIndexQueue()
+        lock = await queue.client.set(f"modai:indexing:lock:{job.document_id}:{job.version}", job_id, nx=True, ex=get_settings().indexing_job_timeout_seconds)
+        if not lock: await queue.close(); return
+        job.status = "processing"; job.attempts += 1; await db.commit()
+        try:
+            version = await db.scalar(select(DocumentVersion).where(DocumentVersion.document_id == job.document_id, DocumentVersion.version == job.version))
+            document = await db.get(Document, job.document_id)
+            if not version or not document: raise ValueError("document version not found")
+            data = await storage.read(version.stored_path or "")
+            content = extract_text(document.filename, data)
+            chunks = chunk_text(content, get_settings().chunk_size, get_settings().chunk_overlap)
+            vectors = await get_embedding_service().embed_texts(chunks)
+            await qdrant_service.delete_document_vectors(user_id=document.user_id, document_id=document.id)
+            await qdrant_service.upsert_document(user_id=document.user_id, document_id=document.id, filename=document.filename, organization_id=document.organization_id, workspace_id=document.workspace_id, knowledge_base_id=document.knowledge_base_id, document_version=version.version, chunks=chunks, vectors=vectors)
+            document.content = content; document.index_status = "ready"; document.index_error = None
+            version.status = "ready"; job.status = "ready"; job.error = None
+            await db.commit()
+        except Exception:
+            logger.exception("Index job failed", extra={"job_id": job_id})
+            job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
+            job.error = "Document indexing failed"
+            document = await db.get(Document, job.document_id)
+            if document: document.index_status = job.status; document.index_error = job.error
+            await db.commit()
+            if job.status == "queued": await queue.enqueue(job.id)
+        finally: await queue.close()
+async def worker_main() -> None:
+    queue = RedisIndexQueue()
+    try:
+        while True:
+            job_id = await queue.dequeue(timeout=5)
+            if job_id:
+                try: await asyncio.wait_for(process_job(job_id), timeout=get_settings().indexing_job_timeout_seconds)
+                except asyncio.TimeoutError: logger.error("Index job timed out", extra={"job_id": job_id})
+    finally: await queue.close()
+if __name__ == "__main__": asyncio.run(worker_main())

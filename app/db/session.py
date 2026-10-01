@@ -6,5 +6,6 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSe
 async def get_db():
     async with SessionLocal() as session: yield session
 async def init_db():
+    if not get_settings().auto_create_schema:
+        return
     async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all)
-

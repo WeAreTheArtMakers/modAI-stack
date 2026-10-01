@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     max_concurrent_llm_requests: int = 4
     max_upload_bytes: int = 10 * 1024 * 1024
+    data_dir: str = "./data/modai"
+    auto_create_schema: bool = False
+    indexing_job_timeout_seconds: int = 900
+    indexing_max_retries: int = 3
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 @lru_cache

@@ -1,10 +1,12 @@
 import io
 from pathlib import Path
 from pypdf import PdfReader
-ALLOWED = {".txt", ".md", ".pdf"}
+ALLOWED = {".txt", ".md", ".pdf", ".docx"}
 def extract_text(filename: str, data: bytes) -> str:
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED: raise ValueError("unsupported document type")
     if suffix == ".pdf": return "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(data)).pages)
+    if suffix == ".docx":
+        from docx import Document as DocxDocument
+        return "\n".join(paragraph.text for paragraph in DocxDocument(io.BytesIO(data)).paragraphs)
     return data.decode("utf-8", errors="strict")
-

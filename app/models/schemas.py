@@ -16,7 +16,7 @@ class RagRequest(BaseModel):
     knowledge_base_ids: list[int] = Field(default_factory=list, max_length=20)
 class DocumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: int; filename: str; index_status: str = "ready"; knowledge_base_id: int | None = None
+    id: int; filename: str; index_status: str = "ready"; index_error: str | None = None; knowledge_base_id: int | None = None; file_size: int = 0; active_version: int = 1
 class KnowledgeBaseCreate(BaseModel): name: str = Field(min_length=1, max_length=150); description: str | None = Field(default=None, max_length=2000)
 class KnowledgeBaseResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

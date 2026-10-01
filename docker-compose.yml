@@ -29,6 +29,29 @@ services:
 
     restart: unless-stopped
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: "redis://redis:6379/0"
+      QDRANT_URL: "http://qdrant:6333"
+      DATA_DIR: "/data/modai"
+      OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+    volumes:
+      - modaidata:/data/modai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
 
   postgres:
     image: postgres:16
@@ -98,3 +121,4 @@ services:
 volumes:
   pgdata:
   qdrantdata:
+  modaidata:

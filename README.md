@@ -48,6 +48,12 @@ Belge yükleme akışı şöyledir: `upload → extract → chunk → embed → 
 
 Sorgu akışı şöyledir: `question → embed → user_id filtreli similarity search → top-k context → Ollama → answer + sources`. Kullanıcı filtreleri sayesinde bir kullanıcı başka bir kullanıcının belge parçalarını arayamaz. Belge silme işlemi de sahiplik kontrolünden sonra PostgreSQL kaydını ve Qdrant vektörlerini birlikte kaldırır.
 
+## Asenkron indeksleme ve dosya depolama
+
+Upload isteği artık embedding çalıştırmaz. API dosyayı güvenli, üretilmiş bir adla `DATA_DIR/uploads/` altına atomik olarak kaydeder; PostgreSQL’de belge sürümü ve `IndexJob` oluşturur; işi Redis kuyruğuna bırakır ve `queued` durumuyla döner. Ayrı worker süreci `queued → processing → ready` akışında extraction, chunking, embedding ve Qdrant upsert işlemlerini yürütür. Hatalar güvenli `failed` durumuna alınır ve sınırlı retry uygulanır.
+
+Desteklenen dosya türleri PDF, TXT, Markdown ve DOCX’tir. Kullanıcı dosya adı yalnızca metadata olarak saklanır; filesystem yolu hiçbir zaman istemciden alınmaz. Docker Compose içinde `api`, `worker`, PostgreSQL, Redis ve Qdrant servisleri bulunur; kaynak dosyalar `modaidata` volume’unda kalıcıdır.
+
 ## Kurulum
 
 ```bash
