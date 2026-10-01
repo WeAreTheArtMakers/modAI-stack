@@ -44,11 +44,11 @@ class QdrantService:
             )
 
     @staticmethod
-    def point_id(document_id: int, chunk_index: int) -> str:
+    def point_id(document_id: int, chunk_index: int, document_version: int = 1) -> str:
         return str(
             uuid5(
                 NAMESPACE_URL,
-                f"modai-stack:{document_id}:{chunk_index}",
+                f"modai-stack:{document_id}:{document_version}:{chunk_index}",
             )
         )
 
@@ -62,6 +62,7 @@ class QdrantService:
         workspace_id: int | None = None,
         knowledge_base_id: int | None = None,
         document_version: int = 1,
+        is_active: bool = True,
         chunks: list[str],
         vectors: list[list[float]],
     ) -> None:
@@ -75,7 +76,7 @@ class QdrantService:
 
         points = [
             models.PointStruct(
-                id=self.point_id(document_id, index),
+                id=self.point_id(document_id, index, document_version),
                 vector=vector,
                 payload={
                     "user_id": user_id,
@@ -84,6 +85,7 @@ class QdrantService:
                     "knowledge_base_id": knowledge_base_id,
                     "document_id": document_id,
                     "document_version": document_version,
+                    "is_active": is_active,
                     "filename": filename,
                     "chunk_index": index,
                     "text": chunk,
@@ -106,7 +108,10 @@ class QdrantService:
         organization_id: int | None = None,
         workspace_id: int | None = None,
         knowledge_base_id: int | None = None,
+        knowledge_base_ids: list[int] | None = None,
+        active_only: bool = True,
         document_id: int | None = None,
+        document_version: int | None = None,
     ) -> models.Filter:
         conditions = [
             models.FieldCondition(
@@ -115,9 +120,16 @@ class QdrantService:
             )
         ]
 
-        for key, value in (("organization_id", organization_id), ("workspace_id", workspace_id), ("knowledge_base_id", knowledge_base_id)):
+        for key, value in (("organization_id", organization_id), ("workspace_id", workspace_id)):
             if value is not None:
                 conditions.append(models.FieldCondition(key=key, match=models.MatchValue(value=value)))
+
+        if knowledge_base_ids:
+            conditions.append(models.FieldCondition(key="knowledge_base_id", match=models.MatchAny(any=knowledge_base_ids)))
+        elif knowledge_base_id is not None:
+            conditions.append(models.FieldCondition(key="knowledge_base_id", match=models.MatchValue(value=knowledge_base_id)))
+        if active_only:
+            conditions.append(models.FieldCondition(key="is_active", match=models.MatchValue(value=True)))
 
         if document_id is not None:
             conditions.append(
@@ -126,6 +138,8 @@ class QdrantService:
                     match=models.MatchValue(value=document_id),
                 )
             )
+        if document_version is not None:
+            conditions.append(models.FieldCondition(key="document_version", match=models.MatchValue(value=document_version)))
 
         return models.Filter(must=conditions)
 
@@ -138,12 +152,13 @@ class QdrantService:
         organization_id: int | None = None,
         workspace_id: int | None = None,
         knowledge_base_id: int | None = None,
+        knowledge_base_ids: list[int] | None = None,
     ):
         return await self.client.search(
             collection_name=self.collection_name,
             query_vector=vector,
             limit=limit,
-            query_filter=self._user_filter(user_id, organization_id, workspace_id, knowledge_base_id),
+            query_filter=self._user_filter(user_id, organization_id, workspace_id, knowledge_base_id, knowledge_base_ids),
             with_payload=True,
         )
 
@@ -152,6 +167,7 @@ class QdrantService:
         *,
         user_id: int,
         document_id: int,
+        document_version: int | None = None,
     ) -> None:
         collections = await self.client.get_collections()
 
@@ -166,9 +182,19 @@ class QdrantService:
             points_selector=models.FilterSelector(
                 filter=self._user_filter(
                     user_id,
-                    document_id,
+                    document_id=document_id,
+                    document_version=document_version,
+                    active_only=False,
                 )
             ),
+            wait=True,
+        )
+
+    async def set_version_active(self, *, user_id: int, document_id: int, document_version: int, active: bool) -> None:
+        await self.client.set_payload(
+            collection_name=self.collection_name,
+            payload={"is_active": active},
+            points=self._user_filter(user_id, document_id=document_id, document_version=document_version, active_only=False),
             wait=True,
         )
 

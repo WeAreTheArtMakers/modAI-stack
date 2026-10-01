@@ -76,6 +76,27 @@ async def reindex_document(document_id: int, user=Depends(current_user), db: Asy
     try: await queue.enqueue(job.id)
     finally: await queue.close()
     return doc
+@router.post("/{document_id}/replace", response_model=DocumentResponse)
+async def replace_document(document_id: int, file: UploadFile = File(...), user=Depends(current_user), db: AsyncSession = Depends(get_db)):
+    doc = await db.scalar(select(Document).where(Document.id == document_id, Document.user_id == int(user["sub"])))
+    if not doc: raise HTTPException(404, "Document not found")
+    data = await file.read()
+    if len(data) > get_settings().max_upload_bytes: raise HTTPException(413, "File too large")
+    try: extract_text(file.filename or doc.filename, data)
+    except Exception as exc: raise HTTPException(400, "Unsupported or invalid document") from exc
+    digest = hashlib.sha256(data).hexdigest()
+    if digest == doc.content_hash: raise HTTPException(409, "Replacement has identical content")
+    versions = await db.scalars(select(DocumentVersion.version).where(DocumentVersion.document_id == doc.id))
+    next_version = max(list(versions), default=doc.active_version) + 1
+    path = await storage.save(data, Path(file.filename or doc.filename).suffix)
+    version = DocumentVersion(document_id=doc.id, version=next_version, content_hash=digest, file_size=len(data), status="queued", stored_path=path)
+    job = IndexJob(document_id=doc.id, version=next_version, status="queued")
+    doc.filename = (file.filename or doc.filename)[:255]; doc.index_status = "queued"; doc.index_error = None
+    db.add_all([version, job]); await db.commit()
+    queue = RedisIndexQueue()
+    try: await queue.enqueue(job.id)
+    finally: await queue.close()
+    return doc
 @router.post("/upload-batch", response_model=list[DocumentResponse], status_code=201)
 async def upload_batch(files: list[UploadFile] = File(...), knowledge_base_id: int | None = Form(default=None), user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     results = []
@@ -93,4 +114,8 @@ async def delete_document(document_id: int, user=Depends(current_user), db: Asyn
     except Exception as exc:
         logger.exception("Document vector deletion failed", extra={"document_id": doc.id})
         raise HTTPException(503, "Document vector deletion failed") from exc
+    versions = list((await db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == doc.id))).all())
+    jobs = list((await db.scalars(select(IndexJob).where(IndexJob.document_id == doc.id, IndexJob.status.in_(["queued", "processing"])))).all())
+    for job in jobs: job.status = "cancelled"
+    for version in versions: await storage.delete(version.stored_path)
     await db.delete(doc); await db.commit()
