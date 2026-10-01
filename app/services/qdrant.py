@@ -1,4 +1,4 @@
-from uuid import uuid5, NAMESPACE_URL
+from uuid import NAMESPACE_URL, uuid5
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
@@ -10,60 +10,148 @@ class QdrantService:
     collection_name = "rag_documents"
 
     def __init__(self, client: AsyncQdrantClient | None = None):
-        self.client = client or AsyncQdrantClient(url=get_settings().qdrant_url)
+        if client is not None:
+            self.client = client
+            return
+
+        raw_url = get_settings().qdrant_url
+
+        # Defensive cleanup for accidental escaped URL values.
+        url = (
+            raw_url
+            .replace("\\", "")
+            .strip()
+        )
+
+        self.client = AsyncQdrantClient(
+            url=url,
+            timeout=30,
+            trust_env=False,
+        )
 
     async def ensure_collection(self, vector_size: int) -> None:
         collections = await self.client.get_collections()
-        if self.collection_name not in {item.name for item in collections.collections}:
+
+        names = {item.name for item in collections.collections}
+
+        if self.collection_name not in names:
             await self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=models.VectorParams(
-                    size=vector_size, distance=models.Distance.COSINE
+                    size=vector_size,
+                    distance=models.Distance.COSINE,
                 ),
             )
 
     @staticmethod
     def point_id(document_id: int, chunk_index: int) -> str:
-        return str(uuid5(NAMESPACE_URL, f"modai-stack:{document_id}:{chunk_index}"))
+        return str(
+            uuid5(
+                NAMESPACE_URL,
+                f"modai-stack:{document_id}:{chunk_index}",
+            )
+        )
 
     async def upsert_document(
-        self, *, user_id: int, document_id: int, filename: str,
-        chunks: list[str], vectors: list[list[float]],
+        self,
+        *,
+        user_id: int,
+        document_id: int,
+        filename: str,
+        chunks: list[str],
+        vectors: list[list[float]],
     ) -> None:
         if len(chunks) != len(vectors):
             raise ValueError("chunk and vector counts must match")
+
         if not vectors:
             return
+
         await self.ensure_collection(len(vectors[0]))
+
         points = [
             models.PointStruct(
                 id=self.point_id(document_id, index),
                 vector=vector,
                 payload={
-                    "user_id": user_id, "document_id": document_id,
-                    "filename": filename, "chunk_index": index, "text": chunk,
+                    "user_id": user_id,
+                    "document_id": document_id,
+                    "filename": filename,
+                    "chunk_index": index,
+                    "text": chunk,
                 },
             )
-            for index, (chunk, vector) in enumerate(zip(chunks, vectors))
+            for index, (chunk, vector) in enumerate(
+                zip(chunks, vectors)
+            )
         ]
-        await self.client.upsert(collection_name=self.collection_name, points=points)
 
-    def _user_filter(self, user_id: int, document_id: int | None = None):
-        conditions = [models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))]
-        if document_id is not None:
-            conditions.append(models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id)))
-        return models.Filter(must=conditions)
-
-    async def search(self, *, user_id: int, vector: list[float], limit: int):
-        return await self.client.search(
-            collection_name=self.collection_name, query_vector=vector, limit=limit,
-            query_filter=self._user_filter(user_id), with_payload=True,
+        await self.client.upsert(
+            collection_name=self.collection_name,
+            points=points,
+            wait=True,
         )
 
-    async def delete_document_vectors(self, *, user_id: int, document_id: int) -> None:
+    def _user_filter(
+        self,
+        user_id: int,
+        document_id: int | None = None,
+    ) -> models.Filter:
+        conditions = [
+            models.FieldCondition(
+                key="user_id",
+                match=models.MatchValue(value=user_id),
+            )
+        ]
+
+        if document_id is not None:
+            conditions.append(
+                models.FieldCondition(
+                    key="document_id",
+                    match=models.MatchValue(value=document_id),
+                )
+            )
+
+        return models.Filter(must=conditions)
+
+    async def search(
+        self,
+        *,
+        user_id: int,
+        vector: list[float],
+        limit: int,
+    ):
+        return await self.client.search(
+            collection_name=self.collection_name,
+            query_vector=vector,
+            limit=limit,
+            query_filter=self._user_filter(user_id),
+            with_payload=True,
+        )
+
+    async def delete_document_vectors(
+        self,
+        *,
+        user_id: int,
+        document_id: int,
+    ) -> None:
+        collections = await self.client.get_collections()
+
+        names = {item.name for item in collections.collections}
+
+        # Old PostgreSQL documents may exist without Qdrant vectors.
+        if self.collection_name not in names:
+            return
+
         await self.client.delete(
             collection_name=self.collection_name,
-            points_selector=models.FilterSelector(filter=self._user_filter(user_id, document_id)),
+            points_selector=models.FilterSelector(
+                filter=self._user_filter(
+                    user_id,
+                    document_id,
+                )
+            ),
+            wait=True,
         )
 
     async def health_check(self) -> bool:

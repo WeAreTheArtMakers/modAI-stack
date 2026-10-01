@@ -8,7 +8,7 @@
 
 ## Proje hakkında
 
-modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, semantik arama yapmayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Qdrant vektör aramayı, Redis ise geçici durum ve koordinasyonu destekler. Model sağlayıcı arayüzü sayesinde Ollama yerine vLLM eklenebilir.
+modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, semantik arama yapmayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Qdrant vektör aramayı destekler. Redis Compose içinde hazır tutulur ancak mevcut uygulama akışında henüz kullanılmamaktadır. Model sağlayıcı arayüzü sayesinde Ollama yerine vLLM eklenebilir.
 
 ## Kullanılan teknolojiler
 
@@ -20,7 +20,7 @@ modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, s
 | RAG | Sentence Transformers, metin parçalama | Belge kaynaklı yanıt üretimi |
 | Vektör arama | Qdrant, cosine similarity, metadata filtreleri | Embedding saklama ve arama |
 | Kalıcı veri | PostgreSQL, SQLAlchemy Async ORM, asyncpg | Kullanıcı, belge, oturum ve mesajlar |
-| Geçici veri | Redis | Rate limit, iş durumu ve koordinasyon |
+| Geçici veri | Redis | Compose içinde hazır; rate limit ve iş durumu entegrasyonu sonraki adımdır |
 | Gerçek zamanlı iletişim | WebSocket | Token akışı ve canlı sohbet |
 | Güvenlik | JWT, access/refresh token, bcrypt, RBAC | Kimlik doğrulama ve yetkilendirme |
 | Belge işleme | `pypdf`, Markdown, TXT | Dosyadan metin çıkarma |
@@ -35,7 +35,7 @@ modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, s
                                       |              |
                                       |              └-> RAG -> Embedding -> Qdrant
                                       └-> SQLAlchemy -> PostgreSQL
-                                          Redis: geçici durum, rate limit, koordinasyon
+                                          Redis: Compose altyapısında hazır, henüz uygulama akışına bağlı değil
 ```
 
 Ollama çağrıları yalnızca `app/services/llm/` katmanından yapılır. RAG context’i güvenilmeyen veri olarak sistem talimatlarından ayrılır.
