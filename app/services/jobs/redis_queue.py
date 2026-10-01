@@ -9,3 +9,4 @@ class RedisIndexQueue:
         item = await self.client.blpop(self.key, timeout=timeout)
         return json.loads(item[1])["job_id"] if item else None
     async def close(self): await self.client.aclose()
+    async def publish_progress(self, event: dict): await self.client.publish("modai:indexing:events", json.dumps(event))

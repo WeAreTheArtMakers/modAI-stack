@@ -20,18 +20,28 @@ async def process_job(job_id: str) -> None:
         if not lock: await queue.close(); return
         job.status = "processing"; job.attempts += 1; await db.commit()
         try:
+            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "extracting"})
             version = await db.scalar(select(DocumentVersion).where(DocumentVersion.document_id == job.document_id, DocumentVersion.version == job.version))
             document = await db.get(Document, job.document_id)
             if not version or not document: raise ValueError("document version not found")
             data = await storage.read(version.stored_path or "")
             content = extract_text(document.filename, data)
+            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "chunking"})
             chunks = chunk_text(content, get_settings().chunk_size, get_settings().chunk_overlap)
+            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "embedding"})
             vectors = await get_embedding_service().embed_texts(chunks)
-            await qdrant_service.delete_document_vectors(user_id=document.user_id, document_id=document.id)
-            await qdrant_service.upsert_document(user_id=document.user_id, document_id=document.id, filename=document.filename, organization_id=document.organization_id, workspace_id=document.workspace_id, knowledge_base_id=document.knowledge_base_id, document_version=version.version, chunks=chunks, vectors=vectors)
-            document.content = content; document.index_status = "ready"; document.index_error = None
+            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "vector_indexing"})
+            is_replacement = version.version > document.active_version
+            await qdrant_service.upsert_document(user_id=document.user_id, document_id=document.id, filename=document.filename, organization_id=document.organization_id, workspace_id=document.workspace_id, knowledge_base_id=document.knowledge_base_id, document_version=version.version, is_active=not is_replacement, chunks=chunks, vectors=vectors)
+            if is_replacement:
+                await qdrant_service.set_version_active(user_id=document.user_id, document_id=document.id, document_version=version.version, active=True)
+                await qdrant_service.set_version_active(user_id=document.user_id, document_id=document.id, document_version=document.active_version, active=False)
+                await qdrant_service.delete_document_vectors(user_id=document.user_id, document_id=document.id, document_version=document.active_version)
+                document.active_version = version.version
+            document.content = content; document.content_hash = version.content_hash; document.file_size = version.file_size; document.index_status = "ready"; document.index_error = None
             version.status = "ready"; job.status = "ready"; job.error = None
             await db.commit()
+            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "ready", "stage": "ready"})
         except Exception:
             logger.exception("Index job failed", extra={"job_id": job_id})
             job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
@@ -39,6 +49,7 @@ async def process_job(job_id: str) -> None:
             document = await db.get(Document, job.document_id)
             if document: document.index_status = job.status; document.index_error = job.error
             await db.commit()
+            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": job.status, "stage": "failed"})
             if job.status == "queued": await queue.enqueue(job.id)
         finally: await queue.close()
 async def worker_main() -> None:

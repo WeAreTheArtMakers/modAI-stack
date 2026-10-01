@@ -54,6 +54,8 @@ Upload isteği artık embedding çalıştırmaz. API dosyayı güvenli, üretilm
 
 Desteklenen dosya türleri PDF, TXT, Markdown ve DOCX’tir. Kullanıcı dosya adı yalnızca metadata olarak saklanır; filesystem yolu hiçbir zaman istemciden alınmaz. Docker Compose içinde `api`, `worker`, PostgreSQL, Redis ve Qdrant servisleri bulunur; kaynak dosyalar `modaidata` volume’unda kalıcıdır.
 
+Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{id}/replace`, `GET /documents/{id}/versions` ve `DELETE /documents/{id}` endpoint’leri bulunur. Replace işleminde yeni sürüm indekslenene kadar eski sürüm aktif kalır; başarılı sürüm aktivasyonundan sonra eski Qdrant noktaları temizlenir. Index worker olayları `ws://localhost:8000/ws/indexing?token=<access-token>` kanalından `queued`, `extracting`, `chunking`, `embedding`, `vector_indexing`, `ready` ve `failed` durumlarıyla yayınlar.
+
 ## Kurulum
 
 ```bash
