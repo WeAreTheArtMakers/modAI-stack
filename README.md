@@ -82,22 +82,8 @@ WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağ
 
 Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve güvenli RAG prompt sınırını gösterir. Üretim için embedding üretimi, Qdrant upsert/silme, arka plan indeksleme worker’ı ve gerçek dağıtık rate-limit middleware’i ayrıca bağlanmalıdır. Üretime geçişte Alembic, merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme ve yük testleri eklenmelidir.
 
-## Teknik mülakat notları
+## Lisans
 
-1. **RAG neden fine-tuning yerine kullanılır?** Değişken belgeler yeniden eğitim olmadan güncellenir ve kaynak gösterilebilir.
-2. **LoRA ile Modelfile farkı nedir?** Modelfile sunum/prompt ayarıdır; LoRA öğrenilmiş adapter ağırlığıdır.
-3. **`asyncio` ne sağlar?** Ağ ve veritabanı beklemelerinde event loop başka istekleri işleyebilir.
-4. **LLM event loop’u bloklarsa?** Tüm istekler yavaşlar; asenkron istemci veya ayrı worker gerekir.
-5. **WebSocket neden kullanılır?** Token’ları yanıt bitmeden düşük gecikmeyle aktarır.
-6. **Bin bağlantı nasıl ölçeklenir?** Bounded queue, semaphore, iptal, yatay worker ve dağıtık rate limit kullanılır.
-7. **Ollama nasıl vLLM olur?** Aynı `LLMProvider` sözleşmesini uygulayan yeni sağlayıcı yazılır.
-8. **Backpressure nerede oluşur?** WebSocket buffer’ında, iş kuyruğunda, model concurrency limitinde ve veritabanı havuzlarında.
-9. **RAG injection nasıl önlenir?** Context güvenilmeyen veri olarak sistem talimatlarından ayrılır.
-10. **Qdrant neden seçildi?** Vektör arama ve metadata filtreleri için amaca yönelik bir servistir.
-11. **Kötü retrieval nasıl incelenir?** Chunk, embedding, top-k, skor dağılımı ve etiketli test seti ölçülür.
-12. **Qdrant veya model kapanırsa?** Readiness başarısız olur, sınırlı retry uygulanır ve güvenli hata döndürülür.
-13. **Authentication ve authorization farkı?** İlki kimliği, ikincisi erişim yetkisini doğrular.
-14. **Redis ve PostgreSQL ayrımı?** Redis geçici koordinasyon; PostgreSQL kalıcı kaynak verisidir.
-15. **API nasıl korunur?** Doğrulama, upload limiti, süreli JWT, rate limit ve güvenli hata yanıtı kullanılır.
-16. **Gecikme nasıl izlenir?** İstek, retrieval, LLM ve kuyruk süreleri hassas içerik olmadan ölçülür.
-17. **Üretime geçişte ne eklenir?** Migration, secret yönetimi, TLS, gözlemlenebilirlik, autoscaling, yedekleme ve arıza testleri.
+Bu proje WATAM lisansı ile sunulmaktadır.
+
+<a href="https://wearetheartmakers.com" target="_blank" rel="noopener noreferrer">We Are The Art Makers</a>
