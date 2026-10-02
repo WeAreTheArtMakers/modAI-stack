@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from app.api.authorization import require_document_access, require_knowledge_base_access, role_allows
+from app.api.authorization import require_document_access, require_knowledge_base_access, require_workspace_access, resolve_knowledge_base_scope, role_allows
 from app.models.database import Base, Document, KnowledgeBase, Membership, Organization, User, Workspace
 from app.services.qdrant import QdrantService
 
@@ -34,6 +34,18 @@ async def test_authorized_manager_can_manage_own_document_and_kb(session):
     db, ids = session
     doc, membership = await require_document_access(db, ids["a"], ids["doc_a"])
     assert membership.role == "manager"
+
+@pytest.mark.asyncio
+async def test_workspace_and_multi_kb_scope_are_tenant_isolated(session):
+    db, ids = session
+    with pytest.raises(Exception):
+        await require_workspace_access(db, ids["a"], 2)
+    with pytest.raises(Exception):
+        await resolve_knowledge_base_scope(db, ids["a"], [ids["kb"]])
+
+    authorized_ids, scope = await resolve_knowledge_base_scope(db, ids["a"], [ids["ka"]])
+    assert authorized_ids == [ids["ka"]]
+    assert scope is not None and scope[1].id != 2
 
 def test_role_policy_is_explicit():
     assert role_allows("admin", "manager")

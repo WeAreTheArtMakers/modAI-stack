@@ -1,15 +1,15 @@
 import hashlib
 import logging
 from pathlib import Path
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.authorization import require_document_access, require_knowledge_base_access
+from app.api.authorization import authorized_workspaces, require_document_access, require_knowledge_base_access
 from app.api.deps import current_user
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models.database import Document, DocumentVersion, IndexJob, KnowledgeBase, Membership, Workspace
-from app.models.schemas import DocumentResponse
+from app.models.database import Document, DocumentVersion, IndexJob
+from app.models.schemas import DocumentListResponse, DocumentResponse
 from app.services.documents.parser import extract_text
 from app.services.jobs.redis_queue import RedisIndexQueue
 from app.services.qdrant import qdrant_service
@@ -49,10 +49,33 @@ async def upload(file: UploadFile = File(...), knowledge_base_id: int | None = F
         await db.commit()
         raise HTTPException(503, "Document indexing job could not be queued") from exc
     return doc
-@router.get("", response_model=list[DocumentResponse])
-async def list_documents(user=Depends(current_user), db: AsyncSession = Depends(get_db)):
-    allowed_workspaces = select(Membership.workspace_id).where(Membership.user_id == int(user["sub"]), Membership.workspace_id.is_not(None))
-    return list((await db.scalars(select(Document).where(Document.workspace_id.in_(allowed_workspaces)).order_by(Document.id.desc()))).all())
+@router.get("", response_model=DocumentListResponse)
+async def list_documents(
+    knowledge_base_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if knowledge_base_id is not None:
+        knowledge_base, workspace, _ = await require_knowledge_base_access(db, user, knowledge_base_id)
+        filters = [
+            Document.knowledge_base_id == knowledge_base.id,
+            Document.workspace_id == workspace.id,
+            Document.organization_id == workspace.organization_id,
+        ]
+    else:
+        workspace_ids = [workspace.id for workspace, _, _ in await authorized_workspaces(db, user)]
+        if not workspace_ids:
+            return DocumentListResponse(items=[], total=0, limit=limit, offset=offset)
+        filters = [Document.workspace_id.in_(workspace_ids)]
+
+    base_query = select(Document).where(*filters)
+    total = await db.scalar(select(func.count()).select_from(base_query.subquery()))
+    documents = list((await db.scalars(
+        base_query.order_by(Document.id.desc()).offset(offset).limit(limit)
+    )).all())
+    return DocumentListResponse(items=documents, total=total or 0, limit=limit, offset=offset)
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(document_id: int, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     doc, _ = await require_document_access(db, user, document_id)

@@ -1,9 +1,13 @@
 .env
 .venv/
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 *.db
 artifacts/
 data/
+models/
 .DS_Store

@@ -7,7 +7,7 @@ from app.models.database import Document, DocumentVersion, IndexJob
 from app.services.documents.parser import extract_text
 from app.services.jobs.redis_queue import RedisIndexQueue
 from app.services.rag.chunker import chunk_text
-from app.services.rag.embeddings import get_embedding_service
+from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail, get_embedding_service
 from app.services.qdrant import qdrant_service
 from app.services.storage import storage
 logger = logging.getLogger(__name__)
@@ -20,17 +20,33 @@ async def process_job(job_id: str) -> None:
         if not lock: await queue.close(); return
         job.status = "processing"; job.attempts += 1; await db.commit()
         try:
-            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "extracting"})
             version = await db.scalar(select(DocumentVersion).where(DocumentVersion.document_id == job.document_id, DocumentVersion.version == job.version))
             document = await db.get(Document, job.document_id)
             if not version or not document: raise ValueError("document version not found")
+            def event(status: str, stage: str) -> dict:
+                return {
+                    "type": "index_progress",
+                    "organization_id": document.organization_id,
+                    "workspace_id": document.workspace_id,
+                    "knowledge_base_id": document.knowledge_base_id,
+                    "document_id": document.id,
+                    "job_id": job.id,
+                    "status": status,
+                    "stage": stage,
+                }
+
+            async def emit(status: str, stage: str) -> None:
+                if document.workspace_id is not None:
+                    await queue.publish_progress(event(status, stage), document.workspace_id)
+
+            await emit("processing", "extracting")
             data = await storage.read(version.stored_path or "")
             content = extract_text(document.filename, data)
-            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "chunking"})
+            await emit("processing", "chunking")
             chunks = chunk_text(content, get_settings().chunk_size, get_settings().chunk_overlap)
-            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "embedding"})
+            await emit("processing", "embedding")
             vectors = await get_embedding_service().embed_texts(chunks)
-            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "processing", "stage": "vector_indexing"})
+            await emit("processing", "vector_indexing")
             is_replacement = version.version > document.active_version
             await qdrant_service.upsert_document(user_id=document.user_id, document_id=document.id, filename=document.filename, organization_id=document.organization_id, workspace_id=document.workspace_id, knowledge_base_id=document.knowledge_base_id, document_version=version.version, is_active=not is_replacement, chunks=chunks, vectors=vectors)
             if is_replacement:
@@ -41,7 +57,29 @@ async def process_job(job_id: str) -> None:
             document.content = content; document.content_hash = version.content_hash; document.file_size = version.file_size; document.index_status = "ready"; document.index_error = None
             version.status = "ready"; job.status = "ready"; job.error = None
             await db.commit()
-            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": "ready", "stage": "ready"})
+            await emit("ready", "ready")
+        except EmbeddingModelUnavailableError:
+            logger.warning("Index job blocked because the embedding model is unavailable", extra={"job_id": job_id})
+            job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
+            job.error = embedding_model_unavailable_detail()
+            document = await db.get(Document, job.document_id)
+            if document: document.index_status = job.status; document.index_error = job.error
+            await db.commit()
+            if document and document.workspace_id is not None:
+                await queue.publish_progress(
+                    {
+                        "type": "index_progress",
+                        "organization_id": document.organization_id,
+                        "workspace_id": document.workspace_id,
+                        "knowledge_base_id": document.knowledge_base_id,
+                        "document_id": document.id,
+                        "job_id": job.id,
+                        "status": job.status,
+                        "stage": "failed",
+                    },
+                    document.workspace_id,
+                )
+            if job.status == "queued": await queue.enqueue(job.id)
         except Exception:
             logger.exception("Index job failed", extra={"job_id": job_id})
             job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
@@ -49,7 +87,20 @@ async def process_job(job_id: str) -> None:
             document = await db.get(Document, job.document_id)
             if document: document.index_status = job.status; document.index_error = job.error
             await db.commit()
-            await queue.publish_progress({"type": "index_progress", "document_id": job.document_id, "job_id": job.id, "status": job.status, "stage": "failed"})
+            if document and document.workspace_id is not None:
+                await queue.publish_progress(
+                    {
+                        "type": "index_progress",
+                        "organization_id": document.organization_id,
+                        "workspace_id": document.workspace_id,
+                        "knowledge_base_id": document.knowledge_base_id,
+                        "document_id": document.id,
+                        "job_id": job.id,
+                        "status": job.status,
+                        "stage": "failed",
+                    },
+                    document.workspace_id,
+                )
             if job.status == "queued": await queue.enqueue(job.id)
         finally: await queue.close()
 async def worker_main() -> None:
