@@ -121,6 +121,31 @@ async def test_replace_refreshes_server_managed_fields_before_document_response(
 
 
 @pytest.mark.asyncio
+async def test_list_versions_queries_versions_without_async_lazy_loading(monkeypatch):
+    document = DeferredUpdatedDocument()
+    versions = [
+        SimpleNamespace(version=1, status="ready", content_hash="first", file_size=5, created_at=document.created_at),
+        SimpleNamespace(version=2, status="queued", content_hash="second", file_size=7, created_at=document.created_at),
+    ]
+
+    class Result:
+        def all(self):
+            return versions
+
+    class VersionsDb:
+        async def scalars(self, _statement):
+            return Result()
+
+    monkeypatch.setattr(documents, "require_document_access", document_access)
+
+    db = VersionsDb()
+    db.document = document
+    response = await documents.list_versions(document.id, {"sub": "1"}, db)
+
+    assert [item["version"] for item in response] == [1, 2]
+
+
+@pytest.mark.asyncio
 async def test_worker_releases_its_document_version_lock_after_indexing(monkeypatch):
     job = SimpleNamespace(id="job-7", document_id=7, version=1, status="queued", attempts=0, error=None)
     version = SimpleNamespace(version=1, stored_path="/temporary/source.txt", content_hash="hash", file_size=5, status="queued")

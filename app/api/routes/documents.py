@@ -86,7 +86,12 @@ async def get_document(document_id: int, user=Depends(current_user), db: AsyncSe
 @router.get("/{document_id}/versions")
 async def list_versions(document_id: int, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     doc, _ = await require_document_access(db, user, document_id)
-    return [{"version": v.version, "status": v.status, "content_hash": v.content_hash, "file_size": v.file_size, "created_at": v.created_at} for v in doc.versions]
+    versions = list((await db.scalars(
+        select(DocumentVersion)
+        .where(DocumentVersion.document_id == doc.id)
+        .order_by(DocumentVersion.version)
+    )).all())
+    return [{"version": v.version, "status": v.status, "content_hash": v.content_hash, "file_size": v.file_size, "created_at": v.created_at} for v in versions]
 @router.post("/{document_id}/reindex", response_model=DocumentResponse)
 async def reindex_document(request: Request, document_id: int, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     doc, _ = await require_document_access(db, user, document_id, "manager")
