@@ -93,7 +93,7 @@ async def reindex_document(request: Request, document_id: int, user=Depends(curr
     version = await db.scalar(select(DocumentVersion).where(DocumentVersion.document_id == doc.id, DocumentVersion.version == doc.active_version))
     if not version: raise HTTPException(409, "Document has no source version")
     job = IndexJob(document_id=doc.id, version=version.version, status="queued")
-    doc.index_status = "queued"; doc.index_error = None; db.add(job); record_audit_event(db, action="document_reindex", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, request=request); await db.commit()
+    doc.index_status = "queued"; doc.index_error = None; db.add(job); record_audit_event(db, action="document_reindex", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, request=request); await db.commit(); await db.refresh(doc)
     queue = RedisIndexQueue()
     try: await queue.enqueue(job.id)
     finally: await queue.close()
@@ -113,7 +113,7 @@ async def replace_document(request: Request, document_id: int, file: UploadFile 
     version = DocumentVersion(document_id=doc.id, version=next_version, content_hash=digest, file_size=len(data), status="queued", stored_path=path)
     job = IndexJob(document_id=doc.id, version=next_version, status="queued")
     doc.filename = (file.filename or doc.filename)[:255]; doc.index_status = "queued"; doc.index_error = None
-    db.add_all([version, job]); record_audit_event(db, action="document_replace", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, metadata={"version": next_version}, request=request); await db.commit()
+    db.add_all([version, job]); record_audit_event(db, action="document_replace", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, metadata={"version": next_version}, request=request); await db.commit(); await db.refresh(doc)
     queue = RedisIndexQueue()
     try: await queue.enqueue(job.id)
     finally: await queue.close()
