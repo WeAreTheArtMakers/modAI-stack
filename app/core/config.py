@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     indexing_max_retries: int = 3
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    @property
+    def trusted_frontend_origin_set(self) -> set[str]:
+        """Configured explicit browser origins, normalized without a trailing slash."""
+        return {origin.strip().rstrip("/") for origin in self.trusted_frontend_origins.split(",") if origin.strip()}
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

@@ -38,16 +38,49 @@ class WebSocketTicketService:
         await self.client.aclose()
 
 
+class RefreshSessionService:
+    """Redis-backed, one-time refresh JWT sessions.
+
+    Redis only stores a random JWT identifier and its subject, never a refresh
+    token itself. ``GETDEL`` makes use of a refresh token a single atomic
+    operation, so a successfully rotated credential cannot be replayed.
+    """
+
+    prefix = "modai:refresh-session:"
+
+    def __init__(self, client: Redis | None = None):
+        self.client = client or Redis.from_url(get_settings().redis_url, decode_responses=True)
+
+    async def create(self, jti: str, user_id: int, ttl_seconds: int) -> bool:
+        return bool(await self.client.set(self.prefix + jti, str(user_id), ex=ttl_seconds, nx=True))
+
+    async def consume(self, jti: str, user_id: int) -> bool:
+        value = await self.client.getdel(self.prefix + jti)
+        return value == str(user_id)
+
+    async def revoke(self, jti: str) -> None:
+        await self.client.delete(self.prefix + jti)
+
+    async def close(self) -> None:
+        await self.client.aclose()
+
+
 class RedisRateLimiter:
     prefix = "modai:rate-limit:"
+    _increment_with_ttl = """
+    local count = redis.call('INCR', KEYS[1])
+    if count == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+    end
+    return count
+    """
 
     def __init__(self, client: Redis | None = None):
         self.client = client or Redis.from_url(get_settings().redis_url, decode_responses=True)
 
     async def enforce(self, bucket: str, key: str, limit: int, window_seconds: int) -> None:
-        count = await self.client.incr(f"{self.prefix}{bucket}:{key}")
-        if count == 1:
-            await self.client.expire(f"{self.prefix}{bucket}:{key}", window_seconds)
+        redis_key = f"{self.prefix}{bucket}:{key}"
+        count = int(await self.client.eval(self._increment_with_ttl, 1, redis_key, window_seconds))
         if count > limit:
             raise HTTPException(429, "Too many requests. Please try again later.")
 

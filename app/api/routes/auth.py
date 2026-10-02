@@ -1,4 +1,5 @@
 import hashlib
+import secrets
 from datetime import timedelta
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy import select
@@ -19,7 +20,7 @@ from app.models.schemas import (
     WebSocketTicketResponse,
     WorkspaceResponse,
 )
-from app.services.security import RedisRateLimiter, WebSocketTicketService
+from app.services.security import RefreshSessionService, RedisRateLimiter, WebSocketTicketService
 from app.services.audit import record_audit_event
 router = APIRouter(prefix="/auth", tags=["auth"])
 def tokens(user: User):
@@ -27,9 +28,23 @@ def tokens(user: User):
     return TokenResponse(access_token=create_token(str(user.id), user.role, "access", timedelta(minutes=s.access_token_expire_minutes)))
 
 
-def _refresh_token(user: User) -> str:
+def _refresh_token(user: User, jti: str) -> str:
     settings = get_settings()
-    return create_token(str(user.id), user.role, "refresh", timedelta(days=settings.refresh_token_expire_days))
+    return create_token(str(user.id), user.role, "refresh", timedelta(days=settings.refresh_token_expire_days), jti=jti)
+
+
+async def _issue_refresh_token(user: User) -> str:
+    """Create a refresh JWT and its matching one-time Redis session."""
+    settings = get_settings()
+    jti = secrets.token_urlsafe(32)
+    service = RefreshSessionService()
+    try:
+        stored = await service.create(jti, user.id, settings.refresh_token_expire_days * 24 * 60 * 60)
+    finally:
+        await service.close()
+    if not stored:
+        raise HTTPException(500, "Could not establish refresh session")
+    return _refresh_token(user, jti)
 
 
 def _set_refresh_cookie(response: Response, value: str) -> None:
@@ -51,6 +66,30 @@ async def _limit(request: Request, bucket: str, key: str, limit: int, window: in
     finally: await limiter.close()
 
 
+def _enforce_cookie_mutation_origin(request: Request) -> None:
+    """Permit same-origin/no-Origin clients and deliberately configured UI origins.
+
+    Browsers attach ``Origin`` to cross-origin POST requests. Requests without it
+    remain available for non-browser local tooling; browser clients still retain
+    SameSite cookie protection. This endpoint layer never enables wildcard CORS.
+    """
+    origin = request.headers.get("origin")
+    if not origin:
+        return
+    normalized_origin = origin.rstrip("/")
+    host = request.headers.get("host", request.url.netloc)
+    forwarded_scheme = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    scheme = forwarded_scheme if forwarded_scheme in {"http", "https"} else request.url.scheme
+    same_origin = f"{scheme}://{host}".rstrip("/")
+    settings = get_settings()
+    trusted_origins = getattr(settings, "trusted_frontend_origin_set", None)
+    if trusted_origins is None:
+        trusted_origins = {value.strip().rstrip("/") for value in settings.trusted_frontend_origins.split(",") if value.strip()}
+    if normalized_origin == same_origin or normalized_origin in trusted_origins:
+        return
+    raise HTTPException(403, "Untrusted request origin")
+
+
 @router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(req: RegisterRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     if not get_settings().allow_registration:
@@ -67,7 +106,7 @@ async def register(req: RegisterRequest, request: Request, response: Response, d
     await db.flush()
     db.add(Membership(user_id=user.id, organization_id=organization.id, workspace_id=workspace.id, role="admin"))
     record_audit_event(db, action="registration", resource_type="user", actor_user_id=user.id, organization_id=organization.id, workspace_id=workspace.id, resource_id=user.id, request=request)
-    await db.commit(); await db.refresh(user); _set_refresh_cookie(response, _refresh_token(user)); return tokens(user)
+    await db.commit(); await db.refresh(user); _set_refresh_cookie(response, await _issue_refresh_token(user)); return tokens(user)
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     await _limit(request, "login", request.client.host if request.client else "unknown", get_settings().rate_limit_auth_per_minute, 60)
@@ -78,24 +117,44 @@ async def login(req: LoginRequest, request: Request, response: Response, db: Asy
         raise HTTPException(401, "Invalid email or password")
     record_audit_event(db, action="login", resource_type="session", actor_user_id=user.id, success=True, request=request)
     await db.commit()
-    _set_refresh_cookie(response, _refresh_token(user)); return tokens(user)
+    _set_refresh_cookie(response, await _issue_refresh_token(user)); return tokens(user)
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(request: Request, response: Response, refresh_token: str | None = Cookie(default=None), db: AsyncSession = Depends(get_db)):
+    _enforce_cookie_mutation_origin(request)
     await _limit(request, "refresh", request.client.host if request.client else "unknown", get_settings().rate_limit_auth_per_minute, 60)
     try:
         payload = decode_token(refresh_token or "")
-        if payload.get("type") != "refresh": raise ValueError
+        if payload.get("type") != "refresh" or not isinstance(payload.get("jti"), str) or not payload["jti"]: raise ValueError
         user_id = int(payload["sub"])
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(401, "Invalid refresh token") from exc
+    service = RefreshSessionService()
+    try:
+        if not await service.consume(payload["jti"], user_id):
+            raise HTTPException(401, "Invalid refresh token")
+    finally:
+        await service.close()
     user = await db.get(User, user_id)
     if not user: raise HTTPException(401, "Invalid refresh token")
-    _set_refresh_cookie(response, _refresh_token(user)); return tokens(user)
+    _set_refresh_cookie(response, await _issue_refresh_token(user)); return tokens(user)
 
 
 @router.post("/logout", status_code=204)
-async def logout(response: Response):
+async def logout(request: Request, response: Response, refresh_token: str | None = Cookie(default=None)):
+    _enforce_cookie_mutation_origin(request)
+    try:
+        payload = decode_token(refresh_token or "")
+        if payload.get("type") == "refresh" and isinstance(payload.get("jti"), str) and payload["jti"]:
+            service = RefreshSessionService()
+            try:
+                await service.revoke(payload["jti"])
+            finally:
+                await service.close()
+    except (TypeError, ValueError):
+        # Logout is intentionally idempotent: an expired or already-consumed
+        # cookie is still cleared without revealing why it was invalid.
+        pass
     response.delete_cookie(get_settings().refresh_cookie_name, path="/")
 
 

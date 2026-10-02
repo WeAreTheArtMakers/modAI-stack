@@ -173,7 +173,7 @@ Console’daki **Modeller** ekranı Ollama bağlantı durumunu ve endpoint’ini
 
 Model listesi ve durum bilgisi giriş yapmış kullanıcılar tarafından okunabilir. Model çekme ve silme yalnızca **platform `admin`** rolüne açıktır; workspace/Organization `admin` üyeliği bu yetkiyi vermez ve backend yetkiyi zorunlu olarak doğrular. Model adı uzunluk, güvenli karakter kümesi ve path traversal kurallarıyla kontrol edilir; API shell komutu veya keyfi filesystem yolu kabul etmez. Aktif `OLLAMA_MODEL` silinemez ve aktif generation model seçimi bu sürümde yalnızca yapılandırmadan okunur; HTTP üzerinden `.env` değiştirilmez.
 
-Model çekme işlemi `ws://localhost:8000/ws/models/pull?token=<access-token>` WebSocket’iyle yapılır. Admin istemci bağlantıdan sonra `{"model":"llama3.2:3b"}` gönderir; Ollama’nın sağladığı değerler varsa `model_pull_progress` olayları `status`, `completed` ve `total` alanlarıyla iletilir. İstemci sahte ilerleme yüzdesi üretmez. Silme işlemi arayüzde açık onay gerektirir.
+Model çekme işlemi, önce platform admin yetkisiyle `POST /auth/ws-ticket` üzerinden alınan kısa ömürlü ve tek kullanımlık `models_pull` ticket’ı ile `ws://localhost:8000/ws/models/pull?ticket=<tek-kullanimlik-ticket>` bağlantısına yapılır. Normal access JWT URL’ye konmaz. Admin istemci bağlantıdan sonra `{"model":"llama3.2:3b"}` gönderir; Ollama’nın sağladığı değerler varsa `model_pull_progress` olayları `status`, `completed` ve `total` alanlarıyla iletilir. İstemci sahte ilerleme yüzdesi üretmez. Silme işlemi arayüzde açık onay gerektirir.
 
 ## API kullanımı
 
@@ -181,7 +181,9 @@ Model çekme işlemi `ws://localhost:8000/ws/models/pull?token=<access-token>` W
 curl -X POST http://localhost:8000/auth/register -H 'Content-Type: application/json' -d '{"email":"user@example.com","password":"correct-horse-battery"}'
 export TOKEN="<access-token>"
 curl http://localhost:8000/auth/me -H "Authorization: Bearer $TOKEN"
-curl -X POST http://localhost:8000/auth/refresh -H 'Content-Type: application/json' -d '{"refresh_token":"<refresh-token>"}'
+# Login/register yanıtındaki HttpOnly refresh cookie için cookie jar kullanın.
+curl -c cookies.txt -X POST http://localhost:8000/auth/login -H 'Content-Type: application/json' -d '{"email":"user@example.com","password":"correct-horse-battery"}'
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:8000/auth/refresh
 curl http://localhost:8000/workspaces -H "Authorization: Bearer $TOKEN"
 curl http://localhost:8000/knowledge-bases -H "Authorization: Bearer $TOKEN"
 curl -X POST http://localhost:8000/chat -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"prompt":"Embedding nedir?"}'
@@ -212,15 +214,15 @@ Model API’leri `GET /models/providers`, `GET /models`, `GET /models/{provider}
 
 ### Oturumlar ve WebSocket kimlik doğrulaması
 
-Access token kısa ömürlüdür ve frontend’in yaptığı yetkili API çağrıları için bellekte/yerel tarayıcı deposunda tutulur. Refresh token ise API yanıt gövdesine veya JavaScript’e hiç verilmez: `HttpOnly` cookie içinde döndürülür ve `/auth/refresh` çağrısında rotasyonla yenilenir. Cookie ayarları `REFRESH_COOKIE_NAME`, `REFRESH_COOKIE_SAMESITE` ve `REFRESH_COOKIE_SECURE` ile yönetilir. Üretimde HTTPS zorunlu olduğundan `REFRESH_COOKIE_SECURE=true` olmalıdır; bu değer kapalıysa production başlangıcı durur.
+Access token kısa ömürlüdür ve frontend’in yaptığı yetkili API çağrıları için bellekte/yerel tarayıcı deposunda tutulur. Refresh token ise API yanıt gövdesine veya JavaScript’e hiç verilmez: `HttpOnly` cookie içinde döndürülür. Her refresh JWT benzersiz bir `jti` taşır; Redis sadece `jti → user_id` ve JWT ömrüne eşit TTL tutar. `/auth/refresh` eski `jti` kaydını atomik olarak tüketir, yeni `jti` ve cookie üretir. Bu nedenle başarılı biçimde döndürülmüş eski refresh token tekrar kullanılamaz. Cookie ayarları `REFRESH_COOKIE_NAME`, `REFRESH_COOKIE_SAMESITE` ve `REFRESH_COOKIE_SECURE` ile yönetilir. Üretimde HTTPS zorunlu olduğundan `REFRESH_COOKIE_SECURE=true` olmalıdır; bu değer kapalıysa production başlangıcı durur.
 
-Cookie refresh akışı aynı-origin kullanım ve `SameSite` politikası için tasarlanmıştır. Ayrı frontend origin’i kullanmak istendiğinde CORS’u genişletmek yerine TLS terminasyonu altında aynı origin reverse-proxy düzeni tercih edilmelidir. Logout refresh cookie’yi temizler. Bu ilk sürümde server-side refresh-token revocation tablosu yoktur; bir cookie/token ele geçirildiyse doğal süre sonuna kadar geçerli kalabilir.
+Cookie refresh akışı aynı-origin kullanım ve `SameSite` politikası için tasarlanmıştır. `/auth/refresh` ve `/auth/logout` cookie-mutating POST uçları `Origin` başlığı varsa yalnızca kendi origin’iyle veya `TRUSTED_FRONTEND_ORIGINS` içinde açıkça listelenen virgülle ayrılmış origin’lerle eşleştiğinde kabul edilir; diğer cross-origin istekler `403` alır. TLS termination kullanan reverse proxy, API’ye `X-Forwarded-Proto` değerini iletmelidir; sağlanan Nginx bunu yapar. Origin’siz istekler browser olmayan yerel CLI/otomasyon istemcileri için kabul edilir; bu durum wildcard CORS açmaz ve tarayıcı isteklerinde `SameSite` savunması devam eder. Ayrı frontend origin’i kullanmak istendiğinde CORS’u genişletmek yerine TLS terminasyonu altında aynı origin reverse-proxy düzeni tercih edilmelidir. Logout, geçerli cookie varsa ilgili `jti` Redis kaydını siler ve cookie’yi her durumda temizler; çağrı idempotenttir.
 
 WebSocket bağlantılarında normal access JWT URL’ye konmaz. İstemci önce yetkili `POST /auth/ws-ticket` çağrısıyla `chat`, `rag`, `indexing` veya `models_pull` kapsamlı bir ticket alır. Ticket Redis’te tutulur, varsayılan 60 saniyede dolar ve ilk kullanımda silinir. Indexing ticket’ı workspace kapsamına, model pull ticket’ı platform admin rolüne bağlıdır.
 
 ### Limitler, denetim ve gözlemlenebilirlik
 
-Redis tabanlı sayaçlar login, registration, refresh, WebSocket ticket üretimi, RAG başlangıcı ve model pull için uygulanır. Limitler `RATE_LIMIT_AUTH_PER_MINUTE`, `RATE_LIMIT_RAG_PER_MINUTE` ve `RATE_LIMIT_MODEL_PULL_PER_HOUR` ile ayarlanır. Aşım güvenli bir `429` yanıtı üretir.
+Redis tabanlı sayaçlar login, registration, refresh, WebSocket ticket üretimi, RAG başlangıcı ve model pull için uygulanır. Sayaç artışı ve yeni bucket TTL ataması tek Redis Lua işlemiyle atomiktir; yarım kalan `INCR` sonucu süresiz key bırakmaz. Limitler `RATE_LIMIT_AUTH_PER_MINUTE`, `RATE_LIMIT_RAG_PER_MINUTE` ve `RATE_LIMIT_MODEL_PULL_PER_HOUR` ile ayarlanır. Aşım güvenli bir `429` yanıtı üretir.
 
 Audit trail Alembic ile oluşturulan `audit_events` tablosuna yazılır. Login, registration, platform-admin promotion, Knowledge Base oluşturma, belge upload/replace/reindex/delete, WebSocket ticket ve model pull/delete gibi güvenlik veya yönetim olayları yapılandırılmış şekilde saklanır. Parolalar, JWT’ler, refresh cookie’leri, belge içerikleri, prompt’lar ve model dosyaları metadata’ya alınmaz. Platform admin kullanıcıları olayları `GET /audit?limit=50&offset=0&action=<name>` ile okuyabilir; endpoint tenantlar arası erişime açılmaz.
 
@@ -248,7 +250,7 @@ Geri yükleme sırası: önce aynı sürümde PostgreSQL’i geri yükleyin, son
 
 Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Gerçek canlı RAG uçtan uca kabul testi, makinede bir embedding modeli hazırlanmasını gerektirir ve [takip maddesi #4](https://github.com/WeAreTheArtMakers/modAI-stack/issues/4) altında beklemektedir. Üretim dağıtımında merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme, dağıtık rate limiting ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
 
-Üretim güvenlik sertleştirmesi için sonraki adımlar; refresh token’ın HttpOnly cookie’ye taşınması, access token süresinin kısaltılması ve WebSocket kimlik doğrulamasında uzun ömürlü query-string token yerine daha güvenli bir el sıkışma yönteminin kullanılmasıdır.
+Üretim güvenliği için ileri seviye sonraki adımlar; secret yönetiminin merkezi bir kasa ile yapılması, ağ katmanında metrik erişim kısıtlaması, düzenli restore tatbikatı ve gerçek modelle canlı RAG kabul testidir.
 
 ## Lisans
 
