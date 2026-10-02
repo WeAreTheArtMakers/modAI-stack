@@ -3,7 +3,8 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
 from app.api import deps
 from app.api.routes import models as model_routes
@@ -98,13 +99,59 @@ def test_model_pull_websocket_rejects_non_admin_before_starting_a_pull(monkeypat
         async def receive_json(self): raise AssertionError("non-admin users must not start a pull")
 
     websocket = FakeWebSocket()
-    async def non_admin(_ws): return {"role": "user"}
+    async def non_admin(_ws): return {"role": "user", "workspace_membership_role": "admin"}
     monkeypatch.setattr(model_websocket, "websocket_user", non_admin)
 
     run(model_websocket.pull_model(websocket))
 
     assert websocket.messages == [{"type": "error", "data": "Admin role required"}]
     assert 1008 in websocket.close_codes
+
+
+def test_platform_admin_can_start_a_model_pull_without_real_ollama(monkeypatch):
+    class FakeWebSocket:
+        def __init__(self): self.messages = []; self.close_codes = []
+        async def accept(self): pass
+        async def send_json(self, value): self.messages.append(value)
+        async def close(self, code=None): self.close_codes.append(code)
+        async def receive_json(self): return {"model": "qwen2.5:7b"}
+    class FakeProvider:
+        async def pull_model(self, _model):
+            yield {"status": "downloading", "completed": 1, "total": 2}
+
+    websocket = FakeWebSocket()
+    async def platform_admin(_ws): return {"role": "admin", "workspace_membership_role": "user"}
+    monkeypatch.setattr(model_websocket, "websocket_user", platform_admin)
+    monkeypatch.setattr(model_websocket, "get_model_provider", lambda _provider: FakeProvider())
+
+    run(model_websocket.pull_model(websocket))
+
+    assert websocket.messages == [
+        {"type": "model_pull_progress", "model": "qwen2.5:7b", "status": "downloading", "completed": 1, "total": 2},
+        {"type": "complete", "model": "qwen2.5:7b"},
+    ]
+
+
+def test_tenant_admin_cannot_delete_but_platform_admin_can_delete_non_configured_model(monkeypatch):
+    class FakeProvider:
+        def __init__(self): self.deleted = []
+        async def delete_model(self, model): self.deleted.append(model)
+
+    provider = FakeProvider()
+    app = FastAPI()
+    app.include_router(model_routes.router)
+    monkeypatch.setattr(model_routes, "get_model_provider", lambda _name: provider)
+    monkeypatch.setattr(model_routes, "get_settings", lambda: SimpleNamespace(ollama_model="configured:latest"))
+
+    app.dependency_overrides[model_routes.current_user] = lambda: {"role": "user", "workspace_membership_role": "admin"}
+    with TestClient(app) as client:
+        assert client.delete("/models/ollama/removable:latest").status_code == 403
+    assert provider.deleted == []
+
+    app.dependency_overrides[model_routes.current_user] = lambda: {"role": "admin", "workspace_membership_role": "user"}
+    with TestClient(app) as client:
+        assert client.delete("/models/ollama/removable:latest").status_code == 204
+    assert provider.deleted == ["removable:latest"]
 
 
 def test_delete_refuses_the_configured_generation_model(monkeypatch):

@@ -18,7 +18,7 @@ vi.mock("./api/websocket", async (importOriginal) => ({ ...(await importOriginal
 
 const modelStatus: ModelSystemStatus = { providers: [{ provider: "ollama", endpoint: "http://localhost:11434", ready: true }], generation: { provider: "ollama", configured_model: "llama3.2:3b", ready: true, running: true }, embedding: { configured_model: "sentence-transformers/all-MiniLM-L6-v2", source: "huggingface_cache", download_allowed: false, cache_available: false, ready: false, status: "unavailable" } };
 const admin: UserContext = { id: 1, email: "admin@example.com", role: "admin", organizations: [], workspaces: [] };
-const member: UserContext = { ...admin, id: 2, email: "member@example.com", role: "user" };
+const member: UserContext = { ...admin, id: 2, email: "member@example.com", role: "user", organizations: [{ id: 1, name: "Tenant", slug: "tenant", membership_role: "admin" }], workspaces: [{ id: 1, organization_id: 1, name: "Workspace", slug: "workspace", membership_role: "admin" }] };
 function renderModels() { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><ModelsPage /></QueryClientProvider>); }
 
 describe("Web Console critical UI", () => {

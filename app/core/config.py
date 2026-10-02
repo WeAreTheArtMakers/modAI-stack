@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_cache_dir: str | None = None
     embedding_allow_download: bool = False
+    allow_registration: bool = True
     jwt_secret: str = "change-me-in-production"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7

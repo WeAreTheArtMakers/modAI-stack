@@ -10,7 +10,16 @@
 
 modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, asenkron indekslemeyi, semantik aramayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Redis indeks iş kuyruğu ve ilerleme olaylarını, Qdrant ise vektör aramayı destekler. Model sağlayıcı arayüzü sayesinde Ollama yerine başka bir sağlayıcı eklenebilir.
 
-Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge Base oluşturulur. Knowledge Base erişimi Membership kayıtlarıyla kontrol edilir; kullanıcılar `admin`, `manager` veya `user` rolleriyle sınırlandırılır. Belge ve Qdrant erişimi bu kapsam bilgileriyle ilişkilendirilir.
+Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge Base oluşturulur. Knowledge Base erişimi Membership kayıtlarıyla kontrol edilir; `admin`, `manager` ve `user` üyelik rolleri belge, Knowledge Base, RAG ve workspace işlemlerini tenant kapsamı içinde sınırlar. Belge ve Qdrant erişimi bu kapsam bilgileriyle ilişkilendirilir.
+
+### Platform rolü ve tenant üyeliği
+
+Sistemde birbirinden bağımsız iki yetki alanı bulunur:
+
+- **Platform rolü** (`User.role`): Makine genelindeki işlemleri belirler. Yalnızca platform `admin`, Ollama model çekme/silme ve gelecekteki platform yönetimi gibi host düzeyindeki işlemleri yapabilir.
+- **Organization / Workspace üyelik rolü** (`Membership.role`): Tenant kaynaklarını belirler. `admin`, `manager` ve `user` rolleri yalnızca yetkili Organization, Workspace ve Knowledge Base içindeki belge/RAG işlemlerini yönetir.
+
+Bu nedenle bir kullanıcı platform rolü `user` iken kendi workspace’inde üyelik rolü `admin` olabilir. Bu beklenen davranıştır; workspace yöneticiliği platform yöneticiliği vermez.
 
 ## Kullanılan teknolojiler
 
@@ -83,6 +92,26 @@ pip install -r requirements-training.txt
 
 Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını çalıştırın. API `http://localhost:8000`, Qdrant `http://localhost:6333`, host PostgreSQL bağlantısı `localhost:55432` adresindedir. Docker içindeki API, Mac üzerinde Ollama’ya `host.docker.internal:11434` adresinden bağlanır.
 
+### Kayıt ve ilk platform yöneticisi
+
+Geliştirme varsayılanında `ALLOW_REGISTRATION=true` ile kullanıcılar `POST /auth/register` üzerinden kaydolabilir. Yeni kullanıcıların **platform rolü `user`** olur; kendi oluşturdukları Organization/Workspace için Membership rolü `admin` kalır.
+
+Kurumsal üretimde `ALLOW_REGISTRATION=false` ayarlanmalıdır. Bu durumda kayıt endpoint’i `403` döndürür, mevcut kullanıcıların girişi çalışmaya devam eder. İlk platform yöneticisini public bir HTTP endpoint’i kullanmadan, uygulamanın erişebildiği güvenli terminalde oluşturun veya yükseltin:
+
+```bash
+# Var olan kullanıcıyı platform admin yapar.
+python -m app.tools.create_platform_admin --email admin@example.com
+
+# Kullanıcı yoksa yalnızca açık --create tercihiyle oluşturur.
+# Parola komut satırına yazılmaz; güvenli etkileşimli giriş istenir.
+python -m app.tools.create_platform_admin --create --email admin@example.com
+
+# Mevcut platform admin e-posta kayıtlarını parolasız listeler.
+python -m app.tools.list_platform_admins
+```
+
+Mevcut kurulumlarda migration gerekmez: `users.role` kolonu zaten şemadadır. Bu güncelleme mevcut `admin` kayıtlarını otomatik olarak düşürmez. Yükseltme sonrasında `python -m app.tools.list_platform_admins` ile platform yöneticilerini inceleyin; gerekli olmayanları güvenli işletim prosedürünüzle platform `user` rolüne alın. Rolü değişen kullanıcıların güncel JWT rolünü alabilmesi için yeniden giriş yapması veya refresh token akışını kullanması gerekir.
+
 ### Embedding modeli: bağlı ve air-gapped kurulum
 
 Repository model ağırlıklarını içermez. Embedding modeli, Ollama modelinden ayrı bir gereksinimdir: Ollama LLM yanıtı üretir; SentenceTransformer ise belge ve soru embedding'lerini üretir.
@@ -142,7 +171,7 @@ Model Manager, yerel AI çalışma zamanını yönetmek için ilk sağlayıcı k
 
 Console’daki **Modeller** ekranı Ollama bağlantı durumunu ve endpoint’ini, yapılandırılmış generation modelini, Ollama’nın bildirdiği yüklü modelleri ve embedding modelinin cache/yerel hazırlık durumunu gösterir. Generation ve embedding modelleri ayrı kavramlardır: Ollama yanıt üretir, SentenceTransformer belge ve soru embedding’lerini üretir.
 
-Model listesi ve durum bilgisi giriş yapmış kullanıcılar tarafından okunabilir. Model çekme ve silme yalnızca `admin` rolüne açıktır; yetki backend’de zorunlu olarak doğrulanır. Model adı uzunluk, güvenli karakter kümesi ve path traversal kurallarıyla kontrol edilir; API shell komutu veya keyfi filesystem yolu kabul etmez. Aktif `OLLAMA_MODEL` silinemez ve aktif generation model seçimi bu sürümde yalnızca yapılandırmadan okunur; HTTP üzerinden `.env` değiştirilmez.
+Model listesi ve durum bilgisi giriş yapmış kullanıcılar tarafından okunabilir. Model çekme ve silme yalnızca **platform `admin`** rolüne açıktır; workspace/Organization `admin` üyeliği bu yetkiyi vermez ve backend yetkiyi zorunlu olarak doğrular. Model adı uzunluk, güvenli karakter kümesi ve path traversal kurallarıyla kontrol edilir; API shell komutu veya keyfi filesystem yolu kabul etmez. Aktif `OLLAMA_MODEL` silinemez ve aktif generation model seçimi bu sürümde yalnızca yapılandırmadan okunur; HTTP üzerinden `.env` değiştirilmez.
 
 Model çekme işlemi `ws://localhost:8000/ws/models/pull?token=<access-token>` WebSocket’iyle yapılır. Admin istemci bağlantıdan sonra `{"model":"llama3.2:3b"}` gönderir; Ollama’nın sağladığı değerler varsa `model_pull_progress` olayları `status`, `completed` ve `total` alanlarıyla iletilir. İstemci sahte ilerleme yüzdesi üretmez. Silme işlemi arayüzde açık onay gerektirir.
 
