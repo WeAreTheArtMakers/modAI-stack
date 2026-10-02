@@ -25,6 +25,30 @@ def _is_local_model_path(value: str) -> bool:
     return expanded.is_absolute() or value.startswith(("./", "../", "~"))
 
 
+def embedding_model_status() -> dict:
+    """Return safe, non-loading provisioning state for the configured embedding model."""
+    settings = get_settings()
+    model_name = settings.embedding_model
+    is_local_path = _is_local_model_path(model_name)
+    cache_dir = Path(settings.embedding_cache_dir).expanduser() if settings.embedding_cache_dir else None
+    loaded = get_embedding_service()._model is not None
+    if is_local_path:
+        available = Path(model_name).expanduser().is_dir()
+        display_name = f"local:{Path(model_name).expanduser().name}"
+    else:
+        cache_key = f"models--{model_name.replace('/', '--')}"
+        available = (cache_dir / cache_key).is_dir() if cache_dir else None
+        display_name = model_name
+    return {
+        "configured_model": display_name,
+        "source": "local_path" if is_local_path else "huggingface_cache",
+        "download_allowed": settings.embedding_allow_download,
+        "cache_available": available,
+        "ready": loaded or available is True,
+        "status": "ready" if loaded else "available" if available is True else "unavailable" if available is False else "unverified",
+    }
+
+
 class EmbeddingService:
     """Lazy, process-local embedding model shared by all requests."""
 
