@@ -99,7 +99,7 @@ def test_model_pull_websocket_rejects_non_admin_before_starting_a_pull(monkeypat
         async def receive_json(self): raise AssertionError("non-admin users must not start a pull")
 
     websocket = FakeWebSocket()
-    async def non_admin(_ws): return {"role": "user", "workspace_membership_role": "admin"}
+    async def non_admin(_ws, _scope): return {"role": "user", "workspace_membership_role": "admin"}
     monkeypatch.setattr(model_websocket, "websocket_user", non_admin)
 
     run(model_websocket.pull_model(websocket))
@@ -120,9 +120,20 @@ def test_platform_admin_can_start_a_model_pull_without_real_ollama(monkeypatch):
             yield {"status": "downloading", "completed": 1, "total": 2}
 
     websocket = FakeWebSocket()
-    async def platform_admin(_ws): return {"role": "admin", "workspace_membership_role": "user"}
+    class NoopLimiter:
+        async def enforce(self, *_args): pass
+        async def close(self): pass
+    class FakeDb:
+        def add(self, _event): pass
+        async def commit(self): pass
+    class FakeSession:
+        async def __aenter__(self): return FakeDb()
+        async def __aexit__(self, *_args): pass
+    async def platform_admin(_ws, _scope): return {"sub": "1", "role": "admin", "workspace_membership_role": "user"}
     monkeypatch.setattr(model_websocket, "websocket_user", platform_admin)
     monkeypatch.setattr(model_websocket, "get_model_provider", lambda _provider: FakeProvider())
+    monkeypatch.setattr(model_websocket, "RedisRateLimiter", NoopLimiter)
+    monkeypatch.setattr(model_websocket, "SessionLocal", lambda: FakeSession())
 
     run(model_websocket.pull_model(websocket))
 
@@ -138,17 +149,22 @@ def test_tenant_admin_cannot_delete_but_platform_admin_can_delete_non_configured
         async def delete_model(self, model): self.deleted.append(model)
 
     provider = FakeProvider()
+    class FakeDb:
+        def add(self, _event): pass
+        async def commit(self): pass
     app = FastAPI()
     app.include_router(model_routes.router)
     monkeypatch.setattr(model_routes, "get_model_provider", lambda _name: provider)
     monkeypatch.setattr(model_routes, "get_settings", lambda: SimpleNamespace(ollama_model="configured:latest"))
+    async def db_dependency(): yield FakeDb()
+    app.dependency_overrides[model_routes.get_db] = db_dependency
 
-    app.dependency_overrides[model_routes.current_user] = lambda: {"role": "user", "workspace_membership_role": "admin"}
+    app.dependency_overrides[model_routes.current_user] = lambda: {"sub": "2", "role": "user", "workspace_membership_role": "admin"}
     with TestClient(app) as client:
         assert client.delete("/models/ollama/removable:latest").status_code == 403
     assert provider.deleted == []
 
-    app.dependency_overrides[model_routes.current_user] = lambda: {"role": "admin", "workspace_membership_role": "user"}
+    app.dependency_overrides[model_routes.current_user] = lambda: {"sub": "1", "role": "admin", "workspace_membership_role": "user"}
     with TestClient(app) as client:
         assert client.delete("/models/ollama/removable:latest").status_code == 204
     assert provider.deleted == ["removable:latest"]
@@ -158,7 +174,7 @@ def test_delete_refuses_the_configured_generation_model(monkeypatch):
     monkeypatch.setattr(model_routes, "get_settings", lambda: SimpleNamespace(ollama_model="modAIJet:latest"))
 
     with pytest.raises(HTTPException) as error:
-        run(model_routes.delete_model("ollama", "modAIJet:latest", user={"role": "admin"}))
+        run(model_routes.delete_model("ollama", "modAIJet:latest", request=None, user={"sub": "1", "role": "admin"}, db=SimpleNamespace(add=lambda _event: None, commit=lambda: None)))
 
     assert error.value.status_code == 409
 

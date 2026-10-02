@@ -7,7 +7,7 @@ router = APIRouter()
 async def websocket_chat(ws: WebSocket):
     await ws.accept()
     try:
-        await websocket_user(ws)
+        await websocket_user(ws, "chat")
         while True:
             prompt = await ws.receive_text()
             async for token in provider.stream(prompt): await ws.send_json({"type": "token", "data": token})
@@ -16,4 +16,3 @@ async def websocket_chat(ws: WebSocket):
     except Exception:
         try: await ws.send_json({"type": "error", "data": "streaming failed"})
         except Exception: pass
-

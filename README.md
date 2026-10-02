@@ -173,7 +173,7 @@ Console’daki **Modeller** ekranı Ollama bağlantı durumunu ve endpoint’ini
 
 Model listesi ve durum bilgisi giriş yapmış kullanıcılar tarafından okunabilir. Model çekme ve silme yalnızca **platform `admin`** rolüne açıktır; workspace/Organization `admin` üyeliği bu yetkiyi vermez ve backend yetkiyi zorunlu olarak doğrular. Model adı uzunluk, güvenli karakter kümesi ve path traversal kurallarıyla kontrol edilir; API shell komutu veya keyfi filesystem yolu kabul etmez. Aktif `OLLAMA_MODEL` silinemez ve aktif generation model seçimi bu sürümde yalnızca yapılandırmadan okunur; HTTP üzerinden `.env` değiştirilmez.
 
-Model çekme işlemi `ws://localhost:8000/ws/models/pull?token=<access-token>` WebSocket’iyle yapılır. Admin istemci bağlantıdan sonra `{"model":"llama3.2:3b"}` gönderir; Ollama’nın sağladığı değerler varsa `model_pull_progress` olayları `status`, `completed` ve `total` alanlarıyla iletilir. İstemci sahte ilerleme yüzdesi üretmez. Silme işlemi arayüzde açık onay gerektirir.
+Model çekme işlemi, önce platform admin yetkisiyle `POST /auth/ws-ticket` üzerinden alınan kısa ömürlü ve tek kullanımlık `models_pull` ticket’ı ile `ws://localhost:8000/ws/models/pull?ticket=<tek-kullanimlik-ticket>` bağlantısına yapılır. Normal access JWT URL’ye konmaz. Admin istemci bağlantıdan sonra `{"model":"llama3.2:3b"}` gönderir; Ollama’nın sağladığı değerler varsa `model_pull_progress` olayları `status`, `completed` ve `total` alanlarıyla iletilir. İstemci sahte ilerleme yüzdesi üretmez. Silme işlemi arayüzde açık onay gerektirir.
 
 ## API kullanımı
 
@@ -181,7 +181,9 @@ Model çekme işlemi `ws://localhost:8000/ws/models/pull?token=<access-token>` W
 curl -X POST http://localhost:8000/auth/register -H 'Content-Type: application/json' -d '{"email":"user@example.com","password":"correct-horse-battery"}'
 export TOKEN="<access-token>"
 curl http://localhost:8000/auth/me -H "Authorization: Bearer $TOKEN"
-curl -X POST http://localhost:8000/auth/refresh -H 'Content-Type: application/json' -d '{"refresh_token":"<refresh-token>"}'
+# Login/register yanıtındaki HttpOnly refresh cookie için cookie jar kullanın.
+curl -c cookies.txt -X POST http://localhost:8000/auth/login -H 'Content-Type: application/json' -d '{"email":"user@example.com","password":"correct-horse-battery"}'
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:8000/auth/refresh
 curl http://localhost:8000/workspaces -H "Authorization: Bearer $TOKEN"
 curl http://localhost:8000/knowledge-bases -H "Authorization: Bearer $TOKEN"
 curl -X POST http://localhost:8000/chat -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"prompt":"Embedding nedir?"}'
@@ -208,6 +210,38 @@ Model API’leri `GET /models/providers`, `GET /models`, `GET /models/{provider}
 - Embedding modeli çalışma zamanında varsayılan olarak cache-only yüklenir. Model bulunamazsa API giriş ve sistem ekranları çalışmaya devam eder; yalnızca indexing/RAG işlemleri açık bir provisioning hatasıyla durur.
 - Model Manager yalnızca Ollama’nın yerel API’sine erişir; Docker içindeki varsayılan adres `host.docker.internal:11434` olarak yapılandırılabilir. Ollama HTTP istemcileri proxy ortam değişkenlerini kullanmaz (`trust_env=False`).
 
+## Production hardening ve işletim
+
+### Oturumlar ve WebSocket kimlik doğrulaması
+
+Access token kısa ömürlüdür ve frontend’in yaptığı yetkili API çağrıları için bellekte/yerel tarayıcı deposunda tutulur. Refresh token ise API yanıt gövdesine veya JavaScript’e hiç verilmez: `HttpOnly` cookie içinde döndürülür. Her refresh JWT benzersiz bir `jti` taşır; Redis sadece `jti → user_id` ve JWT ömrüne eşit TTL tutar. `/auth/refresh` eski `jti` kaydını atomik olarak tüketir, yeni `jti` ve cookie üretir. Bu nedenle başarılı biçimde döndürülmüş eski refresh token tekrar kullanılamaz. Cookie ayarları `REFRESH_COOKIE_NAME`, `REFRESH_COOKIE_SAMESITE` ve `REFRESH_COOKIE_SECURE` ile yönetilir. Üretimde HTTPS zorunlu olduğundan `REFRESH_COOKIE_SECURE=true` olmalıdır; bu değer kapalıysa production başlangıcı durur.
+
+Cookie refresh akışı aynı-origin kullanım ve `SameSite` politikası için tasarlanmıştır. `/auth/refresh` ve `/auth/logout` cookie-mutating POST uçları `Origin` başlığı varsa yalnızca kendi origin’iyle veya `TRUSTED_FRONTEND_ORIGINS` içinde açıkça listelenen virgülle ayrılmış origin’lerle eşleştiğinde kabul edilir; diğer cross-origin istekler `403` alır. TLS termination kullanan reverse proxy, API’ye `X-Forwarded-Proto` değerini iletmelidir; sağlanan Nginx bunu yapar. Origin’siz istekler browser olmayan yerel CLI/otomasyon istemcileri için kabul edilir; bu durum wildcard CORS açmaz ve tarayıcı isteklerinde `SameSite` savunması devam eder. Ayrı frontend origin’i kullanmak istendiğinde CORS’u genişletmek yerine TLS terminasyonu altında aynı origin reverse-proxy düzeni tercih edilmelidir. Logout, geçerli cookie varsa ilgili `jti` Redis kaydını siler ve cookie’yi her durumda temizler; çağrı idempotenttir.
+
+WebSocket bağlantılarında normal access JWT URL’ye konmaz. İstemci önce yetkili `POST /auth/ws-ticket` çağrısıyla `chat`, `rag`, `indexing` veya `models_pull` kapsamlı bir ticket alır. Ticket Redis’te tutulur, varsayılan 60 saniyede dolar ve ilk kullanımda silinir. Indexing ticket’ı workspace kapsamına, model pull ticket’ı platform admin rolüne bağlıdır.
+
+### Limitler, denetim ve gözlemlenebilirlik
+
+Redis tabanlı sayaçlar login, registration, refresh, WebSocket ticket üretimi, RAG başlangıcı ve model pull için uygulanır. Sayaç artışı ve yeni bucket TTL ataması tek Redis Lua işlemiyle atomiktir; yarım kalan `INCR` sonucu süresiz key bırakmaz. Limitler `RATE_LIMIT_AUTH_PER_MINUTE`, `RATE_LIMIT_RAG_PER_MINUTE` ve `RATE_LIMIT_MODEL_PULL_PER_HOUR` ile ayarlanır. Aşım güvenli bir `429` yanıtı üretir.
+
+Audit trail Alembic ile oluşturulan `audit_events` tablosuna yazılır. Login, registration, platform-admin promotion, Knowledge Base oluşturma, belge upload/replace/reindex/delete, WebSocket ticket ve model pull/delete gibi güvenlik veya yönetim olayları yapılandırılmış şekilde saklanır. Parolalar, JWT’ler, refresh cookie’leri, belge içerikleri, prompt’lar ve model dosyaları metadata’ya alınmaz. Platform admin kullanıcıları olayları `GET /audit?limit=50&offset=0&action=<name>` ile okuyabilir; endpoint tenantlar arası erişime açılmaz.
+
+Her HTTP isteği güvenli gelen `X-Request-ID` değerini korur veya yeni bir kimlik üretir; yanıt aynı başlığı taşır. Production’da JSON loglar request ID, bileşen, durum ve süre bilgisini içerir; hassas istek gövdeleri loglanmaz. `GET /metrics` Prometheus metin formatında düşük-cardinality HTTP ve güvenli olay sayaçlarını sunar ve platform admin ile korunur. Metrik endpoint’ini ayrıca reverse proxy/ağ seviyesinde yalnızca izleme sistemine açın.
+
+`GET /health` yalnızca API liveness bilgisidir. `GET /ready`, PostgreSQL, Redis ve Qdrant için zararsız kontrolleri yapar; Ollama ve embedding hazırlığı ayrı alanlarda bildirilir. Ollama erişilemez olsa da yönetim ekranı ve API process’i ayakta kalır.
+
+### Production yapılandırması ve TLS
+
+Üretimde en az aşağıdaki değerleri açıkça ayarlayın: benzersiz `JWT_SECRET`, güçlü `POSTGRES_PASSWORD`, `ALLOW_REGISTRATION=false`, `REFRESH_COOKIE_SECURE=true`, uygun `REFRESH_COOKIE_SAMESITE`, rate-limit değerleri, `MODEL_DIR` ve embedding cache yolu. Bilinen JWT placeholder değeri veya güvenli olmayan refresh cookie ile `APP_ENV=production` başlangıcı bilerek başarısız olur.
+
+Önerilen dağıtım düzeni şudur: **TLS termination (Nginx/Caddy/Traefik) → frontend reverse proxy → API/worker ve iç servisler**. Frontend Nginx yapılandırması CSP, nosniff, referrer, permissions ve frame koruma başlıklarını uygular. CSP, React’in yalnızca dinamik progress style değeri için `style-src 'unsafe-inline'` içerir; script kaynağı yalnızca same-origin’dir. Local HTTP geliştirme akışı korunur, ancak Secure cookie gerçek üretimde yalnızca HTTPS altında çalışır.
+
+### Yedekleme ve geri yükleme
+
+`scripts/backup_local.sh <backup-directory>` çalışan Compose servislerinden PostgreSQL dump’ı, Qdrant storage ve `modaidata` kaynak dosyalarını alır. Komut gerçek credential istemez; çalışan container ortamındaki PostgreSQL ayarlarını kullanır. Model/cache dizini ve `.env` dosyası ayrı, erişimi sınırlı bir yere kopyalanmalıdır; bunları kaynak depoya eklemeyin.
+
+Geri yükleme sırası: önce aynı sürümde PostgreSQL’i geri yükleyin, sonra Qdrant storage ve `modaidata`yı **aynı zaman noktasına ait** yedeklerden geri koyun, ardından model/cache’i ve güvenli ortam değişkenlerini yerleştirin. Veritabanı, aktif vector index ve stored source dosyaları farklı yedek anlarından karıştırılırsa replace/reindex yaşam döngüsü tutarsızlaşabilir. Geri yükleme ardından `alembic upgrade head`, readiness kontrolleri ve Issue #4’teki gerçek RAG kabul akışı çalıştırılmalıdır.
+
 ## Test ve LoRA eğitimi
 
 `pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile testleri çalıştırın. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
@@ -216,7 +250,7 @@ Model API’leri `GET /models/providers`, `GET /models`, `GET /models/{provider}
 
 Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Gerçek canlı RAG uçtan uca kabul testi, makinede bir embedding modeli hazırlanmasını gerektirir ve [takip maddesi #4](https://github.com/WeAreTheArtMakers/modAI-stack/issues/4) altında beklemektedir. Üretim dağıtımında merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme, dağıtık rate limiting ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
 
-Üretim güvenlik sertleştirmesi için sonraki adımlar; refresh token’ın HttpOnly cookie’ye taşınması, access token süresinin kısaltılması ve WebSocket kimlik doğrulamasında uzun ömürlü query-string token yerine daha güvenli bir el sıkışma yönteminin kullanılmasıdır.
+Üretim güvenliği için ileri seviye sonraki adımlar; secret yönetiminin merkezi bir kasa ile yapılması, ağ katmanında metrik erişim kısıtlaması, düzenli restore tatbikatı ve gerçek modelle canlı RAG kabul testidir.
 
 ## Lisans
 

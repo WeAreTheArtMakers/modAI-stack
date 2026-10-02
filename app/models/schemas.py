@@ -3,8 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class RegisterRequest(BaseModel): email: EmailStr; password: str = Field(min_length=8, max_length=128)
 class LoginRequest(RegisterRequest): pass
-class RefreshRequest(BaseModel): refresh_token: str = Field(min_length=1)
-class TokenResponse(BaseModel): access_token: str; refresh_token: str; token_type: str = "bearer"
+class TokenResponse(BaseModel): access_token: str; token_type: str = "bearer"
 class OrganizationAccess(BaseModel):
     id: int
     name: str
@@ -106,3 +105,29 @@ class ModelSystemStatus(BaseModel):
 
 class ModelPullRequest(BaseModel):
     model: str = Field(min_length=1, max_length=200)
+
+
+class WebSocketTicketRequest(BaseModel):
+    scope: str = Field(pattern="^(chat|rag|indexing|models_pull)$")
+    workspace_id: int | None = Field(default=None, gt=0)
+
+
+class WebSocketTicketResponse(BaseModel):
+    ticket: str
+    expires_in: int
+
+
+class AuditEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    timestamp: datetime | None = None
+    actor_user_id: int | None = None
+    organization_id: int | None = None
+    workspace_id: int | None = None
+    action: str
+    resource_type: str
+    resource_id: str | None = None
+    success: bool
+    metadata_json: dict = Field(default_factory=dict)
+    request_id: str | None = None
+    source_ip: str | None = None

@@ -67,13 +67,16 @@ describe("Web Console critical UI", () => {
       close() { this.onclose?.(); }
     }
     vi.stubGlobal("WebSocket", FakeWebSocket);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ticket: "short-lived-ticket" }), { status: 200 })));
     const onEvent = vi.fn(); const stop = connectIndexing(8, onEvent, vi.fn());
-    const socket = FakeWebSocket.instances[0];
-    expect(socket.url).toContain("/ws/indexing?workspace_id=8");
-    socket.onmessage?.(new MessageEvent("message", { data: JSON.stringify({ type: "index_progress", workspace_id: 8, document_id: 2, status: "ready", stage: "ready" }) }));
-    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ workspace_id: 8, status: "ready" }));
-    stop();
-    vi.unstubAllGlobals();
+    return waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1)).then(() => {
+      const socket = FakeWebSocket.instances[0];
+      expect(socket.url).toContain("/ws/indexing?ticket=short-lived-ticket");
+      socket.onmessage?.(new MessageEvent("message", { data: JSON.stringify({ type: "index_progress", workspace_id: 8, document_id: 2, status: "ready", stage: "ready" }) }));
+      expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ workspace_id: 8, status: "ready" }));
+      stop();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("reports an unexpected RAG WebSocket close instead of resolving as success", async () => {
@@ -88,7 +91,9 @@ describe("Web Console critical UI", () => {
       close() {}
     }
     vi.stubGlobal("WebSocket", RagWebSocket);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ticket: "short-lived-ticket" }), { status: 200 })));
     const promise = streamRag([4], "test", vi.fn());
+    await waitFor(() => expect(RagWebSocket.instances).toHaveLength(1));
     RagWebSocket.instances[0].onopen?.();
     RagWebSocket.instances[0].onclose?.();
     await expect(promise).rejects.toThrow("beklenmedik şekilde kapandı");

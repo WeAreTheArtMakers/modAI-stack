@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!hasSession()) { setLoading(false); return; }
     getCurrentUser()
       .then(setUser)
-      .catch(() => clearSession())
+      .catch(() => { void clearSession(); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try { setUser(await loginRequest(email, password)); }
       catch (reason) { const message = reason instanceof Error ? reason.message : "Giriş başarısız."; setError(message); throw reason; }
     },
-    logout() { clearSession(); setUser(null); setError(null); },
+    logout() { void clearSession(); setUser(null); setError(null); },
   }), [user, loading, error]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -19,7 +19,7 @@ provider = OllamaProvider()
 async def websocket_rag(ws: WebSocket):
     await ws.accept()
     try:
-        user = await websocket_user(ws)
+        user = await websocket_user(ws, "rag")
         while True:
             try:
                 req = RagRequest.model_validate(await ws.receive_json())

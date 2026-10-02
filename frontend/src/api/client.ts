@@ -1,6 +1,5 @@
 const API_PREFIX = import.meta.env.VITE_API_PREFIX ?? "/api";
 const ACCESS_KEY = "modai.access_token";
-const REFRESH_KEY = "modai.refresh_token";
 type AuthFailureListener = () => void;
 const authFailureListeners = new Set<AuthFailureListener>();
 
@@ -19,15 +18,13 @@ export const tokenStore = {
     return localStorage.getItem(ACCESS_KEY);
   },
   get refresh() {
-    return localStorage.getItem(REFRESH_KEY);
+    return null;
   },
-  set(access: string, refresh: string) {
+  set(access: string) {
     localStorage.setItem(ACCESS_KEY, access);
-    localStorage.setItem(REFRESH_KEY, refresh);
   },
   clear() {
     localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
   },
 };
 
@@ -56,22 +53,16 @@ function readableError(status: number, detail?: string): string {
 }
 
 async function refreshAccessToken(): Promise<boolean> {
-  const refresh = tokenStore.refresh;
-  if (!refresh) {
-    clearSessionAfterAuthFailure();
-    return false;
-  }
   const response = await fetch(`${API_PREFIX}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refresh }),
+    credentials: "same-origin",
   });
   if (!response.ok) {
     clearSessionAfterAuthFailure();
     return false;
   }
-  const tokens = (await response.json()) as { access_token: string; refresh_token: string };
-  tokenStore.set(tokens.access_token, tokens.refresh_token);
+  const tokens = (await response.json()) as { access_token: string };
+  tokenStore.set(tokens.access_token);
   return true;
 }
 
@@ -87,7 +78,7 @@ export async function request<T>(
   const access = tokenStore.access;
   if (access) headers.set("Authorization", `Bearer ${access}`);
 
-  const response = await fetch(`${API_PREFIX}${path}`, { ...options, headers });
+  const response = await fetch(`${API_PREFIX}${path}`, { ...options, headers, credentials: "same-origin" });
   if (response.status === 401 && allowRefresh && path !== "/auth/refresh" && (await refreshAccessToken())) {
     return request<T>(path, options, false);
   }

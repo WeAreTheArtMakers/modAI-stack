@@ -9,11 +9,9 @@ router = APIRouter()
 async def indexing_events(ws: WebSocket):
     await ws.accept()
     try:
-        user = await websocket_user(ws)
-        raw_workspace_id = ws.query_params.get("workspace_id")
-        try:
-            workspace_id = int(raw_workspace_id or "")
-        except ValueError:
+        user = await websocket_user(ws, "indexing")
+        workspace_id = user.get("workspace_id")
+        if not isinstance(workspace_id, int):
             await ws.close(code=1008)
             return
         async with SessionLocal() as db:
