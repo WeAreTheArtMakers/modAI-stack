@@ -8,7 +8,7 @@ describe("API session refresh", () => {
   });
 
   it("refreshes once after a 401 and retries the original request", async () => {
-    tokenStore.set("expired-access", "refresh-token");
+    tokenStore.set("expired-access");
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "new-access", refresh_token: "new-refresh" }), { status: 200, headers: { "Content-Type": "application/json" } }))
@@ -20,7 +20,7 @@ describe("API session refresh", () => {
   });
 
   it("clears the session and notifies the app when refresh fails", async () => {
-    tokenStore.set("expired-access", "refresh-token");
+    tokenStore.set("expired-access");
     const onFailure = vi.fn();
     const unsubscribe = onAuthFailure(onFailure);
     vi.spyOn(globalThis, "fetch")

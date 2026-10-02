@@ -1,11 +1,13 @@
-from fastapi import Depends, HTTPException, WebSocket
+from fastapi import Depends, HTTPException, Request, WebSocket
 from fastapi.security import OAuth2PasswordBearer
 from app.core.security import decode_token
+from app.services.security import WebSocketTicketService
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
-def current_user(token: str = Depends(oauth2)) -> dict:
+def current_user(request: Request, token: str = Depends(oauth2)) -> dict:
     try:
         payload = decode_token(token)
         if payload.get("type") != "access": raise ValueError
+        request.state.user_id = int(payload["sub"])
         return payload
     except ValueError as exc: raise HTTPException(401, "Invalid authentication credentials") from exc
 
@@ -18,10 +20,13 @@ def ensure_admin(user: dict) -> dict:
 
 def require_admin(user=Depends(current_user)):
     return ensure_admin(user)
-async def websocket_user(ws: WebSocket) -> dict:
-    token = ws.query_params.get("token")
+async def websocket_user(ws: WebSocket, scope: str) -> dict:
+    ticket = ws.query_params.get("ticket")
     try:
-        payload = decode_token(token or "")
-        if payload.get("type") != "access": raise ValueError
+        service = WebSocketTicketService()
+        try: payload = await service.consume(ticket or "", scope)
+        finally: await service.close()
         return payload
-    except ValueError: await ws.close(code=1008); raise
+    except HTTPException:
+        await ws.close(code=1008)
+        raise
