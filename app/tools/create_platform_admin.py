@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.database import User
+from app.services.audit import record_audit_event
 
 
 async def promote_platform_admin(email: str, *, create: bool = False, password: str | None = None) -> tuple[User, bool]:
@@ -28,6 +29,7 @@ async def promote_platform_admin(email: str, *, create: bool = False, password: 
             created = True
         else:
             user.role = "admin"
+        record_audit_event(db, action="platform_admin_promotion", resource_type="user", actor_user_id=user.id if not created else None, resource_id=user.id or normalized_email, metadata={"created": created})
         await db.commit()
         await db.refresh(user)
         return user, created

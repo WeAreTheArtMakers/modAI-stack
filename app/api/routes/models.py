@@ -1,7 +1,8 @@
 import asyncio
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user, require_admin
 from app.core.config import get_settings
@@ -15,6 +16,8 @@ from app.models.schemas import (
 from app.services.models.base import InvalidModelIdentifierError, ModelProviderStatus, ModelProviderUnavailableError
 from app.services.models.registry import configured_model_providers, get_model_provider
 from app.services.rag.embeddings import embedding_model_status
+from app.db.session import get_db
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/models", tags=["models"])
 
@@ -84,11 +87,12 @@ async def get_model(provider: str, model: str, user=Depends(current_user)):
 
 
 @router.delete("/{provider}/{model:path}", status_code=204)
-async def delete_model(provider: str, model: str, user=Depends(require_admin)):
-    del user
+async def delete_model(provider: str, model: str, request: Request, user=Depends(require_admin), db: AsyncSession = Depends(get_db)):
     if provider == "ollama" and model == get_settings().ollama_model:
         raise HTTPException(409, "Configured generation model cannot be deleted")
     try:
         await _provider_or_404(provider).delete_model(model)
     except (InvalidModelIdentifierError, ModelProviderUnavailableError, httpx.HTTPError) as exc:
         raise _provider_error(exc) from exc
+    record_audit_event(db, action="model_delete", resource_type="model", actor_user_id=int(user["sub"]), resource_id=model, metadata={"provider": provider}, request=request)
+    await db.commit()

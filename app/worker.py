@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from sqlalchemy import select
 from app.core.config import get_settings
 from app.db.session import SessionLocal
@@ -10,8 +11,10 @@ from app.services.rag.chunker import chunk_text
 from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail, get_embedding_service
 from app.services.qdrant import qdrant_service
 from app.services.storage import storage
+from app.services.observability import metrics
 logger = logging.getLogger(__name__)
 async def process_job(job_id: str) -> None:
+    started = time.perf_counter()
     async with SessionLocal() as db:
         job = await db.get(IndexJob, job_id)
         if not job or job.status in {"ready", "cancelled"}: return
@@ -19,6 +22,7 @@ async def process_job(job_id: str) -> None:
         lock = await queue.client.set(f"modai:indexing:lock:{job.document_id}:{job.version}", job_id, nx=True, ex=get_settings().indexing_job_timeout_seconds)
         if not lock: await queue.close(); return
         job.status = "processing"; job.attempts += 1; await db.commit()
+        logger.info("Index job started", extra={"component": "worker", "job_id": job.id, "document_id": job.document_id, "attempt": job.attempts})
         try:
             version = await db.scalar(select(DocumentVersion).where(DocumentVersion.document_id == job.document_id, DocumentVersion.version == job.version))
             document = await db.get(Document, job.document_id)
@@ -57,6 +61,8 @@ async def process_job(job_id: str) -> None:
             document.content = content; document.content_hash = version.content_hash; document.file_size = version.file_size; document.index_status = "ready"; document.index_error = None
             version.status = "ready"; job.status = "ready"; job.error = None
             await db.commit()
+            metrics.event("indexing_jobs", "ready")
+            logger.info("Index job completed", extra={"component": "worker", "job_id": job.id, "document_id": job.document_id, "attempt": job.attempts, "duration_ms": round((time.perf_counter() - started) * 1000, 1)})
             await emit("ready", "ready")
         except EmbeddingModelUnavailableError:
             logger.warning("Index job blocked because the embedding model is unavailable", extra={"job_id": job_id})
@@ -80,6 +86,8 @@ async def process_job(job_id: str) -> None:
                     document.workspace_id,
                 )
             if job.status == "queued": await queue.enqueue(job.id)
+            metrics.event("indexing_jobs", job.status)
+            logger.warning("Index job retry or failure", extra={"component": "worker", "job_id": job.id, "document_id": job.document_id, "attempt": job.attempts, "duration_ms": round((time.perf_counter() - started) * 1000, 1)})
         except Exception:
             logger.exception("Index job failed", extra={"job_id": job_id})
             job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
@@ -102,6 +110,8 @@ async def process_job(job_id: str) -> None:
                     document.workspace_id,
                 )
             if job.status == "queued": await queue.enqueue(job.id)
+            metrics.event("indexing_jobs", job.status)
+            logger.error("Index job failed", extra={"component": "worker", "job_id": job.id, "document_id": job.document_id, "attempt": job.attempts, "duration_ms": round((time.perf_counter() - started) * 1000, 1)})
         finally: await queue.close()
 async def worker_main() -> None:
     queue = RedisIndexQueue()
@@ -110,6 +120,8 @@ async def worker_main() -> None:
             job_id = await queue.dequeue(timeout=5)
             if job_id:
                 try: await asyncio.wait_for(process_job(job_id), timeout=get_settings().indexing_job_timeout_seconds)
-                except asyncio.TimeoutError: logger.error("Index job timed out", extra={"job_id": job_id})
+                except asyncio.TimeoutError:
+                    metrics.event("indexing_jobs", "timeout")
+                    logger.error("Index job timed out", extra={"component": "worker", "job_id": job_id})
     finally: await queue.close()
 if __name__ == "__main__": asyncio.run(worker_main())
