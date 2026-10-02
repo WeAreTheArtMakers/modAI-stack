@@ -1,0 +1,27 @@
+import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { FileClock, FileText, FileUp, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
+import type { DocumentItem } from "../types";
+import { deleteDocument, listDocumentVersions, replaceDocument, reindexDocument } from "../api/documents";
+import { getErrorMessage } from "../api/client";
+import { formatBytes, formatDate } from "../lib";
+import { StatusBadge } from "./StatusBadge";
+
+function DocumentRow({ doc, onChanged, canManage }: { doc: DocumentItem; onChanged: () => void; canManage: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const versions = useQuery({ queryKey: ["document-versions", doc.id], queryFn: () => listDocumentVersions(doc.id), enabled: showVersions });
+  async function reindex() { setBusy(true); setError(null); try { await reindexDocument(doc.id); onChanged(); } catch (reason) { setError(getErrorMessage(reason)); } finally { setBusy(false); } }
+  async function replace(file: File) { setBusy(true); setError(null); try { await replaceDocument(doc.id, file); onChanged(); } catch (reason) { setError(getErrorMessage(reason)); } finally { setBusy(false); } }
+  async function remove() { if (!window.confirm(`“${doc.filename}” belgesini silmek istediğinize emin misiniz?`)) return; setBusy(true); setError(null); try { await deleteDocument(doc.id); onChanged(); } catch (reason) { setError(getErrorMessage(reason)); } finally { setBusy(false); } }
+  return <>
+    <tr className="hover:bg-slate-50/60"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-cloud text-slate-500"><FileText size={17} /></span><div><p className="font-semibold text-ink">{doc.filename}</p><p className="mt-0.5 text-xs text-slate-400">{formatBytes(doc.file_size)} · #{doc.id}</p></div></div>{doc.index_error && <p className="mt-2 text-xs text-red-600">{doc.index_error}</p>}{error && <p className="mt-2 text-xs text-red-600">{error}</p>}</td><td className="px-5 py-4"><StatusBadge status={doc.index_status} /></td><td className="px-5 py-4 text-slate-600">v{doc.active_version}</td><td className="px-5 py-4 text-slate-500">{formatDate(doc.updated_at ?? doc.created_at)}</td><td className="px-5 py-4"><div className="flex justify-end gap-1"><button className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-ink" title="Sürümleri gör" onClick={() => setShowVersions(!showVersions)}><FileClock size={16} /></button>{canManage && <><button className="rounded-lg p-2 text-slate-500 hover:bg-cyan/10 hover:text-cyan disabled:opacity-40" title="Yeniden indeksle" disabled={busy} onClick={() => void reindex()}><RefreshCw size={16} className={busy ? "animate-spin" : ""} /></button><button className="rounded-lg p-2 text-slate-500 hover:bg-cyan/10 hover:text-cyan disabled:opacity-40" title="Belgeyi değiştir" disabled={busy} onClick={() => inputRef.current?.click()}><FileUp size={16} /></button><input ref={inputRef} className="hidden" type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void replace(file); event.target.value = ""; }} /><button className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-40" title="Sil" disabled={busy} onClick={() => void remove()}><Trash2 size={16} /></button></>}<button className="rounded-lg p-2 text-slate-300" title="Daha fazla" disabled><MoreHorizontal size={16} /></button></div></td></tr>
+    {showVersions && <tr className="bg-slate-50/50"><td colSpan={5} className="px-5 py-4"><p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">Belge sürümleri</p>{versions.isLoading ? <p className="text-sm text-slate-500">Sürümler yükleniyor...</p> : versions.error ? <p className="text-sm text-red-600">{getErrorMessage(versions.error)}</p> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{versions.data?.map((version) => <div key={version.version} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex items-center justify-between"><span className="text-sm font-semibold text-ink">v{version.version}</span><StatusBadge status={version.status} /></div><p className="mt-2 text-xs text-slate-500">{formatBytes(version.file_size)} · {formatDate(version.created_at)}</p></div>)}</div>}</td></tr>}
+  </>;
+}
+
+export function DocumentTable({ documents, onChanged, canManage }: { documents: DocumentItem[]; onChanged: () => void; canManage: boolean }) {
+  return <div className="panel overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b border-slate-100 bg-slate-50/70 text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-4 font-semibold">Belge</th><th className="px-5 py-4 font-semibold">Durum</th><th className="px-5 py-4 font-semibold">Sürüm</th><th className="px-5 py-4 font-semibold">Güncellendi</th><th className="px-5 py-4 text-right font-semibold">İşlem</th></tr></thead><tbody className="divide-y divide-slate-100">{documents.map((doc) => <DocumentRow key={doc.id} doc={doc} canManage={canManage} onChanged={onChanged} />)}</tbody></table></div></div>;
+}
