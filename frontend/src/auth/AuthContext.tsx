@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCurrentUser, hasSession, login as loginRequest, logout as clearSession } from "../api/auth";
+import { onAuthFailure } from "../api/client";
 import type { UserContext } from "../types";
 
 interface AuthContextValue {
@@ -16,6 +17,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserContext | null>(null);
   const [loading, setLoading] = useState(hasSession());
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => onAuthFailure(() => {
+    setUser(null);
+    setError("Oturumunuz sona erdi. Lütfen yeniden giriş yapın.");
+  }), []);
 
   useEffect(() => {
     if (!hasSession()) { setLoading(false); return; }

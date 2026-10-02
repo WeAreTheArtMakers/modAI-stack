@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginPage } from "./pages/LoginPage";
 import { SourceCard } from "./pages/ChatPage";
 import { UploadDropzone } from "./components/UploadDropzone";
-import { connectIndexing } from "./api/websocket";
+import { connectIndexing, streamRag } from "./api/websocket";
 import type { Source } from "./types";
 
 const mocks = vi.hoisted(() => ({ login: vi.fn(), uploadDocuments: vi.fn() }));
@@ -64,6 +64,25 @@ describe("Web Console critical UI", () => {
     socket.onmessage?.(new MessageEvent("message", { data: JSON.stringify({ type: "index_progress", workspace_id: 8, document_id: 2, status: "ready", stage: "ready" }) }));
     expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ workspace_id: 8, status: "ready" }));
     stop();
+    vi.unstubAllGlobals();
+  });
+
+  it("reports an unexpected RAG WebSocket close instead of resolving as success", async () => {
+    class RagWebSocket {
+      static instances: RagWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor() { RagWebSocket.instances.push(this); }
+      send() {}
+      close() {}
+    }
+    vi.stubGlobal("WebSocket", RagWebSocket);
+    const promise = streamRag([4], "test", vi.fn());
+    RagWebSocket.instances[0].onopen?.();
+    RagWebSocket.instances[0].onclose?.();
+    await expect(promise).rejects.toThrow("beklenmedik şekilde kapandı");
     vi.unstubAllGlobals();
   });
 });

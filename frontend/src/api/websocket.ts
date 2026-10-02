@@ -41,15 +41,31 @@ export function streamRag(
   return new Promise((resolve, reject) => {
     const token = encodeURIComponent(tokenStore.access ?? "");
     const socket = new WebSocket(websocketUrl(`/ws/rag?token=${token}`));
+    let finished = false;
+    let terminalEvent = false;
+    const fail = (reason: Error) => {
+      if (finished) return;
+      finished = true;
+      reject(reason);
+      socket.close();
+    };
     socket.onopen = () => socket.send(JSON.stringify({ question, knowledge_base_ids: knowledgeBaseIds }));
     socket.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data as string) as RagEvent;
         onEvent(event);
-        if (event.type === "complete" || event.type === "error") socket.close();
-      } catch { reject(new Error("RAG yanıtı okunamadı.")); socket.close(); }
+        if (event.type === "complete" || event.type === "error") {
+          terminalEvent = true;
+          socket.close();
+        }
+      } catch { fail(new Error("RAG yanıtı okunamadı.")); }
     };
-    socket.onerror = () => reject(new Error("RAG bağlantısı kurulamadı."));
-    socket.onclose = () => resolve();
+    socket.onerror = () => fail(new Error("RAG bağlantısı kurulamadı."));
+    socket.onclose = () => {
+      if (finished) return;
+      finished = true;
+      if (terminalEvent) resolve();
+      else reject(new Error("RAG bağlantısı beklenmedik şekilde kapandı."));
+    };
   });
 }

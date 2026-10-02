@@ -135,6 +135,8 @@ WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağ
 
 Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Üretim dağıtımında merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme, dağıtık rate limiting ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
 
+Üretim güvenlik sertleştirmesi için sonraki adımlar; refresh token’ın HttpOnly cookie’ye taşınması, access token süresinin kısaltılması ve WebSocket kimlik doğrulamasında uzun ömürlü query-string token yerine daha güvenli bir el sıkışma yönteminin kullanılmasıdır.
+
 ## Lisans
 
 Bu proje WATAM lisansı ile sunulmaktadır.

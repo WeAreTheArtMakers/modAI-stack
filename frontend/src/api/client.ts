@@ -1,6 +1,8 @@
 const API_PREFIX = import.meta.env.VITE_API_PREFIX ?? "/api";
 const ACCESS_KEY = "modai.access_token";
 const REFRESH_KEY = "modai.refresh_token";
+type AuthFailureListener = () => void;
+const authFailureListeners = new Set<AuthFailureListener>();
 
 export class ApiError extends Error {
   constructor(
@@ -29,6 +31,16 @@ export const tokenStore = {
   },
 };
 
+export function onAuthFailure(listener: AuthFailureListener): () => void {
+  authFailureListeners.add(listener);
+  return () => authFailureListeners.delete(listener);
+}
+
+function clearSessionAfterAuthFailure(): void {
+  tokenStore.clear();
+  authFailureListeners.forEach((listener) => listener());
+}
+
 function readableError(status: number, detail?: string): string {
   if (detail) return detail;
   const messages: Record<number, string> = {
@@ -45,14 +57,17 @@ function readableError(status: number, detail?: string): string {
 
 async function refreshAccessToken(): Promise<boolean> {
   const refresh = tokenStore.refresh;
-  if (!refresh) return false;
+  if (!refresh) {
+    clearSessionAfterAuthFailure();
+    return false;
+  }
   const response = await fetch(`${API_PREFIX}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: refresh }),
   });
   if (!response.ok) {
-    tokenStore.clear();
+    clearSessionAfterAuthFailure();
     return false;
   }
   const tokens = (await response.json()) as { access_token: string; refresh_token: string };
