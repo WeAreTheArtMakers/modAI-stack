@@ -133,3 +133,75 @@ export type ModelPullEvent =
   | { type: "model_pull_progress"; model: string; status: string; completed: number | null; total: number | null }
   | { type: "complete"; model: string }
   | { type: "error"; data: string };
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  role: "admin" | "user";
+  created_at: string | null;
+}
+
+export interface AdminOrganization {
+  id: number;
+  name: string;
+  slug: string;
+  created_at: string | null;
+  workspace_count: number;
+  knowledge_base_count: number;
+  document_count: number;
+  member_count: number;
+}
+
+export interface AdminWorkspace {
+  id: number;
+  organization_id: number;
+  name: string;
+  slug: string;
+}
+
+export interface AdminMembership {
+  id: number;
+  user_id: number;
+  user_email: string;
+  organization_id: number;
+  workspace_id: number | null;
+  role: Role;
+}
+
+export interface Invitation {
+  id: number;
+  email: string;
+  organization_id: number;
+  workspace_id: number | null;
+  role: Role;
+  expires_at: string;
+  accepted_at: string | null;
+  created_by_user_id: number | null;
+  created_at: string | null;
+}
+
+export interface CreatedInvitation extends Invitation {
+  delivery_token: string;
+}
+
+export interface AuditEvent {
+  id: number;
+  timestamp: string | null;
+  actor_user_id: number | null;
+  organization_id: number | null;
+  workspace_id: number | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  success: boolean;
+  metadata_json: Record<string, string | number | boolean | null>;
+}
+
+export interface PlatformStatus {
+  registration_enabled: boolean;
+  configured_provider: string;
+  configured_model: string;
+  embedding_model: string;
+  readiness: { status: string; ready: boolean; dependencies?: Record<string, boolean> };
+  metrics_endpoint: string;
+}
