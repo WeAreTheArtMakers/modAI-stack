@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, MessageSquare } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { listDocuments } from "../api/documents";
 import { listKnowledgeBases } from "../api/knowledgeBases";
 import { DocumentTable } from "../components/DocumentTable";
