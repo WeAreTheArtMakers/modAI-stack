@@ -86,14 +86,19 @@ async def get_document(document_id: int, user=Depends(current_user), db: AsyncSe
 @router.get("/{document_id}/versions")
 async def list_versions(document_id: int, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     doc, _ = await require_document_access(db, user, document_id)
-    return [{"version": v.version, "status": v.status, "content_hash": v.content_hash, "file_size": v.file_size, "created_at": v.created_at} for v in doc.versions]
+    versions = list((await db.scalars(
+        select(DocumentVersion)
+        .where(DocumentVersion.document_id == doc.id)
+        .order_by(DocumentVersion.version)
+    )).all())
+    return [{"version": v.version, "status": v.status, "content_hash": v.content_hash, "file_size": v.file_size, "created_at": v.created_at} for v in versions]
 @router.post("/{document_id}/reindex", response_model=DocumentResponse)
 async def reindex_document(request: Request, document_id: int, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     doc, _ = await require_document_access(db, user, document_id, "manager")
     version = await db.scalar(select(DocumentVersion).where(DocumentVersion.document_id == doc.id, DocumentVersion.version == doc.active_version))
     if not version: raise HTTPException(409, "Document has no source version")
     job = IndexJob(document_id=doc.id, version=version.version, status="queued")
-    doc.index_status = "queued"; doc.index_error = None; db.add(job); record_audit_event(db, action="document_reindex", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, request=request); await db.commit()
+    doc.index_status = "queued"; doc.index_error = None; db.add(job); record_audit_event(db, action="document_reindex", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, request=request); await db.commit(); await db.refresh(doc)
     queue = RedisIndexQueue()
     try: await queue.enqueue(job.id)
     finally: await queue.close()
@@ -113,7 +118,7 @@ async def replace_document(request: Request, document_id: int, file: UploadFile 
     version = DocumentVersion(document_id=doc.id, version=next_version, content_hash=digest, file_size=len(data), status="queued", stored_path=path)
     job = IndexJob(document_id=doc.id, version=next_version, status="queued")
     doc.filename = (file.filename or doc.filename)[:255]; doc.index_status = "queued"; doc.index_error = None
-    db.add_all([version, job]); record_audit_event(db, action="document_replace", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, metadata={"version": next_version}, request=request); await db.commit()
+    db.add_all([version, job]); record_audit_event(db, action="document_replace", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, metadata={"version": next_version}, request=request); await db.commit(); await db.refresh(doc)
     queue = RedisIndexQueue()
     try: await queue.enqueue(job.id)
     finally: await queue.close()
