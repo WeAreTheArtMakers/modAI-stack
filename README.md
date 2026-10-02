@@ -68,6 +68,27 @@ uvicorn app.main:app --reload
 
 Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını çalıştırın. API `http://localhost:8000`, Qdrant `http://localhost:6333`, host PostgreSQL bağlantısı `localhost:55432` adresindedir. Docker içindeki API, Mac üzerinde Ollama’ya `host.docker.internal:11434` adresinden bağlanır.
 
+### Embedding modeli: bağlı ve air-gapped kurulum
+
+Repository model ağırlıklarını içermez. Embedding modeli, Ollama modelinden ayrı bir gereksinimdir: Ollama LLM yanıtı üretir; SentenceTransformer ise belge ve soru embedding'lerini üretir.
+
+**Bağlı / online kurulumda**, bağımlılıkları kurduktan sonra modelin bir kez indirilmesi ve doğrulanması için aşağıdaki komutu çalıştırın:
+
+```bash
+python -m app.tools.prefetch_embedding_model
+```
+
+Bu komut `EMBEDDING_MODEL` değerini kullanır, küçük bir test embedding'i üretir ve cache'e yazar. Normal uygulama çalışma zamanında varsayılan `EMBEDDING_ALLOW_DOWNLOAD=false` ayarıyla cache-only davranır; cache'te model yoksa indeksleme ve RAG, güvenli ve açık bir model-provisioning hatası döndürür. İndirmeye çalışma zamanında bilinçli olarak izin vermek gerekirse `EMBEDDING_ALLOW_DOWNLOAD=true` ayarlanabilir.
+
+**Offline / air-gapped kurulumda**, uyumlu SentenceTransformer model dizinini host üzerinde `./models/<model>` altına kopyalayın ve Docker için aşağıdaki ayarı kullanın:
+
+```dotenv
+MODEL_DIR=./models
+EMBEDDING_MODEL=/models/<model>
+```
+
+Compose, `MODEL_DIR` dizinini hem API hem worker içinde `/models` olarak mount eder. `/models/cache` SentenceTransformer ve Hugging Face cache'i için kalıcıdır; worker container'ı yeniden oluşturulduğunda model yeniden indirilmez. Yerel model yolu eksikse sistem başka bir modele sessizce geçmez ve ağdan alternatif indirme denemez. `models/` Git tarafından yok sayılır; model ağırlıklarını depoya eklemeyin.
+
 ## Web Console v1
 
 İlk ürün arayüzü `frontend/` altında React, TypeScript, Vite, React Router, TanStack Query, Tailwind CSS ve Lucide Icons ile geliştirilmiştir. Geliştirme sırasında:
@@ -126,6 +147,7 @@ WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağ
 - Dosya boyutu ve uzantısı doğrulanır; yüklenen dosyalar çalıştırılmaz.
 - JWT secret, bağlantı bilgileri ve parolalar ortam değişkenlerinden okunur.
 - Token, parola, stack trace ve hassas belge içeriği loglanmaz veya istemciye döndürülmez.
+- Embedding modeli çalışma zamanında varsayılan olarak cache-only yüklenir. Model bulunamazsa API giriş ve sistem ekranları çalışmaya devam eder; yalnızca indexing/RAG işlemleri açık bir provisioning hatasıyla durur.
 
 ## Test ve LoRA eğitimi
 

@@ -9,4 +9,5 @@ __pycache__/
 *.db
 artifacts/
 data/
+models/
 .DS_Store

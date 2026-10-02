@@ -9,6 +9,7 @@ from app.db.session import SessionLocal
 from app.models.schemas import RagRequest
 from app.services.llm.ollama import OllamaProvider
 from app.services.rag.pipeline import retrieve_rag_context
+from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail
 
 router = APIRouter()
 provider = OllamaProvider()
@@ -38,6 +39,9 @@ async def websocket_rag(ws: WebSocket):
                         workspace_id=kb_scope[1].id if kb_scope else None,
                         knowledge_base_ids=authorized_kb_ids or None,
                     )
+                except EmbeddingModelUnavailableError:
+                    await ws.send_json({"type": "error", "data": embedding_model_unavailable_detail()})
+                    continue
                 except Exception:
                     await ws.send_json({"type": "error", "data": "RAG request failed"})
                     continue

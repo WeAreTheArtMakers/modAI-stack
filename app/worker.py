@@ -7,7 +7,7 @@ from app.models.database import Document, DocumentVersion, IndexJob
 from app.services.documents.parser import extract_text
 from app.services.jobs.redis_queue import RedisIndexQueue
 from app.services.rag.chunker import chunk_text
-from app.services.rag.embeddings import get_embedding_service
+from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail, get_embedding_service
 from app.services.qdrant import qdrant_service
 from app.services.storage import storage
 logger = logging.getLogger(__name__)
@@ -58,6 +58,28 @@ async def process_job(job_id: str) -> None:
             version.status = "ready"; job.status = "ready"; job.error = None
             await db.commit()
             await emit("ready", "ready")
+        except EmbeddingModelUnavailableError:
+            logger.warning("Index job blocked because the embedding model is unavailable", extra={"job_id": job_id})
+            job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
+            job.error = embedding_model_unavailable_detail()
+            document = await db.get(Document, job.document_id)
+            if document: document.index_status = job.status; document.index_error = job.error
+            await db.commit()
+            if document and document.workspace_id is not None:
+                await queue.publish_progress(
+                    {
+                        "type": "index_progress",
+                        "organization_id": document.organization_id,
+                        "workspace_id": document.workspace_id,
+                        "knowledge_base_id": document.knowledge_base_id,
+                        "document_id": document.id,
+                        "job_id": job.id,
+                        "status": job.status,
+                        "stage": "failed",
+                    },
+                    document.workspace_id,
+                )
+            if job.status == "queued": await queue.enqueue(job.id)
         except Exception:
             logger.exception("Index job failed", extra={"job_id": job_id})
             job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
