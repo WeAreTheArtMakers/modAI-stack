@@ -1,0 +1,6 @@
+# Explicit LoRA/PEFT training environment. Includes runtime inference support.
+-r requirements-runtime.txt
+
+datasets>=3,<4
+peft>=0.13,<1
+accelerate>=1,<2

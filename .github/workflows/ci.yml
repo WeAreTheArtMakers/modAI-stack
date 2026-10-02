@@ -29,7 +29,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - run: pip install -r requirements.txt
+      - run: pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.4"
+      - run: pip install -r requirements-dev.txt
+      - run: pip install --dry-run -r requirements-training.txt
       - run: python -m compileall app alembic tests training
       - run: alembic upgrade head
       - run: python -m pytest -v

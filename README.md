@@ -60,11 +60,26 @@ Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-runtime.txt
 cp .env.example .env
 ollama pull modAIJet:latest
 uvicorn app.main:app --reload
 ```
+
+Bağımlılıklar kullanım amacına göre ayrılmıştır:
+
+```bash
+# API, worker ve RAG runtime
+pip install -r requirements-runtime.txt
+
+# Runtime + backend test araçları
+pip install -r requirements-dev.txt
+
+# Runtime + LoRA/PEFT eğitim araçları
+pip install -r requirements-training.txt
+```
+
+`requirements.txt`, eski tam kurulum alışkanlığı için uyumluluk giriş noktasıdır; runtime, geliştirme ve eğitim bağımlılıklarını birlikte kurar. Production API/worker imajı yalnızca `requirements-runtime.txt` kullanır. SentenceTransformers için gereken `torch` ve `transformers` runtime'da kalır; `datasets`, `peft` ve `accelerate` ise LoRA eğitim ortamına bilinçli olarak ayrılmıştır.
 
 Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını çalıştırın. API `http://localhost:8000`, Qdrant `http://localhost:6333`, host PostgreSQL bağlantısı `localhost:55432` adresindedir. Docker içindeki API, Mac üzerinde Ollama’ya `host.docker.internal:11434` adresinden bağlanır.
 
@@ -151,7 +166,7 @@ WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağ
 
 ## Test ve LoRA eğitimi
 
-`python -m pytest -v` ile testleri, `python training/train_lora.py` ile PEFT/LoRA adapter eğitimini çalıştırın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
+`pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile testleri çalıştırın. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
 
 ## Bilinen sınırlamalar
 
