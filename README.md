@@ -68,6 +68,28 @@ uvicorn app.main:app --reload
 
 Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını çalıştırın. API `http://localhost:8000`, Qdrant `http://localhost:6333`, host PostgreSQL bağlantısı `localhost:55432` adresindedir. Docker içindeki API, Mac üzerinde Ollama’ya `host.docker.internal:11434` adresinden bağlanır.
 
+## Web Console v1
+
+İlk ürün arayüzü `frontend/` altında React, TypeScript, Vite, React Router, TanStack Query, Tailwind CSS ve Lucide Icons ile geliştirilmiştir. Geliştirme sırasında:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Vite, `/api` isteklerini FastAPI’ye ve `/ws` bağlantılarını backend WebSocket endpoint’lerine proxy’ler. Console; giriş, workspace seçimi, Knowledge Base yönetimi, sürükle-bırak batch belge yükleme, workspace kapsamlı indeks durumu, kaynaklı RAG chat ve temel sistem durumu sayfalarını içerir. Üretim benzeri Docker kurulumu için `docker compose up --build` sonrasında arayüz `http://localhost:5173` adresinden açılır.
+
+Frontend doğrulama komutları:
+
+```bash
+cd frontend
+npm run typecheck
+npm run build
+npm run lint
+npm run test
+```
+
 Gerçek JWT secret ve parolaları yalnızca `.env` içine yazın. `.env`, `.venv`, yerel veritabanı ve eğitim çıktıları Git’e alınmaz.
 
 Şema değişiklikleri için uzun vadeli migration aracı Alembic’tir:
