@@ -19,7 +19,8 @@ async def process_job(job_id: str) -> None:
         job = await db.get(IndexJob, job_id)
         if not job or job.status in {"ready", "cancelled"}: return
         queue = RedisIndexQueue()
-        lock = await queue.client.set(f"modai:indexing:lock:{job.document_id}:{job.version}", job_id, nx=True, ex=get_settings().indexing_job_timeout_seconds)
+        lock_key = f"modai:indexing:lock:{job.document_id}:{job.version}"
+        lock = await queue.client.set(lock_key, job_id, nx=True, ex=get_settings().indexing_job_timeout_seconds)
         if not lock: await queue.close(); return
         job.status = "processing"; job.attempts += 1; await db.commit()
         logger.info("Index job started", extra={"component": "worker", "job_id": job.id, "document_id": job.document_id, "attempt": job.attempts})
@@ -112,7 +113,17 @@ async def process_job(job_id: str) -> None:
             if job.status == "queued": await queue.enqueue(job.id)
             metrics.event("indexing_jobs", job.status)
             logger.error("Index job failed", extra={"component": "worker", "job_id": job.id, "document_id": job.document_id, "attempt": job.attempts, "duration_ms": round((time.perf_counter() - started) * 1000, 1)})
-        finally: await queue.close()
+        finally:
+            try:
+                await queue.client.eval(
+                    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0",
+                    1,
+                    lock_key,
+                    job_id,
+                )
+            except Exception:
+                logger.warning("Index job lock could not be released", extra={"job_id": job_id})
+            await queue.close()
 async def worker_main() -> None:
     queue = RedisIndexQueue()
     try:

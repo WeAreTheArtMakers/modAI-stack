@@ -11,6 +11,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 from app.api.routes import documents
 from app.models.schemas import DocumentResponse
+from app import worker
 
 
 def request_for(path: str) -> Request:
@@ -117,3 +118,93 @@ async def test_replace_refreshes_server_managed_fields_before_document_response(
 
     assert db.refreshed == [document]
     assert DocumentResponse.model_validate(result).updated_at is not None
+
+
+@pytest.mark.asyncio
+async def test_worker_releases_its_document_version_lock_after_indexing(monkeypatch):
+    job = SimpleNamespace(id="job-7", document_id=7, version=1, status="queued", attempts=0, error=None)
+    version = SimpleNamespace(version=1, stored_path="/temporary/source.txt", content_hash="hash", file_size=5, status="queued")
+    document = SimpleNamespace(
+        id=7,
+        user_id=1,
+        organization_id=2,
+        workspace_id=3,
+        knowledge_base_id=4,
+        filename="source.txt",
+        active_version=1,
+        content="",
+        content_hash="old",
+        file_size=0,
+        index_status="queued",
+        index_error=None,
+    )
+
+    class Db:
+        async def get(self, model, _identifier):
+            return job if model is worker.IndexJob else document
+
+        async def scalar(self, _statement):
+            return version
+
+        async def commit(self):
+            pass
+
+    class SessionContext:
+        async def __aenter__(self):
+            return Db()
+
+        async def __aexit__(self, *_args):
+            pass
+
+    class Redis:
+        def __init__(self):
+            self.values = {}
+
+        async def set(self, key, value, nx, ex):
+            if nx and key in self.values:
+                return False
+            self.values[key] = value
+            return True
+
+        async def eval(self, script, _key_count, key, value):
+            if self.values.get(key) == value:
+                del self.values[key]
+                return 1
+            return 0
+
+    class Queue:
+        def __init__(self):
+            self.client = Redis()
+            self.events = []
+
+        async def publish_progress(self, event, _workspace_id):
+            self.events.append(event)
+
+        async def close(self):
+            pass
+
+    queue = Queue()
+
+    async def read(_path):
+        return b"indexed"
+
+    async def embed_texts(_chunks):
+        return [[0.1, 0.2]]
+
+    async def upsert_document(**_kwargs):
+        pass
+
+    monkeypatch.setattr(worker, "SessionLocal", SessionContext)
+    monkeypatch.setattr(worker, "RedisIndexQueue", lambda: queue)
+    monkeypatch.setattr(worker, "get_settings", lambda: SimpleNamespace(indexing_job_timeout_seconds=60, chunk_size=10, chunk_overlap=1))
+    monkeypatch.setattr(worker, "storage", SimpleNamespace(read=read))
+    monkeypatch.setattr(worker, "extract_text", lambda *_args: "indexed")
+    monkeypatch.setattr(worker, "chunk_text", lambda *_args: ["indexed"])
+    monkeypatch.setattr(worker, "get_embedding_service", lambda: SimpleNamespace(embed_texts=embed_texts))
+    monkeypatch.setattr(worker, "qdrant_service", SimpleNamespace(upsert_document=upsert_document))
+    monkeypatch.setattr(worker, "metrics", SimpleNamespace(event=lambda *_args: None))
+
+    await worker.process_job(job.id)
+
+    assert job.status == "ready"
+    assert queue.client.values == {}
