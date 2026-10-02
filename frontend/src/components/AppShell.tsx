@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Activity, BookOpen, ChevronDown, FileText, LayoutDashboard, LogOut, MessageSquare, Menu, Server, X } from "lucide-react";
+import { Activity, BookOpen, ChevronDown, Cpu, FileText, LayoutDashboard, LogOut, MessageSquare, Menu, Server, X } from "lucide-react";
 import { connectIndexing } from "../api/websocket";
 import { Logo } from "./Logo";
 import { useAuth } from "../auth/AuthContext";
@@ -12,6 +12,7 @@ const navItems = [
   { to: "/knowledge-bases", label: "Knowledge Base'ler", icon: BookOpen },
   { to: "/documents", label: "Belgeler", icon: FileText },
   { to: "/chat", label: "RAG Chat", icon: MessageSquare },
+  { to: "/models", label: "Modeller", icon: Cpu },
   { to: "/system", label: "Sistem", icon: Server },
 ];
 

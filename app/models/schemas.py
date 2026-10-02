@@ -62,3 +62,47 @@ class KnowledgeBaseResponse(BaseModel):
     slug: str
     description: str | None = None
     membership_role: str | None = None
+
+
+class ModelProviderResponse(BaseModel):
+    provider: str
+    endpoint: str
+    ready: bool
+
+
+class ManagedModelResponse(BaseModel):
+    provider: str
+    name: str
+    size: int | None = None
+    modified_at: str | None = None
+    family: str | None = None
+    parameter_size: str | None = None
+    quantization: str | None = None
+    context_length: int | None = None
+    capabilities: list[str] | None = None
+
+
+class GenerationModelStatus(BaseModel):
+    provider: str
+    configured_model: str
+    ready: bool
+    running: bool
+
+
+class EmbeddingModelStatus(BaseModel):
+    configured_model: str
+    source: str
+    download_allowed: bool
+    cache_available: bool | None = None
+    ready: bool
+    status: str
+
+
+class ModelSystemStatus(BaseModel):
+    providers: list[ModelProviderResponse]
+    generation: GenerationModelStatus
+    embedding: EmbeddingModelStatus
+
+
+class ModelPullRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=200)

@@ -88,3 +88,48 @@ export interface HealthState {
   status: string;
   ollama?: boolean;
 }
+
+export interface ModelProviderStatus {
+  provider: string;
+  endpoint: string;
+  ready: boolean;
+}
+
+export interface ManagedModel {
+  provider: string;
+  name: string;
+  size: number | null;
+  modified_at: string | null;
+  family: string | null;
+  parameter_size: string | null;
+  quantization: string | null;
+  context_length: number | null;
+  capabilities: string[] | null;
+}
+
+export interface GenerationModelStatus {
+  provider: string;
+  configured_model: string;
+  ready: boolean;
+  running: boolean;
+}
+
+export interface EmbeddingModelStatus {
+  configured_model: string;
+  source: "local_path" | "huggingface_cache" | string;
+  download_allowed: boolean;
+  cache_available: boolean | null;
+  ready: boolean;
+  status: "ready" | "available" | "unavailable" | "unverified" | string;
+}
+
+export interface ModelSystemStatus {
+  providers: ModelProviderStatus[];
+  generation: GenerationModelStatus;
+  embedding: EmbeddingModelStatus;
+}
+
+export type ModelPullEvent =
+  | { type: "model_pull_progress"; model: string; status: string; completed: number | null; total: number | null }
+  | { type: "complete"; model: string }
+  | { type: "error"; data: string };

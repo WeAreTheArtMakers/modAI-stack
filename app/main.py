@@ -3,10 +3,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.db.session import init_db
-from app.api.routes import auth, chat, documents, health, knowledge_bases, rag, workspaces
+from app.api.routes import auth, chat, documents, health, knowledge_bases, models, rag, workspaces
 from app.api.websocket import chat as ws_chat
 from app.api.websocket import indexing as ws_indexing
 from app.api.websocket import rag as ws_rag
+from app.api.websocket import models as ws_models
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db(); yield
@@ -17,4 +18,4 @@ async def request_metrics(request: Request, call_next):
     try: response = await call_next(request)
     except Exception: return JSONResponse(status_code=500, content={"detail": "Internal server error"})
     response.headers["X-Request-Latency-ms"] = f"{(time.perf_counter()-started)*1000:.1f}"; return response
-app.include_router(auth.router); app.include_router(chat.router); app.include_router(documents.router); app.include_router(health.router); app.include_router(knowledge_bases.router); app.include_router(workspaces.router); app.include_router(rag.router); app.include_router(ws_chat.router); app.include_router(ws_indexing.router); app.include_router(ws_rag.router)
+app.include_router(auth.router); app.include_router(chat.router); app.include_router(documents.router); app.include_router(health.router); app.include_router(knowledge_bases.router); app.include_router(workspaces.router); app.include_router(models.router); app.include_router(rag.router); app.include_router(ws_chat.router); app.include_router(ws_indexing.router); app.include_router(ws_rag.router); app.include_router(ws_models.router)

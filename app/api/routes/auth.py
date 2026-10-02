@@ -24,8 +24,11 @@ def tokens(user: User):
     return TokenResponse(access_token=create_token(str(user.id), user.role, "access", timedelta(minutes=s.access_token_expire_minutes)), refresh_token=create_token(str(user.id), user.role, "refresh", timedelta(days=s.refresh_token_expire_days)))
 @router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    if not get_settings().allow_registration:
+        raise HTTPException(403, "Registration is disabled")
     if await db.scalar(select(User).where(User.email == req.email)): raise HTTPException(409, "Email already registered")
-    user = User(email=req.email, password_hash=hash_password(req.password), role="admin")
+    # Platform administration and tenant membership are deliberately independent.
+    user = User(email=req.email, password_hash=hash_password(req.password), role="user")
     email_suffix = hashlib.sha256(req.email.encode()).hexdigest()[:10]
     organization = Organization(name=f"{req.email}'s organization", slug=f"org-{req.email.split('@')[0].lower()}-{email_suffix}")
     workspace = Workspace(name="Default workspace", slug="default", organization=organization)

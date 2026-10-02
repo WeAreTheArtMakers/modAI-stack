@@ -1,4 +1,4 @@
-import type { IndexingEvent, RagEvent } from "../types";
+import type { IndexingEvent, ModelPullEvent, RagEvent } from "../types";
 import { tokenStore, websocketUrl } from "./client";
 
 export function connectIndexing(
@@ -66,6 +66,39 @@ export function streamRag(
       finished = true;
       if (terminalEvent) resolve();
       else reject(new Error("RAG bağlantısı beklenmedik şekilde kapandı."));
+    };
+  });
+}
+
+export function streamModelPull(model: string, onEvent: (event: ModelPullEvent) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const token = encodeURIComponent(tokenStore.access ?? "");
+    const socket = new WebSocket(websocketUrl(`/ws/models/pull?token=${token}`));
+    let finished = false;
+    let terminalEvent = false;
+    const fail = (reason: Error) => {
+      if (finished) return;
+      finished = true;
+      reject(reason);
+      socket.close();
+    };
+    socket.onopen = () => socket.send(JSON.stringify({ model }));
+    socket.onmessage = (message) => {
+      try {
+        const event = JSON.parse(message.data as string) as ModelPullEvent;
+        onEvent(event);
+        if (event.type === "complete" || event.type === "error") {
+          terminalEvent = true;
+          socket.close();
+        }
+      } catch { fail(new Error("Model indirme durumu okunamadı.")); }
+    };
+    socket.onerror = () => fail(new Error("Model sağlayıcısına bağlanılamadı."));
+    socket.onclose = () => {
+      if (finished) return;
+      finished = true;
+      if (terminalEvent) resolve();
+      else reject(new Error("Model indirme bağlantısı beklenmedik şekilde kapandı."));
     };
   });
 }

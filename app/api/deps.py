@@ -8,9 +8,16 @@ def current_user(token: str = Depends(oauth2)) -> dict:
         if payload.get("type") != "access": raise ValueError
         return payload
     except ValueError as exc: raise HTTPException(401, "Invalid authentication credentials") from exc
-def require_admin(user=Depends(current_user)):
+
+
+def ensure_admin(user: dict) -> dict:
+    """Apply the shared model-management policy to HTTP and WebSocket users."""
     if user.get("role") != "admin": raise HTTPException(403, "Admin role required")
     return user
+
+
+def require_admin(user=Depends(current_user)):
+    return ensure_admin(user)
 async def websocket_user(ws: WebSocket) -> dict:
     token = ws.query_params.get("token")
     try:
@@ -18,4 +25,3 @@ async def websocket_user(ws: WebSocket) -> dict:
         if payload.get("type") != "access": raise ValueError
         return payload
     except ValueError: await ws.close(code=1008); raise
-
