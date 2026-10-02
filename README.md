@@ -21,6 +21,22 @@ Sistemde birbirinden bağımsız iki yetki alanı bulunur:
 
 Bu nedenle bir kullanıcı platform rolü `user` iken kendi workspace’inde üyelik rolü `admin` olabilir. Bu beklenen davranıştır; workspace yöneticiliği platform yöneticiliği vermez.
 
+## v0.3 — Enterprise Local AI Platform
+
+v0.3, yerel-öncelikli kurumsal RAG platformu kilometre taşıdır. Production hardening ve Model Manager v0.3 bu sürümde tamamlandı. Backend doğrulama paketi şu anda **64 test** içerir ve son doğrulamada geçmiştir.
+
+- Çok tenantlı Organization → Workspace → Knowledge Base hiyerarşisi, Membership tabanlı yetkilendirme ve tenant izolasyonu kullanılmaktadır.
+- Gerçek canlı RAG kabulü tamamlandı: TXT, PDF ve DOCX yükleme/çıkarma, Qdrant retrieval, kaynaklı HTTP ve WebSocket yanıtları doğrulandı.
+- Reindex, replace/sürüm aktivasyonu ve belge silme/Qdrant vektör temizliği gerçek servislerle doğrulandı; [Issue #4](https://github.com/WeAreTheArtMakers/modAI-stack/issues/4) kapatıldı.
+- Embedding modeli bağlı kurulumda önceden hazırlanabilir; çalışma zamanında varsayılan olarak cache-only/offline davranışı korunur.
+- WebSocket bağlantıları normal access JWT yerine kısa ömürlü, tek kullanımlık ticket ile kurulur.
+
+Bu durum bir güvenlik veya uyumluluk sertifikası iddiası değildir. Dağıtımın TLS, yedekleme, erişim sınırları ve secret yönetimi gereksinimleri işletmecinin sorumluluğundadır.
+
+### Sonraki kilometre taşı: v0.4 — Enterprise Administration
+
+v0.4 odağı; kullanıcılar, Organizations, Workspaces, Membership rollerı, davetler, Audit Log arayüzü, platform yönetimi, kayıt politikası görünürlüğü ve güvenli oturum yönetimidir. Kapsam, mevcut platform rolü ile tenant üyelik rollerinin sıkı ayrımını koruyacaktır.
+
 ## Kullanılan teknolojiler
 
 | Katman | Teknolojiler | Kullanım amacı |
@@ -34,7 +50,7 @@ Bu nedenle bir kullanıcı platform rolü `user` iken kendi workspace’inde üy
 | Geçici veri ve işler | Redis | Asenkron indeks kuyruğu, retry ve workspace kapsamlı ilerleme olayları |
 | Gerçek zamanlı iletişim | WebSocket | Token akışı ve canlı sohbet |
 | Güvenlik | JWT, access/refresh token, bcrypt, RBAC | Kimlik doğrulama ve yetkilendirme |
-| Belge işleme | `pypdf`, Markdown, TXT | Dosyadan metin çıkarma |
+| Belge işleme | `pypdf`, `python-docx`, Markdown, TXT | Dosyadan metin çıkarma |
 | Model uyarlama | Transformers, Datasets, PEFT / LoRA | Adapter eğitimi |
 | Altyapı | Docker, Docker Compose, kalıcı volume | Yerel servis kurulumu |
 | Test | pytest, pytest-asyncio, httpx | Birim ve entegrasyon testleri |
@@ -63,7 +79,9 @@ Upload isteği artık embedding çalıştırmaz. API dosyayı güvenli, üretilm
 
 Desteklenen dosya türleri PDF, TXT, Markdown ve DOCX’tir. Kullanıcı dosya adı yalnızca metadata olarak saklanır; filesystem yolu hiçbir zaman istemciden alınmaz. Docker Compose içinde `api`, `worker`, PostgreSQL, Redis ve Qdrant servisleri bulunur; kaynak dosyalar `modaidata` volume’unda kalıcıdır.
 
-Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{id}/replace`, `GET /documents/{id}/versions` ve `DELETE /documents/{id}` endpoint’leri bulunur. Replace işleminde yeni sürüm indekslenene kadar eski sürüm aktif kalır; başarılı sürüm aktivasyonundan sonra eski Qdrant noktaları temizlenir. Index worker olayları yalnızca yetkili workspace kanalı üzerinden `ws://localhost:8000/ws/indexing?workspace_id=<id>&token=<access-token>` adresinden `queued`, `extracting`, `chunking`, `embedding`, `vector_indexing`, `ready` ve `failed` durumlarıyla yayınlar.
+Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{id}/replace`, `GET /documents/{id}/versions` ve `DELETE /documents/{id}` endpoint’leri bulunur. Replace işleminde yeni sürüm indekslenene kadar eski sürüm aktif kalır; başarılı sürüm aktivasyonundan sonra eski Qdrant noktaları temizlenir.
+
+İndeks ilerleme WebSocket’i için istemci önce access JWT ile yetkili `POST /auth/ws-ticket` çağrısı yapar ve `{"scope":"indexing","workspace_id":<id>}` gönderir. Backend, ticket üretmeden önce workspace erişimini doğrular. Dönen kısa ömürlü, tek kullanımlık ticket yalnızca `ws://localhost:8000/ws/indexing?ticket=<ticket>` adresinde kullanılır. Bu kanal `queued`, `extracting`, `chunking`, `embedding`, `vector_indexing`, `ready` ve `failed` olaylarını yayınlar; access JWT ve workspace kimliği WebSocket URL’sine konmaz.
 
 ## Kurulum
 
@@ -196,7 +214,7 @@ curl 'http://localhost:8000/models?provider=ollama' -H "Authorization: Bearer $T
 
 `GET /auth/me` güvenli kullanıcı, kuruluş ve workspace üyelik özetini; `GET /workspaces` kullanıcının yetkili workspace kayıtlarını; `GET /knowledge-bases` ise yetkili Knowledge Base kayıtlarını döndürür. Yeni bir Knowledge Base oluşturmak için `POST /knowledge-bases?workspace_id=<id>` kullanılabilir. `GET /documents` sayfalı bir `items/total/limit/offset` yanıtı verir; belge listesinde belge içeriği dönmez. Belge yüklerken multipart form alanı olarak `knowledge_base_id` gönderilebilir. RAG sorgusunda `knowledge_base_ids` listesiyle seçili bilgi tabanları belirtilir.
 
-WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağlanıp metin gönderin. Sunucu token başına `type: "token"`, tamamlanınca `type: "complete"` olayı gönderir. Gerçek RAG akışında `ws://localhost:8000/ws/rag?token=<access-token>` bağlantısına `{"question":"...","knowledge_base_ids":[1]}` gönderilir; sunucu sırasıyla `sources`, `token`, `complete` veya `error` olaylarını döndürür.
+WebSocket bağlantılarında access JWT URL’ye eklenmez. İstemci önce yetkili `POST /auth/ws-ticket` çağrısıyla `{"scope":"chat"}`, `{"scope":"rag"}` veya indeks ilerlemesi için `{"scope":"indexing","workspace_id":<id>}` gönderir. Dönen kısa ömürlü, tek kullanımlık ticket bağlantıda kullanılır: `ws://localhost:8000/ws/chat?ticket=<ticket>`, `ws://localhost:8000/ws/rag?ticket=<ticket>` veya `ws://localhost:8000/ws/indexing?ticket=<ticket>`. Chat bağlantısında metin gönderilir ve sunucu `token`/`complete` olaylarını döndürür. RAG bağlantısında `{"question":"...","knowledge_base_ids":[1]}` gönderilir; sunucu sırasıyla `sources`, `token`, `complete` veya `error` olaylarını döndürür. Ticket üretiminde RAG/chat için oturum, indexing için ayrıca workspace yetkisi doğrulanır.
 
 Model API’leri `GET /models/providers`, `GET /models`, `GET /models/{provider}/{model}` ve `GET /models/status` endpoint’lerini sunar. `DELETE /models/{provider}/{model}` yalnızca admin içindir; model çekme uzun sürebildiğinden admin erişimli WebSocket akışıyla yapılır. Embedding durumunda yalnızca yapılandırılmış kimlik/yerel ad, güvenli cache varlığı ve indirme izni döner; keyfi host dizinleri listelenmez.
 
@@ -244,13 +262,11 @@ Geri yükleme sırası: önce aynı sürümde PostgreSQL’i geri yükleyin, son
 
 ## Test ve LoRA eğitimi
 
-`pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile testleri çalıştırın. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
+`pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile testleri çalıştırın; v0.3 durumunda backend paketi 64 test içerir. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
 
 ## Bilinen sınırlamalar
 
-Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Gerçek canlı RAG uçtan uca kabul testi, makinede bir embedding modeli hazırlanmasını gerektirir ve [takip maddesi #4](https://github.com/WeAreTheArtMakers/modAI-stack/issues/4) altında beklemektedir. Üretim dağıtımında merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme, dağıtık rate limiting ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
-
-Üretim güvenliği için ileri seviye sonraki adımlar; secret yönetiminin merkezi bir kasa ile yapılması, ağ katmanında metrik erişim kısıtlaması, düzenli restore tatbikatı ve gerçek modelle canlı RAG kabul testidir.
+Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Gerçek canlı RAG kabulü tamamlandı; TXT/PDF/DOCX retrieval ile reindex, replace ve delete/vectors cleanup yaşam döngüsü doğrulandı. Üretim dağıtımında merkezi secret vault entegrasyonu, TLS işletimi, nesne depolama, yedekleme/restore tatbikatı ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
 
 ## Lisans
 
