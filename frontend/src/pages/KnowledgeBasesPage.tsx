@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, BookOpen, Plus, ShieldCheck } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { createKnowledgeBase, listKnowledgeBases } from "../api/knowledgeBases";
 import { getErrorMessage } from "../api/client";
 import { PageHeader } from "../components/PageHeader";

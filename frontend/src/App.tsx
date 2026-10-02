@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router";
 import { useAuth } from "./auth/AuthContext";
 import AppShell from "./components/AppShell";
 import { LoadingState } from "./components/State";

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, BookOpen, CheckCircle2, Clock3, FileText, XCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { listDocuments } from "../api/documents";
 import { listKnowledgeBases } from "../api/knowledgeBases";
 import { PageHeader } from "../components/PageHeader";

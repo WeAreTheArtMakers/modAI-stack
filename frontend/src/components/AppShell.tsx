@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router";
 import { Activity, BookOpen, ChevronDown, Cpu, FileText, LayoutDashboard, LogOut, MessageSquare, Menu, Server, X } from "lucide-react";
 import { connectIndexing } from "../api/websocket";
 import { Logo } from "./Logo";

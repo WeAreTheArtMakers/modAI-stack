@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { Logo } from "../components/Logo";
 import { useAuth } from "../auth/AuthContext";
