@@ -8,7 +8,7 @@
 
 ## Proje hakkında
 
-modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, semantik arama yapmayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Qdrant vektör aramayı destekler. Redis Compose içinde hazır tutulur ancak mevcut uygulama akışında henüz kullanılmamaktadır. Model sağlayıcı arayüzü sayesinde Ollama yerine vLLM eklenebilir.
+modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, asenkron indekslemeyi, semantik aramayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Redis indeks iş kuyruğu ve ilerleme olaylarını, Qdrant ise vektör aramayı destekler. Model sağlayıcı arayüzü sayesinde Ollama yerine başka bir sağlayıcı eklenebilir.
 
 Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge Base oluşturulur. Knowledge Base erişimi Membership kayıtlarıyla kontrol edilir; kullanıcılar `admin`, `manager` veya `user` rolleriyle sınırlandırılır. Belge ve Qdrant erişimi bu kapsam bilgileriyle ilişkilendirilir.
 
@@ -22,7 +22,7 @@ Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge
 | RAG | Sentence Transformers, metin parçalama | Belge kaynaklı yanıt üretimi |
 | Vektör arama | Qdrant, cosine similarity, metadata filtreleri | Embedding saklama ve arama |
 | Kalıcı veri | PostgreSQL, SQLAlchemy Async ORM, asyncpg | Kullanıcı, belge, oturum ve mesajlar |
-| Geçici veri | Redis | Compose içinde hazır; rate limit ve iş durumu entegrasyonu sonraki adımdır |
+| Geçici veri ve işler | Redis | Asenkron indeks kuyruğu, retry ve workspace kapsamlı ilerleme olayları |
 | Gerçek zamanlı iletişim | WebSocket | Token akışı ve canlı sohbet |
 | Güvenlik | JWT, access/refresh token, bcrypt, RBAC | Kimlik doğrulama ve yetkilendirme |
 | Belge işleme | `pypdf`, Markdown, TXT | Dosyadan metin çıkarma |
@@ -36,8 +36,8 @@ Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge
 İstemci -> FastAPI REST/WebSocket -> JWT/RBAC -> LLMProvider -> Ollama
                                       |              |
                                       |              └-> RAG -> Embedding -> Qdrant
-                                      └-> SQLAlchemy -> PostgreSQL
-                                          Redis: Compose altyapısında hazır, henüz uygulama akışına bağlı değil
+                                      ├-> SQLAlchemy -> PostgreSQL
+                                      └-> Redis -> indeks worker / WebSocket ilerleme olayları
 ```
 
 Ollama çağrıları yalnızca `app/services/llm/` katmanından yapılır. RAG context’i güvenilmeyen veri olarak sistem talimatlarından ayrılır.
@@ -46,7 +46,7 @@ Ollama çağrıları yalnızca `app/services/llm/` katmanından yapılır. RAG c
 
 Belge yükleme akışı şöyledir: `upload → extract → chunk → embed → Qdrant upsert`. Embedding modeli lazy olarak yüklenir, tekrar kullanılır ve senkron model çağrısı `asyncio.to_thread()` ile event loop dışına taşınır. Her Qdrant payload’ında kullanıcı, belge, dosya adı, parça numarası ve metin bulunur.
 
-Sorgu akışı şöyledir: `question → embed → user_id filtreli similarity search → top-k context → Ollama → answer + sources`. Kullanıcı filtreleri sayesinde bir kullanıcı başka bir kullanıcının belge parçalarını arayamaz. Belge silme işlemi de sahiplik kontrolünden sonra PostgreSQL kaydını ve Qdrant vektörlerini birlikte kaldırır.
+Sorgu akışı şöyledir: `question → embed → yetkili Organization/Workspace/Knowledge Base filtreli similarity search → top-k context → Ollama → answer + sources`. Qdrant filtreleri kullanıcı ve kurumsal kapsamla sınırlandırılır; RAG isteğinde seçilen tüm Knowledge Base kayıtları önce Membership üzerinden yetkilendirilir. Belge silme işlemi de yetkilendirme kontrolünden sonra PostgreSQL kaydını ve Qdrant vektörlerini birlikte kaldırır.
 
 ## Asenkron indeksleme ve dosya depolama
 
@@ -54,7 +54,7 @@ Upload isteği artık embedding çalıştırmaz. API dosyayı güvenli, üretilm
 
 Desteklenen dosya türleri PDF, TXT, Markdown ve DOCX’tir. Kullanıcı dosya adı yalnızca metadata olarak saklanır; filesystem yolu hiçbir zaman istemciden alınmaz. Docker Compose içinde `api`, `worker`, PostgreSQL, Redis ve Qdrant servisleri bulunur; kaynak dosyalar `modaidata` volume’unda kalıcıdır.
 
-Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{id}/replace`, `GET /documents/{id}/versions` ve `DELETE /documents/{id}` endpoint’leri bulunur. Replace işleminde yeni sürüm indekslenene kadar eski sürüm aktif kalır; başarılı sürüm aktivasyonundan sonra eski Qdrant noktaları temizlenir. Index worker olayları `ws://localhost:8000/ws/indexing?token=<access-token>` kanalından `queued`, `extracting`, `chunking`, `embedding`, `vector_indexing`, `ready` ve `failed` durumlarıyla yayınlar.
+Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{id}/replace`, `GET /documents/{id}/versions` ve `DELETE /documents/{id}` endpoint’leri bulunur. Replace işleminde yeni sürüm indekslenene kadar eski sürüm aktif kalır; başarılı sürüm aktivasyonundan sonra eski Qdrant noktaları temizlenir. Index worker olayları yalnızca yetkili workspace kanalı üzerinden `ws://localhost:8000/ws/indexing?workspace_id=<id>&token=<access-token>` adresinden `queued`, `extracting`, `chunking`, `embedding`, `vector_indexing`, `ready` ve `failed` durumlarıyla yayınlar.
 
 ## Kurulum
 
@@ -83,14 +83,19 @@ Eski geliştirme veritabanlarında migration çalıştırmadan önce yedek alın
 ```bash
 curl -X POST http://localhost:8000/auth/register -H 'Content-Type: application/json' -d '{"email":"user@example.com","password":"correct-horse-battery"}'
 export TOKEN="<access-token>"
+curl http://localhost:8000/auth/me -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:8000/auth/refresh -H 'Content-Type: application/json' -d '{"refresh_token":"<refresh-token>"}'
+curl http://localhost:8000/workspaces -H "Authorization: Bearer $TOKEN"
+curl http://localhost:8000/knowledge-bases -H "Authorization: Bearer $TOKEN"
 curl -X POST http://localhost:8000/chat -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"prompt":"Embedding nedir?"}'
-curl -X POST http://localhost:8000/documents/upload -H "Authorization: Bearer $TOKEN" -F file=@notlar.pdf
-curl -X POST http://localhost:8000/rag/query -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"question":"Belgede hangi konular anlatılıyor?"}'
+curl -X POST http://localhost:8000/documents/upload -H "Authorization: Bearer $TOKEN" -F knowledge_base_id=1 -F file=@notlar.pdf
+curl 'http://localhost:8000/documents?knowledge_base_id=1&limit=50&offset=0' -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:8000/rag/query -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"question":"Belgede hangi konular anlatılıyor?","knowledge_base_ids":[1]}'
 ```
 
-Knowledge Base listelemek için `GET /knowledge-bases`, yeni bir Knowledge Base oluşturmak için `POST /knowledge-bases?workspace_id=<id>` kullanılabilir. Belge yüklerken multipart form alanı olarak `knowledge_base_id` gönderilebilir. RAG sorgusunda `knowledge_base_ids` listesiyle seçili bilgi tabanları belirtilir.
+`GET /auth/me` güvenli kullanıcı, kuruluş ve workspace üyelik özetini; `GET /workspaces` kullanıcının yetkili workspace kayıtlarını; `GET /knowledge-bases` ise yetkili Knowledge Base kayıtlarını döndürür. Yeni bir Knowledge Base oluşturmak için `POST /knowledge-bases?workspace_id=<id>` kullanılabilir. `GET /documents` sayfalı bir `items/total/limit/offset` yanıtı verir; belge listesinde belge içeriği dönmez. Belge yüklerken multipart form alanı olarak `knowledge_base_id` gönderilebilir. RAG sorgusunda `knowledge_base_ids` listesiyle seçili bilgi tabanları belirtilir.
 
-WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağlanıp metin gönderin. Sunucu token başına `type: "token"`, tamamlanınca `type: "complete"` olayı gönderir.
+WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağlanıp metin gönderin. Sunucu token başına `type: "token"`, tamamlanınca `type: "complete"` olayı gönderir. Gerçek RAG akışında `ws://localhost:8000/ws/rag?token=<access-token>` bağlantısına `{"question":"...","knowledge_base_ids":[1]}` gönderilir; sunucu sırasıyla `sources`, `token`, `complete` veya `error` olaylarını döndürür.
 
 ## Güvenlik ve veri gizliliği
 
@@ -106,7 +111,7 @@ WebSocket için `ws://localhost:8000/ws/chat?token=<access-token>` adresine bağ
 
 ## Bilinen sınırlamalar
 
-Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve güvenli RAG prompt sınırını gösterir. Üretim için embedding üretimi, Qdrant upsert/silme, arka plan indeksleme worker’ı ve gerçek dağıtık rate-limit middleware’i ayrıca bağlanmalıdır. Üretime geçişte Alembic, merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme ve yük testleri eklenmelidir.
+Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Üretim dağıtımında merkezi log/metrik, secret yönetimi, TLS, nesne depolama, yedekleme, dağıtık rate limiting ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
 
 ## Lisans
 

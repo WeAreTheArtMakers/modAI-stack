@@ -10,7 +10,17 @@ def slugify(value: str) -> str:
     return "-".join(value.lower().split())[:140]
 @router.get("", response_model=list[KnowledgeBaseResponse])
 async def list_knowledge_bases(user=Depends(current_user), db: AsyncSession = Depends(get_db)):
-    return await authorized_knowledge_bases(db, user)
+    return [
+        {
+            "id": knowledge_base.id,
+            "workspace_id": knowledge_base.workspace_id,
+            "name": knowledge_base.name,
+            "slug": knowledge_base.slug,
+            "description": knowledge_base.description,
+            "membership_role": membership.role,
+        }
+        for knowledge_base, membership in await authorized_knowledge_bases(db, user)
+    ]
 @router.post("", response_model=KnowledgeBaseResponse, status_code=201)
 async def create_knowledge_base(req: KnowledgeBaseCreate, workspace_id: int, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     await require_workspace_role(db, user, workspace_id, "manager")
