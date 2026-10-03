@@ -1,0 +1,25 @@
+{
+  "answerable_case_count": 132,
+  "answerable_language_counts": {
+    "en": 66,
+    "tr": 66
+  },
+  "case_count": 156,
+  "case_type_counts": {
+    "hard_negative": 44,
+    "no_answer": 24,
+    "normal": 88
+  },
+  "corpus_version": "compact-multilingual-v1",
+  "cross_language_case_counts": {
+    "en_query_to_tr_document": 22,
+    "tr_query_to_en_document": 22
+  },
+  "document_count": 44,
+  "fingerprint_sha256": "81d4546f3564171fd9f8a73ce82dd1f0a97e7ffde83660f9d972284f286f320b",
+  "language_counts": {
+    "en": 78,
+    "tr": 78
+  },
+  "no_answer_case_count": 24
+}

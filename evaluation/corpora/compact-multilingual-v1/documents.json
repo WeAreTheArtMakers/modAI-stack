@@ -1,0 +1,401 @@
+{
+  "corpus_version": "compact-multilingual-v1",
+  "documents": [
+    {
+      "document_id": 1,
+      "filename": "synthetic-hr-leave-01.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Annual leave carry-over. Team members may carry up to 6 days of unused annual leave into the next leave year. Any balance above the allowance expires on 31 March."
+    },
+    {
+      "document_id": 2,
+      "filename": "synthetic-hr-leave-02.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Sick leave notification. Employees should notify their team lead at least 4 hours before a shift begins. A medical note is required after 2 consecutive workdays."
+    },
+    {
+      "document_id": 3,
+      "filename": "synthetic-hr-leave-03.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Ebeveyn izni süresi. Çalışanlara toplam 18 hafta ebeveyn izni verilir. Bu sürenin en fazla 8 haftası doğumdan önce, kalan kısmı doğumdan sonra kullanılabilir."
+    },
+    {
+      "document_id": 4,
+      "filename": "synthetic-hr-leave-04.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Uzaktan çalışma günleri. Ekip üyeleri haftada en fazla 3 gün uzaktan çalışabilir. Bu düzen için yöneticinin önceden onayı gerekir."
+    },
+    {
+      "document_id": 5,
+      "filename": "synthetic-identity-security-05.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "API access-token lifetime. A personal API access token remains valid for 90 days from issuance. The owner must create a replacement before the current token expires."
+    },
+    {
+      "document_id": 6,
+      "filename": "synthetic-identity-security-06.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Browser session timeout. An inactive browser session expires after 30 minutes. A signed-in session also has an absolute lifetime of 8 hours."
+    },
+    {
+      "document_id": 7,
+      "filename": "synthetic-identity-security-07.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Çok faktörlü doğrulama aralığı. Yönetilen cihazlarda çok faktörlü kimlik doğrulama en geç 12 saatte bir yeniden istenir. Hassas işlem başlatıldığında bu süre beklenmez."
+    },
+    {
+      "document_id": 8,
+      "filename": "synthetic-identity-security-08.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Hesap kilidi eşiği. Bir hesap art arda 5 hatalı girişten sonra kilitlenir. Otomatik kilit 20 dakika sürer ve süre sonunda yeniden giriş denenebilir."
+    },
+    {
+      "document_id": 9,
+      "filename": "synthetic-records-retention-09.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Personnel-file retention. Personnel files are retained for 7 years after an employee leaves. The retention clock starts on the recorded separation date."
+    },
+    {
+      "document_id": 10,
+      "filename": "synthetic-records-retention-10.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Audit-log retention. Security audit events remain searchable for 400 days after creation. Archived copies may be kept separately for investigations."
+    },
+    {
+      "document_id": 11,
+      "filename": "synthetic-records-retention-11.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Yedek anlık görüntü saklama. Yedek anlık görüntüleri oluşturulma tarihinden itibaren 45 gün saklanır. Süre dolduğunda eski görüntüler otomatik olarak temizlenir."
+    },
+    {
+      "document_id": 12,
+      "filename": "synthetic-records-retention-12.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Silinen belge bekletme süresi. Silinen belgeler geri dönüşüm alanında 30 gün tutulur. Bu sürenin sonunda belge kalıcı olarak kaldırılır."
+    },
+    {
+      "document_id": 13,
+      "filename": "synthetic-backup-recovery-13.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Full-backup schedule. A complete system backup runs every Sunday at 02:00 UTC. The schedule covers the shared application data volume."
+    },
+    {
+      "document_id": 14,
+      "filename": "synthetic-backup-recovery-14.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Restore-test interval. The operations team performs a recovery restore test every 90 days. Each test records the restored dataset and elapsed recovery time."
+    },
+    {
+      "document_id": 15,
+      "filename": "synthetic-backup-recovery-15.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Artımlı yedekleme sıklığı. Artımlı yedekleme işleri 6 saatte bir çalışır. Her çalışma son başarılı temel yedekten sonraki değişiklikleri kapsar."
+    },
+    {
+      "document_id": 16,
+      "filename": "synthetic-backup-recovery-16.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Portal kurtarma hedefi. Kurum içi portal için hedeflenen en uzun kurtarma süresi 4 saattir. Olay yöneticisi bu hedefi kesinti kaydında izler."
+    },
+    {
+      "document_id": 17,
+      "filename": "synthetic-purchasing-travel-17.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Purchase approval threshold. A purchase request above $2,500 requires approval from a department manager before an order is placed."
+    },
+    {
+      "document_id": 18,
+      "filename": "synthetic-purchasing-travel-18.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Expense receipt deadline. Employees must submit travel receipts within 10 business days after returning. Late submissions need an explanation from the budget owner."
+    },
+    {
+      "document_id": 19,
+      "filename": "synthetic-purchasing-travel-19.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Günlük yemek ödeneği. Onaylı yurt dışı seyahatlerde günlük yemek ödeneği 45 avrodur. Bu tutara alkollü içecekler dahil değildir."
+    },
+    {
+      "document_id": 20,
+      "filename": "synthetic-purchasing-travel-20.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Otel gecelik üst sınırı. Otel konaklaması için geri ödeme gecelik en fazla 160 avrodur. Daha yüksek bir tutar için seyahatten önce finans onayı alınmalıdır."
+    },
+    {
+      "document_id": 21,
+      "filename": "synthetic-vendor-finance-21.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Supplier security-review renewal. An active supplier receives a security review once every 12 months. A material service change triggers an additional review."
+    },
+    {
+      "document_id": 22,
+      "filename": "synthetic-vendor-finance-22.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Software subscription approval. A software subscription costing more than $1,200 per year needs finance approval before renewal."
+    },
+    {
+      "document_id": 23,
+      "filename": "synthetic-vendor-finance-23.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Fatura ödeme vadesi. Eksiksiz ve onaylı bir tedarikçi faturası, kayıt tarihinden itibaren 30 gün içinde ödenir."
+    },
+    {
+      "document_id": 24,
+      "filename": "synthetic-vendor-finance-24.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Teklif toplama eşiği. 50.000 TL üzerindeki ekipman alımlarında karar verilmeden önce en az 3 yazılı teklif toplanır."
+    },
+    {
+      "document_id": 25,
+      "filename": "synthetic-support-response-25.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Priority-one first response. A priority-one incident receives an initial human response within 15 minutes, around the clock."
+    },
+    {
+      "document_id": 26,
+      "filename": "synthetic-support-response-26.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Priority-two first response. A priority-two support case receives an initial response within 4 hours during staffed service hours."
+    },
+    {
+      "document_id": 27,
+      "filename": "synthetic-support-response-27.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Destek eskalasyon eşiği. Destek uzmanı aynı çözüm adımını 2 kez uygulayıp sonuç alamazsa kaydı ikinci seviye ekibe aktarır."
+    },
+    {
+      "document_id": 28,
+      "filename": "synthetic-support-response-28.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Kritik olay bilgilendirme aralığı. Öncelik bir olayda destek ekibi müşteriye en geç her 60 dakikada bir durum güncellemesi gönderir."
+    },
+    {
+      "document_id": 29,
+      "filename": "synthetic-api-limits-29.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "API page-size limit. A list endpoint returns at most 100 records in one page. Clients should follow the continuation cursor for later records."
+    },
+    {
+      "document_id": 30,
+      "filename": "synthetic-api-limits-30.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Rate-limit retry budget. After an HTTP 429 response, a client may retry at most 3 times with exponential backoff."
+    },
+    {
+      "document_id": 31,
+      "filename": "synthetic-api-limits-31.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Dakikalık API istek kotası. Standart bir API istemcisi dakikada en fazla 120 istek gönderebilir. Kota her kayan dakika penceresinde yeniden hesaplanır."
+    },
+    {
+      "document_id": 32,
+      "filename": "synthetic-api-limits-32.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "API sürüm kaldırma bildirimi. Bir API sürümü kullanımdan kaldırılmadan en az 180 gün önce duyuru yapılır."
+    },
+    {
+      "document_id": 33,
+      "filename": "synthetic-workstation-operations-33.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Critical patch deadline. A critical security patch must be deployed within 72 hours after validation."
+    },
+    {
+      "document_id": 34,
+      "filename": "synthetic-workstation-operations-34.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Routine maintenance window. Routine maintenance is scheduled on Tuesday between 20:00 and 22:00 UTC."
+    },
+    {
+      "document_id": 35,
+      "filename": "synthetic-workstation-operations-35.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "İş istasyonu disk şifreleme. Geliştirici iş istasyonlarının diskleri AES-256 ile şifrelenmelidir. Şifreleme durumu cihaz envanterinde denetlenir."
+    },
+    {
+      "document_id": 36,
+      "filename": "synthetic-workstation-operations-36.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Yedek anahtar yenileme. Arşiv yedeklerinin şifreleme anahtarları 180 günde bir yenilenir ve eski anahtarlar güvenli biçimde devre dışı bırakılır."
+    },
+    {
+      "document_id": 37,
+      "filename": "synthetic-privacy-requests-37.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Account recovery-code lifetime. A one-time account recovery code expires 15 minutes after it is issued."
+    },
+    {
+      "document_id": 38,
+      "filename": "synthetic-privacy-requests-38.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Inactive employee account. An employee account is suspended after 60 days without an interactive sign-in."
+    },
+    {
+      "document_id": 39,
+      "filename": "synthetic-privacy-requests-39.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Veri silme talebi takvimi. Doğrulanmış bir kişisel veri silme talebi en geç 14 gün içinde tamamlanır."
+    },
+    {
+      "document_id": 40,
+      "filename": "synthetic-privacy-requests-40.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Veri dışa aktarım bağlantısı. Hazırlanan veri dışa aktarım bağlantısı 7 gün boyunca kullanılabilir; süre sonunda dosya otomatik kaldırılır."
+    },
+    {
+      "document_id": 41,
+      "filename": "synthetic-travel-policy-versions-41.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Travel meal allowance — 2024 handbook. The archived 2024 travel handbook set the meal allowance at $40 per day. This historical rule applied only to trips approved under that edition."
+    },
+    {
+      "document_id": 42,
+      "filename": "synthetic-travel-policy-versions-42.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Travel meal allowance — 2025 handbook. The current 2025 travel handbook sets the meal allowance at $45 per day. New trip approvals follow this edition."
+    },
+    {
+      "document_id": 43,
+      "filename": "synthetic-travel-policy-versions-43.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Otel gecelik üst sınırı — 2024 kuralı. Arşivlenmiş 2024 seyahat kuralında otel geri ödemesi gecelik en fazla 140 avroydu. Bu eski tutar yalnızca o sürümle onaylanan seyahatlerde geçerliydi."
+    },
+    {
+      "document_id": 44,
+      "filename": "synthetic-travel-policy-versions-44.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Otel gecelik üst sınırı — 2025 kuralı. Güncel 2025 seyahat kuralında otel geri ödemesi gecelik en fazla 160 avrodur. Yeni seyahat onaylarında bu sürüm uygulanır."
+    }
+  ]
+}

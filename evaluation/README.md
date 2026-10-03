@@ -122,3 +122,29 @@ Bu revision, `onnx/model_qint8_arm64.onnx` dosyasını içerir. Yalnızca gerekl
 Yerel sentetik korpusta 92 senaryolu, sabit K=3 baseline ve ayrı calibration/holdout adaptive değerlendirmesi tamamlandı. Toplu, içerik içermeyen sonuçlar [retrieval robustness raporunda](experiments/retrieval-robustness-v1.md) bulunur. Gap, ratio ve three-tier seçenekleri holdout ölçütlerini korumadığı için reddedildi; üretim ayarları değiştirilmedi.
 
 Reranker kodu, sabit dosya adıyla ONNX backend’i ve offline/hata yolu test edildi; fakat gerçek model yükleyicisi çalıştırılamadı. Doğru revision `a000c9bddd7d35fafc3b0b0fb4d1c1950ba6bd54` içindeki resmi ARM64 qint8 dosyasının indirmesi ilerleme durduğu için iptal edildi; yerel artifact tamamlanmadı. Mevcut MiniLM embedding bi-encoder’dır. Bu nedenle gerçek reranker ölçümü **BLOCKED BY MODEL PROVISIONING**; kalite, aday havuzu kıyaslamaları (6/8/10), sıralama hareketleri ve gecikme ölçülmedi. Model tamamen provision edilip çevrimdışı yükleme doğrulanana kadar production reranker önerisi yapılamaz. Ayrıntı ve cache envanteri: [local reranker durumu](experiments/local-reranker-v1.md). Adaptive retrieval etkinleştirilmedi; production `RAG_TOP_K=3` olarak kalır.
+
+## Compact Multilingual embedding doğrulaması (deney)
+
+`corpora/compact-multilingual-v1/`, yalnızca kurmaca politika metinlerinden oluşan ve generator ile yeniden üretilebilen karşılaştırma korpusudur. Fingerprint, sürüm + sıralı belgeler + doğrulanmış case dataset’i üzerinden hesaplanır. Vaka dağılımı, sabit K=3, diller ve cross-language yönleri [korpus açıklamasında](corpora/compact-multilingual-v1/README.md) yer alır. Gerçek müşteri veya şirket dokümanlarını bu public benchmark’a koymayın.
+
+Önce şu resmi, sabit revision’ları yerel olarak provision edin: [MiniLM](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/tree/1110a243fdf4706b3f48f1d95db1a4f5529b4d41) ve [multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small/tree/614241f622f53c4eeff9890bdc4f31cfecc418b3). Benchmark ağı indirme yapmaz; yalnızca revision adıyla eşleşen tam snapshot’ı, `model.safetensors` dahil, offline yükler. E5 için yalnızca `query: ` ve `passage: ` preprocessing’i geçerli; iki 384-boyutlu model farklı vektör uzayları olduğundan ayrı geçici Qdrant indeksleri kullanılır.
+
+```bash
+DATABASE_URL=sqlite+aiosqlite:///:memory: RAG_TOP_K=3 \
+  python -m app.tools.benchmark_embedding_profile \
+  --profile minilm \
+  --model-path "$MINILM_MODEL_PATH" \
+  --dataset evaluation/corpora/compact-multilingual-v1/dataset.json \
+  --documents evaluation/corpora/compact-multilingual-v1/documents.json \
+  --output /private/tmp/minilm-aggregate.json
+
+DATABASE_URL=sqlite+aiosqlite:///:memory: RAG_TOP_K=3 \
+  python -m app.tools.benchmark_embedding_profile \
+  --profile e5-small \
+  --model-path "$E5_MODEL_PATH" \
+  --dataset evaluation/corpora/compact-multilingual-v1/dataset.json \
+  --documents evaluation/corpora/compact-multilingual-v1/documents.json \
+  --output /private/tmp/e5-aggregate.json
+```
+
+Kıyaslama generation, reranker, adaptive retrieval, BM25/hybrid veya query rewriting içermez. Sonuçlar yalnızca aggregate metrikleri yazar; soru, belge gövdesi ve yerel model yolu serialize edilmez. Model ağırlıkları ve aggregate çıktılarını Git’e eklemeyin. Ölçüm ve karar durumu [Compact Multilingual v2 raporunda](experiments/compact-multilingual-validation-v2.md) tutulur; deney üretim embedding ayarını değiştirmez.

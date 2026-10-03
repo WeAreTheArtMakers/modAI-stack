@@ -1,0 +1,3990 @@
+{
+  "cases": [
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        2,
+        3,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        1
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 days"
+      ],
+      "id": "answer-01-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to unused vacation moved into a new leave year?",
+      "scenario_id": "hr-leave-document-01",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "hr",
+      "confusable_document_ids": [
+        2,
+        3,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        1
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 days"
+      ],
+      "id": "answer-01-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for unused vacation moved into a new leave year?",
+      "scenario_id": "hr-leave-document-01",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        2,
+        3,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        1
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 days"
+      ],
+      "id": "answer-01-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kullanılmayan iznin yeni izin yılına devredilmesi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "hr-leave-document-01",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        3,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        2
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 hours"
+      ],
+      "id": "answer-02-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to reporting an absence caused by illness?",
+      "scenario_id": "hr-leave-document-02",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        3,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        2
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 hours"
+      ],
+      "id": "answer-02-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for reporting an absence caused by illness?",
+      "scenario_id": "hr-leave-document-02",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        3,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        2
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 hours"
+      ],
+      "id": "answer-02-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Hastalık nedeniyle işe gelememe bildirimi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "hr-leave-document-02",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        2,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        3
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "18 hafta"
+      ],
+      "id": "answer-03-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Ebeveyn izninin süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "hr-leave-document-03",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        2,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        3
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "18 hafta"
+      ],
+      "id": "answer-03-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Ebeveyn izninin süresi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "hr-leave-document-03",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        2,
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        3
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "18 hafta"
+      ],
+      "id": "answer-03-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the length of parental leave?",
+      "scenario_id": "hr-leave-document-03",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        2,
+        3
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        4
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 gün"
+      ],
+      "id": "answer-04-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Haftalık uzaktan çalışma hakkı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "hr-leave-document-04",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        2,
+        3
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        4
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 gün"
+      ],
+      "id": "answer-04-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Haftalık uzaktan çalışma hakkı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "hr-leave-document-04",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        1,
+        2,
+        3
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        4
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 gün"
+      ],
+      "id": "answer-04-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the weekly remote-work allowance?",
+      "scenario_id": "hr-leave-document-04",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        6,
+        7,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        5
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "answer-05-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how long a personal API token remains valid?",
+      "scenario_id": "identity-security-document-05",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        6,
+        7,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        5
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "answer-05-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for how long a personal API token remains valid?",
+      "scenario_id": "identity-security-document-05",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        6,
+        7,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        5
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "answer-05-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kişisel api erişim belirtecinin geçerlilik süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "identity-security-document-05",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        7,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        6
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 minutes"
+      ],
+      "id": "answer-06-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to when an inactive browser session expires?",
+      "scenario_id": "identity-security-document-06",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        7,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        6
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 minutes"
+      ],
+      "id": "answer-06-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for when an inactive browser session expires?",
+      "scenario_id": "identity-security-document-06",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        7,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        6
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 minutes"
+      ],
+      "id": "answer-06-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Etkin olmayan tarayıcı oturumunun sona erme süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "identity-security-document-06",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        6,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        7
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 saatte bir"
+      ],
+      "id": "answer-07-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yönetilen cihazda kimliğin yeniden doğrulanma aralığı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "identity-security-document-07",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        6,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        7
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 saatte bir"
+      ],
+      "id": "answer-07-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yönetilen cihazda kimliğin yeniden doğrulanma aralığı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "identity-security-document-07",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        6,
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        7
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 saatte bir"
+      ],
+      "id": "answer-07-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how often a managed device must re-check identity?",
+      "scenario_id": "identity-security-document-07",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        6,
+        7
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        8
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "5 hatalı giriş"
+      ],
+      "id": "answer-08-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Hesabın kilitlenmesine yol açan hatalı giriş eşiği için hangi sayısal sınır uygulanır?",
+      "scenario_id": "identity-security-document-08",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        6,
+        7
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        8
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "5 hatalı giriş"
+      ],
+      "id": "answer-08-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Hesabın kilitlenmesine yol açan hatalı giriş eşiği konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "identity-security-document-08",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        5,
+        6,
+        7
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        8
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "5 hatalı giriş"
+      ],
+      "id": "answer-08-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the failed sign-in threshold before a lock?",
+      "scenario_id": "identity-security-document-08",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        10,
+        11,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        9
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 years"
+      ],
+      "id": "answer-09-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how long personnel records are kept after departure?",
+      "scenario_id": "records-retention-document-09",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        10,
+        11,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        9
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 years"
+      ],
+      "id": "answer-09-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for how long personnel records are kept after departure?",
+      "scenario_id": "records-retention-document-09",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        10,
+        11,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        9
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 years"
+      ],
+      "id": "answer-09-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Personel kayıtlarının ayrılıktan sonra saklanma süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "records-retention-document-09",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        11,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        10
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "400 days"
+      ],
+      "id": "answer-10-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how long security audit events remain searchable?",
+      "scenario_id": "records-retention-document-10",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        11,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        10
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "400 days"
+      ],
+      "id": "answer-10-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for how long security audit events remain searchable?",
+      "scenario_id": "records-retention-document-10",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        11,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        10
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "400 days"
+      ],
+      "id": "answer-10-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Güvenlik denetim kayıtlarının aranabilir kalma süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "records-retention-document-10",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        10,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        11
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 gün"
+      ],
+      "id": "answer-11-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yedek anlık görüntülerinin saklanma süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "records-retention-document-11",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        10,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        11
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 gün"
+      ],
+      "id": "answer-11-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yedek anlık görüntülerinin saklanma süresi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "records-retention-document-11",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        10,
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        11
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 gün"
+      ],
+      "id": "answer-11-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how long backup snapshots are retained?",
+      "scenario_id": "records-retention-document-11",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        10,
+        11
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        12
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 gün"
+      ],
+      "id": "answer-12-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Silinen dosyanın geri alınabilir kalma süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "records-retention-document-12",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        10,
+        11
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        12
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 gün"
+      ],
+      "id": "answer-12-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Silinen dosyanın geri alınabilir kalma süresi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "records-retention-document-12",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        9,
+        10,
+        11
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        12
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 gün"
+      ],
+      "id": "answer-12-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how long a deleted file stays recoverable?",
+      "scenario_id": "records-retention-document-12",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        14,
+        15,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        13
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "Sunday at 02:00 UTC"
+      ],
+      "id": "answer-13-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the recurring schedule for a complete backup?",
+      "scenario_id": "backup-recovery-document-13",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        14,
+        15,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        13
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "Sunday at 02:00 UTC"
+      ],
+      "id": "answer-13-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the recurring schedule for a complete backup?",
+      "scenario_id": "backup-recovery-document-13",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        14,
+        15,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        13
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "Sunday at 02:00 UTC"
+      ],
+      "id": "answer-13-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Tam yedeklemenin yinelenen takvimi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "backup-recovery-document-13",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        15,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        14
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "answer-14-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how often a recovery restore is tested?",
+      "scenario_id": "backup-recovery-document-14",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        15,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        14
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "answer-14-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for how often a recovery restore is tested?",
+      "scenario_id": "backup-recovery-document-14",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        15,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        14
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "answer-14-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kurtarma geri yüklemesinin test edilme aralığı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "backup-recovery-document-14",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        14,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        15
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 saatte bir"
+      ],
+      "id": "answer-15-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Artımlı yedeklemeler arasındaki süre için hangi sayısal sınır uygulanır?",
+      "scenario_id": "backup-recovery-document-15",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        14,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        15
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 saatte bir"
+      ],
+      "id": "answer-15-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Artımlı yedeklemeler arasındaki süre konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "backup-recovery-document-15",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        14,
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        15
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 saatte bir"
+      ],
+      "id": "answer-15-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the interval between incremental backups?",
+      "scenario_id": "backup-recovery-document-15",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        14,
+        15
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        16
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 saat"
+      ],
+      "id": "answer-16-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kurum içi portalın kurtarma süresi hedefi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "backup-recovery-document-16",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        14,
+        15
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        16
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 saat"
+      ],
+      "id": "answer-16-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kurum içi portalın kurtarma süresi hedefi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "backup-recovery-document-16",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        13,
+        14,
+        15
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        16
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 saat"
+      ],
+      "id": "answer-16-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the recovery-time objective for the internal portal?",
+      "scenario_id": "backup-recovery-document-16",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        18,
+        19,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        17
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$2,500"
+      ],
+      "id": "answer-17-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the spend level that requires purchase approval?",
+      "scenario_id": "purchasing-travel-document-17",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        18,
+        19,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        17
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$2,500"
+      ],
+      "id": "answer-17-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the spend level that requires purchase approval?",
+      "scenario_id": "purchasing-travel-document-17",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        18,
+        19,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        17
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$2,500"
+      ],
+      "id": "answer-17-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Satın alma onayı gerektiren harcama eşiği için hangi sayısal sınır uygulanır?",
+      "scenario_id": "purchasing-travel-document-17",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        19,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        18
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "10 business days"
+      ],
+      "id": "answer-18-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the time allowed to submit travel receipts?",
+      "scenario_id": "purchasing-travel-document-18",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        19,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        18
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "10 business days"
+      ],
+      "id": "answer-18-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the time allowed to submit travel receipts?",
+      "scenario_id": "purchasing-travel-document-18",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        19,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        18
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "10 business days"
+      ],
+      "id": "answer-18-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Seyahat fişlerini teslim etmek için tanınan süre için hangi sayısal sınır uygulanır?",
+      "scenario_id": "purchasing-travel-document-18",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        18,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        19
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 avro"
+      ],
+      "id": "answer-19-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Onaylı seyahatte günlük yemek ödeneği için hangi sayısal sınır uygulanır?",
+      "scenario_id": "purchasing-travel-document-19",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        18,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        19
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 avro"
+      ],
+      "id": "answer-19-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Onaylı seyahatte günlük yemek ödeneği konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "purchasing-travel-document-19",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        18,
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        19
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 avro"
+      ],
+      "id": "answer-19-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the daily meal allowance on approved travel?",
+      "scenario_id": "purchasing-travel-document-19",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        18,
+        19
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        20
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "160 avro"
+      ],
+      "id": "answer-20-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Otel masrafı için gecelik geri ödeme üst sınırı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "purchasing-travel-document-20",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        18,
+        19
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        20
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "160 avro"
+      ],
+      "id": "answer-20-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Otel masrafı için gecelik geri ödeme üst sınırı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "purchasing-travel-document-20",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        17,
+        18,
+        19
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        20
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "160 avro"
+      ],
+      "id": "answer-20-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the nightly hotel reimbursement cap?",
+      "scenario_id": "purchasing-travel-document-20",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        22,
+        23,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        21
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 months"
+      ],
+      "id": "answer-21-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how often an active supplier is reviewed?",
+      "scenario_id": "vendor-finance-document-21",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        22,
+        23,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        21
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 months"
+      ],
+      "id": "answer-21-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for how often an active supplier is reviewed?",
+      "scenario_id": "vendor-finance-document-21",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        22,
+        23,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        21
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 months"
+      ],
+      "id": "answer-21-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Aktif tedarikçinin incelenme sıklığı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "vendor-finance-document-21",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        23,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        22
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$1,200 per year"
+      ],
+      "id": "answer-22-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the annual software spend needing finance approval?",
+      "scenario_id": "vendor-finance-document-22",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        23,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        22
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$1,200 per year"
+      ],
+      "id": "answer-22-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the annual software spend needing finance approval?",
+      "scenario_id": "vendor-finance-document-22",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        23,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        22
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$1,200 per year"
+      ],
+      "id": "answer-22-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Finans onayı gereken yıllık yazılım harcaması için hangi sayısal sınır uygulanır?",
+      "scenario_id": "vendor-finance-document-22",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        22,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        23
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 gün"
+      ],
+      "id": "answer-23-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Geçerli bir fatura için standart ödeme vadesi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "vendor-finance-document-23",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        22,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        23
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 gün"
+      ],
+      "id": "answer-23-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Geçerli bir fatura için standart ödeme vadesi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "vendor-finance-document-23",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        22,
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        23
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 gün"
+      ],
+      "id": "answer-23-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the standard payment term for a valid invoice?",
+      "scenario_id": "vendor-finance-document-23",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        22,
+        23
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        24
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "50.000 TL"
+      ],
+      "id": "answer-24-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Üç teklif gerektiren satın alma tutarı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "vendor-finance-document-24",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        22,
+        23
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        24
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "50.000 TL"
+      ],
+      "id": "answer-24-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Üç teklif gerektiren satın alma tutarı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "vendor-finance-document-24",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        21,
+        22,
+        23
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        24
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "50.000 TL"
+      ],
+      "id": "answer-24-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the purchase value that requires three quotations?",
+      "scenario_id": "vendor-finance-document-24",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        26,
+        27,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        25
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "15 minutes"
+      ],
+      "id": "answer-25-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the initial response target for a critical incident?",
+      "scenario_id": "support-response-document-25",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "support",
+      "confusable_document_ids": [
+        26,
+        27,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        25
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "15 minutes"
+      ],
+      "id": "answer-25-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the initial response target for a critical incident?",
+      "scenario_id": "support-response-document-25",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        26,
+        27,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        25
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "15 minutes"
+      ],
+      "id": "answer-25-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kritik olay için ilk yanıt hedefi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "support-response-document-25",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        27,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        26
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 hours"
+      ],
+      "id": "answer-26-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the initial response target for a high-impact issue?",
+      "scenario_id": "support-response-document-26",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        27,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        26
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 hours"
+      ],
+      "id": "answer-26-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the initial response target for a high-impact issue?",
+      "scenario_id": "support-response-document-26",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        27,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        26
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "4 hours"
+      ],
+      "id": "answer-26-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yüksek etkili sorun için ilk yanıt hedefi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "support-response-document-26",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        26,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        27
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "2 kez"
+      ],
+      "id": "answer-27-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Eskalasyon öncesindeki başarısız deneme sayısı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "support-response-document-27",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        26,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        27
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "2 kez"
+      ],
+      "id": "answer-27-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Eskalasyon öncesindeki başarısız deneme sayısı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "support-response-document-27",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        26,
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        27
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "2 kez"
+      ],
+      "id": "answer-27-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the number of failed attempts before escalation?",
+      "scenario_id": "support-response-document-27",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        26,
+        27
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        28
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "60 dakikada bir"
+      ],
+      "id": "answer-28-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kritik olayda müşteriye bilgi verme aralığı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "support-response-document-28",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        26,
+        27
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        28
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "60 dakikada bir"
+      ],
+      "id": "answer-28-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kritik olayda müşteriye bilgi verme aralığı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "support-response-document-28",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "support",
+      "confusable_document_ids": [
+        25,
+        26,
+        27
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        28
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "60 dakikada bir"
+      ],
+      "id": "answer-28-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how frequently customers receive a critical-incident update?",
+      "scenario_id": "support-response-document-28",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        30,
+        31,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        29
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "100 records"
+      ],
+      "id": "answer-29-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the largest page a list request may return?",
+      "scenario_id": "api-limits-document-29",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "technical",
+      "confusable_document_ids": [
+        30,
+        31,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        29
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "100 records"
+      ],
+      "id": "answer-29-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the largest page a list request may return?",
+      "scenario_id": "api-limits-document-29",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        30,
+        31,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        29
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "100 records"
+      ],
+      "id": "answer-29-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Liste isteğinin döndürebileceği en büyük sayfa için hangi sayısal sınır uygulanır?",
+      "scenario_id": "api-limits-document-29",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        31,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        30
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 times"
+      ],
+      "id": "answer-30-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the retry limit after a rate-limit response?",
+      "scenario_id": "api-limits-document-30",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        31,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        30
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 times"
+      ],
+      "id": "answer-30-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the retry limit after a rate-limit response?",
+      "scenario_id": "api-limits-document-30",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        31,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        30
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 times"
+      ],
+      "id": "answer-30-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Hız sınırı yanıtından sonraki yeniden deneme sınırı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "api-limits-document-30",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        31
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "120 istek"
+      ],
+      "id": "answer-31-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Her dakika izin verilen istek sayısı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "api-limits-document-31",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        31
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "120 istek"
+      ],
+      "id": "answer-31-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Her dakika izin verilen istek sayısı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "api-limits-document-31",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        31
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "120 istek"
+      ],
+      "id": "answer-31-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the number of requests allowed each minute?",
+      "scenario_id": "api-limits-document-31",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        31
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        32
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "180 gün"
+      ],
+      "id": "answer-32-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Api sürümü kaldırılmadan önceki bildirim süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "api-limits-document-32",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        31
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        32
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "180 gün"
+      ],
+      "id": "answer-32-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Api sürümü kaldırılmadan önceki bildirim süresi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "api-limits-document-32",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        31
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        32
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "180 gün"
+      ],
+      "id": "answer-32-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the notice period before an API version is retired?",
+      "scenario_id": "api-limits-document-32",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        34,
+        35,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        33
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "72 hours"
+      ],
+      "id": "answer-33-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the deployment window for a critical security patch?",
+      "scenario_id": "workstation-operations-document-33",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        34,
+        35,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        33
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "72 hours"
+      ],
+      "id": "answer-33-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the deployment window for a critical security patch?",
+      "scenario_id": "workstation-operations-document-33",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        34,
+        35,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        33
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "72 hours"
+      ],
+      "id": "answer-33-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kritik güvenlik yamasının dağıtım süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "workstation-operations-document-33",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        35,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        34
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "Tuesday between 20:00 and 22:00 UTC"
+      ],
+      "id": "answer-34-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the weekly window reserved for planned maintenance?",
+      "scenario_id": "workstation-operations-document-34",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        35,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        34
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "Tuesday between 20:00 and 22:00 UTC"
+      ],
+      "id": "answer-34-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the weekly window reserved for planned maintenance?",
+      "scenario_id": "workstation-operations-document-34",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        35,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        34
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "Tuesday between 20:00 and 22:00 UTC"
+      ],
+      "id": "answer-34-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Planlı bakım için ayrılan haftalık zaman aralığı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "workstation-operations-document-34",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        34,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        35
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "AES-256"
+      ],
+      "id": "answer-35-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Geliştirici dizüstü bilgisayarı için gereken şifreleme gücü için hangi sayısal sınır uygulanır?",
+      "scenario_id": "workstation-operations-document-35",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        34,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        35
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "AES-256"
+      ],
+      "id": "answer-35-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Geliştirici dizüstü bilgisayarı için gereken şifreleme gücü konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "workstation-operations-document-35",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        34,
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        35
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "AES-256"
+      ],
+      "id": "answer-35-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the required encryption strength for a developer laptop?",
+      "scenario_id": "workstation-operations-document-35",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        34,
+        35
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        36
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "180 günde bir"
+      ],
+      "id": "answer-36-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Arşiv yedeği şifreleme anahtarının yenilenme sıklığı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "workstation-operations-document-36",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        34,
+        35
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        36
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "180 günde bir"
+      ],
+      "id": "answer-36-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Arşiv yedeği şifreleme anahtarının yenilenme sıklığı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "workstation-operations-document-36",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        33,
+        34,
+        35
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        36
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "180 günde bir"
+      ],
+      "id": "answer-36-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how often an archived-backup encryption key is rotated?",
+      "scenario_id": "workstation-operations-document-36",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        38,
+        39,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        37
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "15 minutes"
+      ],
+      "id": "answer-37-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how long a one-time recovery code can be used?",
+      "scenario_id": "privacy-requests-document-37",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        38,
+        39,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        37
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "15 minutes"
+      ],
+      "id": "answer-37-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for how long a one-time recovery code can be used?",
+      "scenario_id": "privacy-requests-document-37",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        38,
+        39,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        37
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "15 minutes"
+      ],
+      "id": "answer-37-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Tek kullanımlık kurtarma kodunun kullanılabileceği süre için hangi sayısal sınır uygulanır?",
+      "scenario_id": "privacy-requests-document-37",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        39,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        38
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "60 days"
+      ],
+      "id": "answer-38-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the inactivity period before an account is suspended?",
+      "scenario_id": "privacy-requests-document-38",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        39,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        38
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "60 days"
+      ],
+      "id": "answer-38-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the inactivity period before an account is suspended?",
+      "scenario_id": "privacy-requests-document-38",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        39,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        38
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "60 days"
+      ],
+      "id": "answer-38-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Hesabın askıya alınmasından önceki etkin olmama süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "privacy-requests-document-38",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        38,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        39
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "14 gün"
+      ],
+      "id": "answer-39-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Doğrulanmış silme talebinin tamamlanma hedefi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "privacy-requests-document-39",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        38,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        39
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "14 gün"
+      ],
+      "id": "answer-39-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Doğrulanmış silme talebinin tamamlanma hedefi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "privacy-requests-document-39",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        38,
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        39
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "14 gün"
+      ],
+      "id": "answer-39-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the completion target for a verified deletion request?",
+      "scenario_id": "privacy-requests-document-39",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        38,
+        39
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        40
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 gün"
+      ],
+      "id": "answer-40-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Hazırlanan veri dışa aktarımının indirilebilir kalma süresi için hangi sayısal sınır uygulanır?",
+      "scenario_id": "privacy-requests-document-40",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        38,
+        39
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        40
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 gün"
+      ],
+      "id": "answer-40-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Hazırlanan veri dışa aktarımının indirilebilir kalma süresi konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "privacy-requests-document-40",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        37,
+        38,
+        39
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        40
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 gün"
+      ],
+      "id": "answer-40-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to how long a prepared data export remains downloadable?",
+      "scenario_id": "privacy-requests-document-40",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        42,
+        43,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        41
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$40 per day"
+      ],
+      "id": "answer-41-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the archived 2024 daily meal allowance?",
+      "scenario_id": "travel-policy-versions-document-41",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        42,
+        43,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        41
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$40 per day"
+      ],
+      "id": "answer-41-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the archived 2024 daily meal allowance?",
+      "scenario_id": "travel-policy-versions-document-41",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        42,
+        43,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        41
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$40 per day"
+      ],
+      "id": "answer-41-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "2024 el kitabındaki günlük yemek ödeneği için hangi sayısal sınır uygulanır?",
+      "scenario_id": "travel-policy-versions-document-41",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        43,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        42
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$45 per day"
+      ],
+      "id": "answer-42-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the current 2025 daily meal allowance?",
+      "scenario_id": "travel-policy-versions-document-42",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        43,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        42
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$45 per day"
+      ],
+      "id": "answer-42-en-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What number or time window should staff remember for the current 2025 daily meal allowance?",
+      "scenario_id": "travel-policy-versions-document-42",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        43,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        42
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$45 per day"
+      ],
+      "id": "answer-42-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "2025 el kitabındaki güncel günlük yemek ödeneği için hangi sayısal sınır uygulanır?",
+      "scenario_id": "travel-policy-versions-document-42",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        42,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        43
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "140 avro"
+      ],
+      "id": "answer-43-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "2024 kuralındaki gecelik otel üst sınırı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "travel-policy-versions-document-43",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        42,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        43
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "140 avro"
+      ],
+      "id": "answer-43-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "2024 kuralındaki gecelik otel üst sınırı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "travel-policy-versions-document-43",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        42,
+        44
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        43
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "140 avro"
+      ],
+      "id": "answer-43-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the archived 2024 nightly hotel cap?",
+      "scenario_id": "travel-policy-versions-document-43",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        42,
+        43
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        44
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "160 avro"
+      ],
+      "id": "answer-44-tr-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "2025 kuralındaki güncel gecelik otel üst sınırı için hangi sayısal sınır uygulanır?",
+      "scenario_id": "travel-policy-versions-document-44",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "hard_negative",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        42,
+        43
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        44
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "160 avro"
+      ],
+      "id": "answer-44-tr-2",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "2025 kuralındaki güncel gecelik otel üst sınırı konusunda hangi sayı veya süre dikkate alınmalı?",
+      "scenario_id": "travel-policy-versions-document-44",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        41,
+        42,
+        43
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        44
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "160 avro"
+      ],
+      "id": "answer-44-en-1",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What limit applies to the current 2025 nightly hotel cap?",
+      "scenario_id": "travel-policy-versions-document-44",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-01",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the annual paid volunteer-day allowance?",
+      "scenario_id": "absent-evidence-hr-leave-01",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-02",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "Which payroll date is used for a one-time bonus adjustment?",
+      "scenario_id": "absent-evidence-vendor-finance-02",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-03",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How many personal guest passes can an employee request each month?",
+      "scenario_id": "absent-evidence-hr-leave-03",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-04",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the permitted budget for office celebration gifts?",
+      "scenario_id": "absent-evidence-purchasing-travel-04",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-05",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How long is the grace period for renewing an expired API token?",
+      "scenario_id": "absent-evidence-identity-security-05",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        33,
+        34,
+        35,
+        36
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-06",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "Which weekday is reserved for the quarterly all-hands meeting?",
+      "scenario_id": "absent-evidence-workstation-operations-06",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-07",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the reimbursement limit for home-office furniture?",
+      "scenario_id": "absent-evidence-purchasing-travel-07",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-08",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How many days of bereavement leave are granted for a cousin?",
+      "scenario_id": "absent-evidence-hr-leave-08",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-09",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the maximum number of support tickets one person may open?",
+      "scenario_id": "absent-evidence-support-response-09",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        37,
+        38,
+        39,
+        40
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-10",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "Which checksum algorithm is required for customer exports?",
+      "scenario_id": "absent-evidence-privacy-requests-10",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-11",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How many sandbox environments does each supplier receive?",
+      "scenario_id": "absent-evidence-vendor-finance-11",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        31,
+        32
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-en-12",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the service-credit percentage for a delayed API release?",
+      "scenario_id": "absent-evidence-api-limits-12",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-01",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yıllık ücretli gönüllülük izni kaç gündür?",
+      "scenario_id": "absent-evidence-hr-leave-01",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-02",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Tek seferlik prim için bordro kesim tarihi nedir?",
+      "scenario_id": "absent-evidence-vendor-finance-02",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-03",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Bir çalışan ayda kaç kişisel misafir kartı isteyebilir?",
+      "scenario_id": "absent-evidence-hr-leave-03",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-04",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Ofis kutlaması hediyeleri için izin verilen bütçe nedir?",
+      "scenario_id": "absent-evidence-purchasing-travel-04",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-05",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Süresi dolmuş API belirtecini yenilemek için tanınan ek süre ne kadardır?",
+      "scenario_id": "absent-evidence-identity-security-05",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        33,
+        34,
+        35,
+        36
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-06",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Üç aylık şirket toplantısı haftanın hangi günü yapılır?",
+      "scenario_id": "absent-evidence-workstation-operations-06",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-07",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Ev-ofis mobilyası için geri ödeme üst sınırı nedir?",
+      "scenario_id": "absent-evidence-purchasing-travel-07",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "general",
+      "confusable_document_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-08",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kuzen vefatında kaç gün mazeret izni verilir?",
+      "scenario_id": "absent-evidence-hr-leave-08",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-09",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Bir kişinin açabileceği en fazla destek kaydı sayısı nedir?",
+      "scenario_id": "absent-evidence-support-response-09",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        37,
+        38,
+        39,
+        40
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-10",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Müşteri dışa aktarımlarında hangi özet algoritması zorunludur?",
+      "scenario_id": "absent-evidence-privacy-requests-10",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-11",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Her tedarikçiye kaç test ortamı verilir?",
+      "scenario_id": "absent-evidence-vendor-finance-11",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "no_answer",
+      "category": "technical",
+      "confusable_document_ids": [
+        29,
+        30,
+        31,
+        32
+      ],
+      "expect_answer": false,
+      "expected_document_ids": [],
+      "expected_documents": [],
+      "expected_facts": [],
+      "id": "no-answer-tr-12",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Geciken API sürümü için hizmet kredisi yüzdesi nedir?",
+      "scenario_id": "absent-evidence-api-limits-12",
+      "top_k": 3
+    }
+  ],
+  "name": "compact-multilingual-v1",
+  "version": 1
+}
