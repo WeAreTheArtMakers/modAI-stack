@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -18,6 +20,7 @@ class EvaluationCase(BaseModel):
     question: str = Field(min_length=1, max_length=12000)
     knowledge_base_ids: list[int] = Field(min_length=1, max_length=20)
     expected_documents: list[str] = Field(default_factory=list)
+    expected_document_ids: list[int] = Field(default_factory=list, max_length=50)
     expected_facts: list[str] = Field(default_factory=list)
     top_k: int = Field(default=5, gt=0, le=50)
 
@@ -38,9 +41,9 @@ class EvaluationCase(BaseModel):
             raise ValueError(f"must be one of: {supported}")
         return normalized
 
-    @field_validator("knowledge_base_ids")
+    @field_validator("knowledge_base_ids", "expected_document_ids")
     @classmethod
-    def validate_knowledge_base_ids(cls, value: list[int]) -> list[int]:
+    def validate_positive_unique_ids(cls, value: list[int]) -> list[int]:
         if any(identifier <= 0 for identifier in value):
             raise ValueError("must contain only positive IDs")
         if len(set(value)) != len(value):
@@ -77,11 +80,24 @@ class EvaluationDataset(BaseModel):
         return self
 
 
+def dataset_fingerprint(dataset: EvaluationDataset) -> str:
+    """Return a stable SHA-256 fingerprint of the complete validated dataset."""
+    canonical_json = json.dumps(
+        dataset.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
 class RetrievedEvidence(BaseModel):
     """In-memory evidence. Its text is deliberately never serialized to results."""
 
     document: str = Field(min_length=1)
     score: float
+    document_id: int | None = Field(default=None, gt=0)
+    chunk_index: int | None = Field(default=None, ge=0)
     text: str | None = None
 
 
@@ -104,7 +120,11 @@ class EvaluationCaseResult(BaseModel):
     category: str
     knowledge_base_ids: list[int]
     expected_documents: list[str]
+    expected_document_ids: list[int] = Field(default_factory=list)
     returned_documents: list[str]
+    # Preserve source ordering; ``null`` means legacy/fixture evidence lacked an ID.
+    returned_document_ids: list[int | None] = Field(default_factory=list)
+    returned_chunk_indexes: list[int | None] = Field(default_factory=list)
     source_hit: bool | None = None
     reciprocal_rank: float | None = None
     unexpected_sources: list[str] = Field(default_factory=list)
@@ -136,8 +156,16 @@ class EvaluationResult(BaseModel):
     schema_version: Literal[1] = 1
     dataset_version: Literal[SUPPORTED_DATASET_VERSION]
     dataset_name: str
+    # Optional/defaulted fields keep persisted v0.5 pre-hardening results readable.
+    dataset_fingerprint: str | None = None
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    mode: Literal["fixture", "local"]
-    models: dict[str, str | None]
+    mode: Literal["fixture", "local"] = "fixture"
+    models: dict[str, str | None] = Field(default_factory=dict)
+    embedding_model: str | None = None
+    generation_provider: str | None = None
+    generation_model: str | None = None
+    rag_top_k_default: int | None = Field(default=None, gt=0)
+    application_version: str | None = None
+    evaluation_mode: Literal["fixture", "local"] | None = None
     summary: EvaluationSummary
     cases: list[EvaluationCaseResult]

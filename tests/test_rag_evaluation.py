@@ -10,7 +10,14 @@ from pydantic import ValidationError
 
 from app.services.evaluation.comparison import compare_evaluations
 from app.services.evaluation.metrics import answer_fact_groundedness, fact_coverage, normalize_text
-from app.services.evaluation.models import EvaluationCase, EvaluationDataset, RetrievalResult, RetrievedEvidence
+from app.services.evaluation.models import (
+    EvaluationCase,
+    EvaluationDataset,
+    EvaluationResult,
+    RetrievalResult,
+    RetrievedEvidence,
+    dataset_fingerprint,
+)
 from app.services.evaluation.runner import AuthorizedRagRetriever, EvaluationRunner, load_dataset
 from app.tools.evaluate_rag import _fixture_retriever, _validate_thresholds
 
@@ -127,6 +134,123 @@ def test_text_normalization_is_unicode_case_and_whitespace_safe():
     assert fact_coverage(["Yönetici onayı gereklidir"], ["YÖNETİCİ   onayı gereklidir."]) == 1.0
 
 
+def test_dataset_fingerprint_is_canonical_and_changes_for_semantic_inputs():
+    baseline = dataset()
+    reordered = EvaluationDataset.model_validate(json.loads(baseline.model_dump_json()))
+    changed_question = baseline.model_copy(
+        update={"cases": [baseline.cases[0].model_copy(update={"question": "Different question"}), baseline.cases[1]]}
+    )
+    changed_fact = baseline.model_copy(
+        update={"cases": [baseline.cases[0].model_copy(update={"expected_facts": ["Different fact"]}), baseline.cases[1]]}
+    )
+    changed_scope = baseline.model_copy(
+        update={"cases": [baseline.cases[0].model_copy(update={"knowledge_base_ids": [2]}), baseline.cases[1]]}
+    )
+
+    assert dataset_fingerprint(baseline) == dataset_fingerprint(reordered)
+    assert dataset_fingerprint(baseline) != dataset_fingerprint(changed_question)
+    assert dataset_fingerprint(baseline) != dataset_fingerprint(changed_fact)
+    assert dataset_fingerprint(baseline) != dataset_fingerprint(changed_scope)
+
+
+@pytest.mark.asyncio
+async def test_document_id_matching_prevents_duplicate_filename_false_positives_and_keeps_name_fallback():
+    duplicate_case = EvaluationCase(
+        id="duplicate-name",
+        category="technical",
+        question="duplicate collision",
+        knowledge_base_ids=[1],
+        expected_documents=["shared-sentinel.txt"],
+        expected_document_ids=[101],
+    )
+
+    async def wrong_id(_case: EvaluationCase) -> RetrievalResult:
+        return RetrievalResult(
+            evidence=[RetrievedEvidence(document="shared-sentinel.txt", document_id=202, chunk_index=0, score=1)]
+        )
+
+    async def expected_id(_case: EvaluationCase) -> RetrievalResult:
+        return RetrievalResult(
+            evidence=[RetrievedEvidence(document="different-visible-name.txt", document_id=101, chunk_index=2, score=1)]
+        )
+
+    wrong_result = await EvaluationRunner(wrong_id).run(
+        EvaluationDataset(version=1, name="duplicate-id", cases=[duplicate_case]), mode="fixture"
+    )
+    right_result = await EvaluationRunner(expected_id).run(
+        EvaluationDataset(version=1, name="duplicate-id", cases=[duplicate_case]), mode="fixture"
+    )
+    fallback_case = duplicate_case.model_copy(update={"expected_document_ids": []})
+    fallback_result = await EvaluationRunner(wrong_id).run(
+        EvaluationDataset(version=1, name="duplicate-name-fallback", cases=[fallback_case]), mode="fixture"
+    )
+
+    assert wrong_result.cases[0].source_hit is False
+    assert right_result.cases[0].source_hit is True
+    assert right_result.cases[0].returned_document_ids == [101]
+    assert right_result.cases[0].returned_chunk_indexes == [2]
+    assert fallback_result.cases[0].source_hit is True
+
+
+@pytest.mark.asyncio
+async def test_source_accuracy_uses_only_cases_with_expected_source_identity():
+    cases = [
+        dataset().cases[0],
+        EvaluationCase(id="no-source-assertion", category="general", question="status", knowledge_base_ids=[1]),
+    ]
+
+    async def retrieve(case: EvaluationCase) -> RetrievalResult:
+        if case.id == "case-a":
+            return RetrievalResult(
+                evidence=[
+                    RetrievedEvidence(document="Policy.PDF", score=1),
+                    RetrievedEvidence(document="extra.txt", score=0.5),
+                ]
+            )
+        return RetrievalResult(evidence=[RetrievedEvidence(document="not-scored.txt", score=1)])
+
+    result = await EvaluationRunner(retrieve).run(
+        EvaluationDataset(version=1, name="denominator", cases=cases), mode="fixture"
+    )
+    assert result.summary.source_accuracy == 0.5
+    assert result.summary.unexpected_source_count == 1
+
+
+@pytest.mark.asyncio
+async def test_results_remain_backward_compatible_and_do_not_serialize_sensitive_runtime_content():
+    async def retrieve(_case: EvaluationCase) -> RetrievalResult:
+        return RetrievalResult(
+            evidence=[RetrievedEvidence(document="private.txt", document_id=9, chunk_index=4, score=1, text="source body")],
+            prompt="private prompt",
+        )
+
+    result = await EvaluationRunner(retrieve).run(
+        EvaluationDataset(version=1, name="privacy", cases=[dataset().cases[0]]), mode="fixture"
+    )
+    serialized = result.model_dump(mode="json")
+    text = json.dumps(serialized)
+    assert "source body" not in text and "private prompt" not in text
+    assert "access_token" not in text and "authorization" not in text
+
+    legacy = json.loads(json.dumps(serialized))
+    for field in (
+        "dataset_fingerprint",
+        "embedding_model",
+        "generation_provider",
+        "generation_model",
+        "rag_top_k_default",
+        "application_version",
+        "evaluation_mode",
+    ):
+        legacy.pop(field)
+    for case in legacy["cases"]:
+        case.pop("expected_document_ids")
+        case.pop("returned_document_ids")
+        case.pop("returned_chunk_indexes")
+    parsed = EvaluationResult.model_validate(legacy)
+    assert parsed.dataset_fingerprint is None
+
+
 @pytest.mark.asyncio
 async def test_fixture_retriever_and_explicit_thresholds(tmp_path: Path):
     fixture_path = tmp_path / "fixture.json"
@@ -158,6 +282,23 @@ def test_comparison_reports_objective_deltas_and_embedding_model_warning():
     comparison = compare_evaluations(baseline, candidate)
     assert comparison.deltas["hit_at_k"] == 0.0
     assert comparison.warnings == ["Embedding model changed; reindex knowledge bases before treating retrieval deltas as comparable."]
+
+
+def test_comparison_warns_when_fingerprints_are_missing_or_different():
+    async def retrieve(_case: EvaluationCase) -> RetrievalResult:
+        return RetrievalResult(evidence=[])
+
+    baseline = asyncio.run(EvaluationRunner(retrieve).run(dataset(), mode="fixture"))
+    changed_dataset = dataset().model_copy(
+        update={"cases": [dataset().cases[0].model_copy(update={"expected_facts": ["Changed"]}), dataset().cases[1]]}
+    )
+    candidate = asyncio.run(EvaluationRunner(retrieve).run(changed_dataset, mode="fixture"))
+    comparison = compare_evaluations(baseline, candidate)
+    assert "Dataset content differs; aggregate metric deltas are not directly comparable." in comparison.warnings
+
+    legacy = baseline.model_copy(update={"dataset_fingerprint": None})
+    legacy_comparison = compare_evaluations(legacy, candidate)
+    assert "Dataset fingerprint unavailable; dataset equality cannot be proven for this comparison." in legacy_comparison.warnings
 
 
 @pytest.mark.asyncio

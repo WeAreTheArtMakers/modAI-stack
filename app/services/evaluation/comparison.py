@@ -30,6 +30,11 @@ class EvaluationComparison(BaseModel):
 
 def compare_evaluations(baseline: EvaluationResult, candidate: EvaluationResult) -> EvaluationComparison:
     warnings: list[str] = []
+    if baseline.dataset_fingerprint and candidate.dataset_fingerprint:
+        if baseline.dataset_fingerprint != candidate.dataset_fingerprint:
+            warnings.append("Dataset content differs; aggregate metric deltas are not directly comparable.")
+    else:
+        warnings.append("Dataset fingerprint unavailable; dataset equality cannot be proven for this comparison.")
     if baseline.models.get("embedding_model") != candidate.models.get("embedding_model"):
         warnings.append("Embedding model changed; reindex knowledge bases before treating retrieval deltas as comparable.")
     if baseline.dataset_version != candidate.dataset_version:

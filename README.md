@@ -44,7 +44,7 @@ Enterprise Administration; platform kullanıcı dizini, Organization ve Workspac
 
 ## v0.5 geliştirme — RAG Evaluation & Quality
 
-Bu geliştirme dalı, mevcut RAG davranışını değiştirmeden retrieval ve cevap desteğini ölçülebilir, tekrar çalıştırılabilir hale getirir. Sürümlü, insan gözden geçirmeli evaluation dataset’leri; deterministik kaynak/fact metrikleri; JSON sonuç şeması; eşik kontrollü CLI ve baseline/candidate karşılaştırması bulunur. Bulut LLM judge kullanılmaz. Değerlendirme çalıştıran kullanıcı, RAG endpoint’iyle aynı Knowledge Base yetkilendirmesine tabidir; sonuç dosyaları belge gövdesi, prompt veya üretilmiş tam yanıt içermez.
+Bu geliştirme dalı, mevcut RAG davranışını değiştirmeden retrieval ve cevap desteğini ölçülebilir, tekrar çalıştırılabilir hale getirir. Sürümlü, insan gözden geçirmeli evaluation dataset’leri; canonical SHA-256 dataset fingerprint’i; sabit belge-ID öncelikli kaynak eşlemesi; deterministik kaynak/fact metrikleri; JSON sonuç şeması; eşik kontrollü CLI ve baseline/candidate karşılaştırması bulunur. Aynı adlı iki belge, farklı belge kimlikleri sayesinde yanlış pozitif kaynak eşleşmesi oluşturmaz. Bulut LLM judge kullanılmaz. Değerlendirme çalıştıran kullanıcı, RAG endpoint’iyle aynı Knowledge Base yetkilendirmesine tabidir; yetki reddi retrieval başlamadan uygulanır. Sonuç dosyaları belge gövdesi, prompt, üretilmiş tam yanıt veya token içermez.
 
 Detaylı şema, metrik sınırları, embedding modeli değiştiğinde reindex uyarısı ve komut örnekleri için [evaluation/README.md](evaluation/README.md) dosyasına bakın.
 
