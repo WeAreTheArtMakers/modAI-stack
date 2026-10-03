@@ -2,9 +2,41 @@
 
 <p align="center"><img src="assets/modai-stack-logo.png" alt="modAI-stack logosu" width="760"></p>
 
-> Yerel LLM, gerçek zamanlı sohbet, belge tabanlı RAG ve vektör aramayı birleştiren modüler yapay zekâ platformu.
+> **YEREL · ÖZEL · KURUMSAL · KAYNAKLI YANITLAR · ON-PREMISE**
+
+modAI-stack, şirketlerin iç belgelerini kendi altyapılarında tutup yetkili çalışanların doğal dille arayabildiği yerel-öncelikli kurumsal bilgi platformudur. Belgeler Organization → Workspace → Knowledge Base yapısında düzenlenir; yerel LLM yanıtları erişilebilir kaynaklarla birlikte sunulur. Yerel/on-premise kurulumda belge ve sorgu içeriği varsayılan olarak bir bulut LLM servisine gönderilmez.
+
+Organization, Workspace ve Knowledge Base sınırları rol tabanlı erişimle korunur. Çok dilli retrieval profilleri için mimari hazırlanmaktadır; mevcut embedding baseline'ı İngilizce odaklıdır ve Türkçe optimizasyonu iddia edilmemektedir. Bu proje herhangi bir güvenlik sertifikası iddiasında bulunmaz.
 
 [GitHub deposu](https://github.com/WeAreTheArtMakers/modAI-stack)
+
+## Ürün arayüzü
+
+<p align="center"><img src="docs/screenshots/login-console.png" alt="modAI Console giriş ekranı: şirket belgelerine yerel altyapıdan erişim" width="100%"></p>
+<p align="center"><em>Kuruluşunuzun kendi çalışma alanından özel belge zekâsına giriş.</em></p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/knowledge-bases.png" alt="Workspace içinde kurumsal Knowledge Base listesi" width="100%"><strong>Kurumsal bilgi tabanları</strong><br>Şirket bilgisini çalışma alanları ve yetkili Knowledge Base'ler altında düzenleyin.</td>
+    <td width="33%"><img src="docs/screenshots/system-status.png" alt="Yerel API, model ve altyapı sinyallerini gösteren sistem ekranı" width="100%"><strong>Yerel sistem görünümü</strong><br>API ve yerel model sinyallerini, ayrıca ayrı sağlık sinyali olmayan servisleri açıkça görün.</td>
+    <td width="33%"><img src="docs/screenshots/navigation-drawer.png" alt="Workspace seçimi ve role-aware ürün gezinme menüsü" width="100%"><strong>Çalışma alanı ve erişim</strong><br>Workspace seçin; sohbet, belgeler ve yönetim alanlarına tek menüden ulaşın.</td>
+  </tr>
+</table>
+
+## Search / Retrieval Profiles
+
+Yöneticiler ileride embedding model adları yerine dil ve donanım ihtiyacına göre bir arama profili seçebilecek. Şimdilik katalog ve aktif profil durumu salt okunurdur; model değiştirme veya yeniden indeksleme başlatan bir işlem yoktur.
+
+| Profil | Kullanım hedefi | Yerel kaynak sınıfı | Durum |
+| --- | --- | --- | --- |
+| Compact Multilingual | Türkçe + İngilizce + çok dilli kullanım; düşük bellek ve hızlı yerel kurulum | Düşük | Deneysel; model eşlemesi ve ölçüm bekliyor |
+| Balanced Multilingual | Çok dilli retrieval ile kaynak kullanımı arasında denge | Orta | Model sağlama ve benchmark bekliyor |
+| Advanced Long-Document | Uzun belgeler ve çok dilli koleksiyonlar | Yüksek | Yapılandırılmadı |
+| English Optimized | Mevcut hafif, İngilizce odaklı embedding baseline'ı | Düşük | Aktif profil eşlemesi; Türkçe performansı ölçülmedi |
+
+Çok dilli profiller için nihai model atamaları aynı robustness korpusu üzerinde benchmark edilmeden doğrulanmış üretim varsayılanları sayılmayacaktır. Embedding modeli veya vektör boyutu değiştiğinde eski vektörler yeni uzayla uyumlu olmayabilir; profil değişimi gelecekte açıkça onaylanan bir migration/reindex işlemi olmalıdır. [Sonraki embedding benchmark planı](docs/roadmap/retrieval-profile-embedding-benchmark.md).
+
+Giriş yapmış kullanıcılar mevcut kataloğu `GET /retrieval/profiles` ve etkin yapılandırma eşleşmesini `GET /retrieval/status` ile okuyabilir. Bu yanıtlar model kimliği veya cache/dosya yolu içermez; bu milestone'da profil değiştirme endpoint'i yoktur.
 
 ## Proje hakkında
 
@@ -23,7 +55,7 @@ Bu nedenle bir kullanıcı platform rolü `user` iken kendi workspace’inde üy
 
 ## v0.3 — Enterprise Local AI Platform
 
-v0.3, yerel-öncelikli kurumsal RAG platformu kilometre taşıdır. Production hardening ve Model Manager v0.3 bu sürümde tamamlandı. Mevcut backend doğrulama paketi **85 test** içerir ve son doğrulamada geçmiştir.
+v0.3, yerel-öncelikli kurumsal RAG platformu kilometre taşıdır. Production hardening ve Model Manager v0.3 bu sürümde tamamlandı. O dönemki backend doğrulama paketi 85 test ile CI'da doğrulanmıştır; güncel test komutu aşağıdaki Test ve LoRA eğitimi bölümündedir.
 
 - Çok tenantlı Organization → Workspace → Knowledge Base hiyerarşisi, Membership tabanlı yetkilendirme ve tenant izolasyonu kullanılmaktadır.
 - Gerçek canlı RAG kabulü tamamlandı: TXT, PDF ve DOCX yükleme/çıkarma, Qdrant retrieval, kaynaklı HTTP ve WebSocket yanıtları doğrulandı.
@@ -285,7 +317,7 @@ Geri yükleme sırası: önce aynı sürümde PostgreSQL’i geri yükleyin, son
 
 ## Test ve LoRA eğitimi
 
-`pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile testleri çalıştırın; mevcut backend paketi 85 test içerir. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
+`pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile güncel backend test paketini çalıştırın. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
 
 ## Bilinen sınırlamalar
 
