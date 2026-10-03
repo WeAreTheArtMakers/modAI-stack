@@ -1,4 +1,6 @@
-# Compact Multilingual embedding validation v2
+# Compact Multilingual embedding validation v2 — historical provisioning attempt
+
+> Historical snapshot: this report records the earlier v2 attempt when E5 provisioning was incomplete. The later paired MiniLM vs E5-small run and current decision are documented in [`compact-multilingual-e5-paired-v1.md`](compact-multilingual-e5-paired-v1.md); that paired report supersedes this report for current E5 status.
 
 ## Decision
 

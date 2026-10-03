@@ -81,10 +81,16 @@ def test_runner_uses_ephemeral_profile_isolated_qdrant_and_serializes_aggregates
         def encode(self, values, **kwargs):
             return np.zeros((len(values), MINILM_BASELINE.dimensions), dtype=np.float32)
 
+    constructor_calls = []
+
+    def fake_sentence_transformer(*args, **kwargs):
+        constructor_calls.append((args, kwargs))
+        return FakeModel()
+
     monkeypatch.setitem(
         __import__("sys").modules,
         "sentence_transformers",
-        SimpleNamespace(SentenceTransformer=lambda *args, **kwargs: FakeModel()),
+        SimpleNamespace(SentenceTransformer=fake_sentence_transformer),
     )
     monkeypatch.setattr(benchmark, "_resolve_device", lambda: ("cpu", "test CPU"))
     monkeypatch.setattr(
@@ -136,3 +142,12 @@ def test_runner_uses_ephemeral_profile_isolated_qdrant_and_serializes_aggregates
     assert len(clients) == 1
     assert clients[0].collection_name.startswith("embedding_benchmark_")
     assert clients[0].path.name == MINILM_BASELINE.collection_name
+    assert len(constructor_calls) == 1
+    args, kwargs = constructor_calls[0]
+    assert args == (str(model_path),)
+    assert kwargs["local_files_only"] is True
+    assert kwargs["trust_remote_code"] is False
+    assert kwargs["model_kwargs"] == {
+        "use_safetensors": True,
+        "local_files_only": True,
+    }

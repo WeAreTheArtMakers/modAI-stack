@@ -8,6 +8,7 @@ in memory and are never serialized.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import resource
 import statistics
@@ -32,6 +33,18 @@ from app.services.evaluation.synthetic_corpus import corpus_fingerprint
 from app.services.rag.chunker import chunk_text
 
 TOP_K = 3
+E5_REQUIRED_SNAPSHOT_FILES = (
+    "1_Pooling/config.json",
+    "config.json",
+    "modules.json",
+    "sentence_bert_config.json",
+    "sentencepiece.bpe.model",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "model.safetensors",
+)
+E5_MODEL_SAFETENSORS_SHA256 = "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477"
 
 
 def _read_json(path: Path) -> object:
@@ -125,6 +138,54 @@ def _directory_size(path: Path) -> int:
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as model_file:
+        for block in iter(lambda: model_file.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _validate_local_model_snapshot(profile: EmbeddingProfileSpec, model_path: Path) -> str:
+    if not model_path.is_dir():
+        raise ValueError("model path is not a local directory; downloads are disabled")
+
+    if profile.model_id == MULTILINGUAL_E5_SMALL.model_id:
+        if profile.revision != MULTILINGUAL_E5_SMALL.revision:
+            raise ValueError("E5 benchmark requires the exact pinned model revision")
+        expected_directory_name = f"e5-small-{profile.revision}"
+        required_files = E5_REQUIRED_SNAPSHOT_FILES
+    elif profile.model_id == MINILM_BASELINE.model_id:
+        if profile.revision != MINILM_BASELINE.revision:
+            raise ValueError("MiniLM benchmark requires the exact pinned model revision")
+        expected_directory_name = profile.revision
+        required_files = ("model.safetensors",)
+    else:
+        raise ValueError("unsupported model identity for offline embedding benchmark")
+    if model_path.name != expected_directory_name:
+        raise ValueError("model path must use the exact pinned local snapshot directory name")
+
+    missing_or_empty = [
+        filename
+        for filename in required_files
+        if not (model_path / filename).is_file()
+        or (model_path / filename).stat().st_size <= 0
+    ]
+    if missing_or_empty:
+        raise ValueError(
+            "pinned local model snapshot has missing or empty required files: "
+            + ", ".join(missing_or_empty)
+        )
+
+    safetensors_sha256 = _sha256_file(model_path / "model.safetensors")
+    if (
+        profile.model_id == MULTILINGUAL_E5_SMALL.model_id
+        and safetensors_sha256 != E5_MODEL_SAFETENSORS_SHA256
+    ):
+        raise ValueError("pinned E5 model.safetensors SHA-256 does not match the expected digest")
+    return safetensors_sha256
+
+
 def _group_metrics(records: list[dict]) -> dict:
     answerable = [record for record in records if record["answerable"]]
     if not answerable:
@@ -177,13 +238,7 @@ def _validate_profile_preprocessing(profile: EmbeddingProfileSpec) -> None:
 
 def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, documents_path: Path) -> dict:
     _validate_profile_preprocessing(profile)
-    if not model_path.is_dir():
-        raise ValueError("model path is not a local directory; downloads are disabled")
-    if model_path.name != profile.revision:
-        raise ValueError("model path must be the exact pinned local snapshot revision")
-    weights_path = model_path / "model.safetensors"
-    if not weights_path.is_file() or weights_path.stat().st_size <= 0:
-        raise ValueError("the pinned local model.safetensors artifact is missing or empty")
+    safetensors_sha256 = _validate_local_model_snapshot(profile, model_path)
     dataset = _load_dataset(dataset_path)
     corpus_version, documents = _load_documents(documents_path)
     if corpus_version != "unspecified" and dataset.name != corpus_version:
@@ -392,6 +447,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
     report = {
         "schema_version": 1,
         "profile": profile.safe_metadata(),
+        "model_artifacts": {"safetensors_sha256": safetensors_sha256},
         "inference": {
             "backend": "sentence-transformers / PyTorch",
             "device": str(model.device),

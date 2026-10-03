@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import replace
 from pathlib import Path
 
@@ -85,6 +86,61 @@ def test_incomplete_or_zero_byte_snapshot_weights_are_rejected_before_loading(tm
             model_path,
             tmp_path / "does-not-need-to-be-read.json",
             tmp_path / "also-not-read.json",
+        )
+
+
+def _complete_e5_snapshot(tmp_path: Path) -> Path:
+    model_path = tmp_path / f"e5-small-{MULTILINGUAL_E5_SMALL.revision}"
+    for filename in benchmark_embedding_profile.E5_REQUIRED_SNAPSHOT_FILES:
+        artifact = model_path / filename
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_bytes(b"test-only snapshot artifact")
+    return model_path
+
+
+def test_e5_snapshot_validation_requires_every_nonempty_pinned_artifact(tmp_path):
+    model_path = _complete_e5_snapshot(tmp_path)
+    (model_path / "tokenizer.json").unlink()
+
+    with pytest.raises(ValueError, match="tokenizer.json"):
+        benchmark_embedding_profile._validate_local_model_snapshot(
+            MULTILINGUAL_E5_SMALL, model_path
+        )
+
+
+def test_e5_snapshot_validation_verifies_safetensors_sha256(tmp_path, monkeypatch):
+    model_path = _complete_e5_snapshot(tmp_path)
+    weights = model_path / "model.safetensors"
+    weights.write_bytes(b"synthetic safetensors test fixture")
+    expected = hashlib.sha256(weights.read_bytes()).hexdigest()
+    monkeypatch.setattr(
+        benchmark_embedding_profile,
+        "E5_MODEL_SAFETENSORS_SHA256",
+        expected,
+    )
+
+    assert benchmark_embedding_profile._validate_local_model_snapshot(
+        MULTILINGUAL_E5_SMALL, model_path
+    ) == expected
+
+    monkeypatch.setattr(
+        benchmark_embedding_profile,
+        "E5_MODEL_SAFETENSORS_SHA256",
+        "0" * 64,
+    )
+    with pytest.raises(ValueError, match="SHA-256"):
+        benchmark_embedding_profile._validate_local_model_snapshot(
+            MULTILINGUAL_E5_SMALL, model_path
+        )
+
+
+def test_snapshot_validator_rejects_a_non_pinned_revision_directory(tmp_path):
+    model_path = tmp_path / ("f" * 40)
+    model_path.mkdir()
+
+    with pytest.raises(ValueError, match="exact pinned local snapshot directory name"):
+        benchmark_embedding_profile._validate_local_model_snapshot(
+            MULTILINGUAL_E5_SMALL, model_path
         )
 
 
