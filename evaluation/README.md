@@ -52,7 +52,7 @@ python -m app.tools.evaluate_rag \
   --output top-k-3.json
 ```
 
-`N` 1–50 aralığında olmalıdır. Kaydedilen sonuçta `top_k_override` ve uniform koşulda `effective_top_k` bulunur; ayrıca case ve özet seviyesinde güvenli retrieved source/chunk sayıları kaydedilir. Bu sayımlar kaynak metni içermez. Karşılaştırma aracı, iki koşunun etkin top-k veya override metadatası farklıysa bunu açıkça uyarı olarak bildirir.
+`N` 1–50 aralığında olmalıdır. Kaydedilen sonuçta `top_k_override` ve uniform koşulda `effective_top_k` bulunur; ayrıca case ve özet seviyesinde güvenli retrieved source/chunk sayıları kaydedilir. `--generate` koşularında cevap metni yerine yalnızca `generated_answer_char_count` saklanır. Bu sayımlar kaynak metni veya cevabı içermez. Karşılaştırma aracı, iki koşunun etkin top-k veya override metadatası farklıysa bunu açıkça uyarı olarak bildirir.
 
 İki koşuyu nesnel delta olarak karşılaştırın:
 

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     chunk_size: int = 700
     chunk_overlap: int = 100
-    rag_top_k: int = 5
+    rag_top_k: int = 3
     max_concurrent_llm_requests: int = 4
     max_upload_bytes: int = 10 * 1024 * 1024
     data_dir: str = "./data/modai"
