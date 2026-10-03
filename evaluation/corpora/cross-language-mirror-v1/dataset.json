@@ -1,0 +1,966 @@
+{
+  "cases": [
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        2
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        1
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 days"
+      ],
+      "id": "annual-leave-carryover-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kullanılmayan yıllık izin sonraki izin yılına en fazla kaç gün devredilebilir?",
+      "scenario_id": "mirror-pair-01",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        1
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        2
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "6 gün"
+      ],
+      "id": "annual-leave-carryover-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How many unused annual leave days may be carried into the next leave year?",
+      "scenario_id": "mirror-pair-01",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        4
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        3
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "18 weeks"
+      ],
+      "id": "parental-leave-duration-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Ebeveyn izni hakkı ne kadar sürer?",
+      "scenario_id": "mirror-pair-02",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        3
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        4
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "18 hafta"
+      ],
+      "id": "parental-leave-duration-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How long is the parental leave entitlement?",
+      "scenario_id": "mirror-pair-02",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        6
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        5
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "2 consecutive workdays"
+      ],
+      "id": "medical-note-threshold-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kaç iş günü üst üste devamsızlıktan sonra sağlık raporu gerekir?",
+      "scenario_id": "mirror-pair-03",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "hr",
+      "confusable_document_ids": [
+        5
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        6
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "2 iş günü"
+      ],
+      "id": "medical-note-threshold-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "After how many consecutive workdays is a medical note required?",
+      "scenario_id": "mirror-pair-03",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        8
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        7
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "api-token-lifetime-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kişisel API erişim belirteci ne kadar süre geçerli kalır?",
+      "scenario_id": "mirror-pair-04",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        7
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        8
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 gün"
+      ],
+      "id": "api-token-lifetime-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How long does a personal API access token remain valid?",
+      "scenario_id": "mirror-pair-04",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        10
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        9
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 minutes"
+      ],
+      "id": "browser-session-timeout-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Etkin olmayan tarayıcı oturumu ne zaman sona erer?",
+      "scenario_id": "mirror-pair-05",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        9
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        10
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 dakika"
+      ],
+      "id": "browser-session-timeout-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "When does an inactive browser session expire?",
+      "scenario_id": "mirror-pair-05",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        12
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        11
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 hours"
+      ],
+      "id": "mfa-recheck-interval-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yönetilen cihazda çok faktörlü doğrulama ne sıklıkla yinelenmelidir?",
+      "scenario_id": "mirror-pair-06",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        11
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        12
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 saat"
+      ],
+      "id": "mfa-recheck-interval-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How often must a managed device repeat multi-factor authentication?",
+      "scenario_id": "mirror-pair-06",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        14
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        13
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "5 failed attempts"
+      ],
+      "id": "account-lockout-threshold-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Bir hesabın kilitlenmesi için art arda kaç başarısız giriş gerekir?",
+      "scenario_id": "mirror-pair-07",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        13
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        14
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "5 başarısız deneme"
+      ],
+      "id": "account-lockout-threshold-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How many consecutive failed sign-ins lock an account?",
+      "scenario_id": "mirror-pair-07",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        16
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        15
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 years"
+      ],
+      "id": "personnel-file-retention-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Personel dosyaları ayrılıktan sonra ne kadar süre saklanır?",
+      "scenario_id": "mirror-pair-08",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        15
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        16
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "7 yıl"
+      ],
+      "id": "personnel-file-retention-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How long are personnel files retained after departure?",
+      "scenario_id": "mirror-pair-08",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        18
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        17
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "400 days"
+      ],
+      "id": "audit-log-retention-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Güvenlik denetim olayları kaç gün boyunca aranabilir kalır?",
+      "scenario_id": "mirror-pair-09",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        17
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        18
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "400 gün"
+      ],
+      "id": "audit-log-retention-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "For how many days do security audit events remain searchable?",
+      "scenario_id": "mirror-pair-09",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        20
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        19
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 days"
+      ],
+      "id": "backup-snapshot-retention-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Yedek anlık görüntüleri ne kadar süre saklanır?",
+      "scenario_id": "mirror-pair-10",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        19
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        20
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 gün"
+      ],
+      "id": "backup-snapshot-retention-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How long are backup snapshots retained?",
+      "scenario_id": "mirror-pair-10",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        22
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        21
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 days"
+      ],
+      "id": "restore-test-interval-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Kurtarma geri yükleme testi ne sıklıkla yapılır?",
+      "scenario_id": "mirror-pair-11",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "operations",
+      "confusable_document_ids": [
+        21
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        22
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "90 gün"
+      ],
+      "id": "restore-test-interval-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How often is a recovery restore test performed?",
+      "scenario_id": "mirror-pair-11",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        24
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        23
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "$2,500"
+      ],
+      "id": "purchase-approval-threshold-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Bir satın alma hangi tutarın üzerinde yönetici onayı gerektirir?",
+      "scenario_id": "mirror-pair-12",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        23
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        24
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "2.500 ABD doları"
+      ],
+      "id": "purchase-approval-threshold-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "Above what amount does a purchase require manager approval?",
+      "scenario_id": "mirror-pair-12",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        26
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        25
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "10 business days"
+      ],
+      "id": "travel-receipt-deadline-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Seyahat fişleri dönüşten sonra en geç ne zaman teslim edilmelidir?",
+      "scenario_id": "mirror-pair-13",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        25
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        26
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "10 iş günü"
+      ],
+      "id": "travel-receipt-deadline-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the deadline for submitting travel receipts after return?",
+      "scenario_id": "mirror-pair-13",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        28
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        27
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 euros"
+      ],
+      "id": "daily-meal-allowance-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Onaylı uluslararası seyahatte günlük yemek ödeneği ne kadardır?",
+      "scenario_id": "mirror-pair-14",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        27
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        28
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "45 avro"
+      ],
+      "id": "daily-meal-allowance-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the daily meal allowance for approved international travel?",
+      "scenario_id": "mirror-pair-14",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        30
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        29
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "160 euros per night"
+      ],
+      "id": "hotel-reimbursement-cap-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Otel masrafı için gecelik en fazla ne kadar geri ödeme yapılır?",
+      "scenario_id": "mirror-pair-15",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        29
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        30
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "gecelik 160 avro"
+      ],
+      "id": "hotel-reimbursement-cap-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the maximum hotel reimbursement per night?",
+      "scenario_id": "mirror-pair-15",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        32
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        31
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 months"
+      ],
+      "id": "supplier-review-period-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Etkin bir tedarikçi ne sıklıkla güvenlik incelemesinden geçirilir?",
+      "scenario_id": "mirror-pair-16",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        31
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        32
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "12 ay"
+      ],
+      "id": "supplier-review-period-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How often does an active supplier receive a security review?",
+      "scenario_id": "mirror-pair-16",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        34
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        33
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 days"
+      ],
+      "id": "invoice-payment-term-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Onaylı bir tedarikçi faturası kaç gün içinde ödenir?",
+      "scenario_id": "mirror-pair-17",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "policy",
+      "confusable_document_ids": [
+        33
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        34
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "30 gün"
+      ],
+      "id": "invoice-payment-term-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "Within how many days is an approved supplier invoice paid?",
+      "scenario_id": "mirror-pair-17",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        36
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        35
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "100 records"
+      ],
+      "id": "api-page-size-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Bir API sayfasında en fazla kaç kayıt döner?",
+      "scenario_id": "mirror-pair-18",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        35
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        36
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "100 kayıt"
+      ],
+      "id": "api-page-size-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "What is the maximum number of records in one API page?",
+      "scenario_id": "mirror-pair-18",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        38
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        37
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 retries"
+      ],
+      "id": "rate-limit-retries-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "HTTP 429 yanıtından sonra kaç yeniden denemeye izin verilir?",
+      "scenario_id": "mirror-pair-19",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "technical",
+      "confusable_document_ids": [
+        37
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        38
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "3 kez"
+      ],
+      "id": "rate-limit-retries-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "How many retries are allowed after an HTTP 429 response?",
+      "scenario_id": "mirror-pair-19",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        40
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        39
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "72 hours"
+      ],
+      "id": "critical-patch-deadline-tr-query-en-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "question": "Doğrulanmış kritik bir yama ne kadar süre içinde dağıtılmalıdır?",
+      "scenario_id": "mirror-pair-20",
+      "top_k": 3
+    },
+    {
+      "authorization_expectation": "allow",
+      "case_type": "normal",
+      "category": "security",
+      "confusable_document_ids": [
+        39
+      ],
+      "expect_answer": true,
+      "expected_document_ids": [
+        40
+      ],
+      "expected_documents": [],
+      "expected_facts": [
+        "72 saat"
+      ],
+      "id": "critical-patch-deadline-en-query-tr-source",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "question": "Within what period must a validated critical patch be deployed?",
+      "scenario_id": "mirror-pair-20",
+      "top_k": 3
+    }
+  ],
+  "name": "cross-language-mirror-v1",
+  "version": 1
+}

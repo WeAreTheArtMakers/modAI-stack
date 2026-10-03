@@ -1,0 +1,365 @@
+{
+  "corpus_version": "cross-language-mirror-v1",
+  "documents": [
+    {
+      "document_id": 1,
+      "filename": "mirror-01-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Annual leave carry-over. Unused annual leave may be carried into the next leave year for up to 6 days."
+    },
+    {
+      "document_id": 2,
+      "filename": "mirror-01-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "İzin devri. Kullanılmayan yıllık izin sonraki izin yılına en fazla 6 gün devredilebilir."
+    },
+    {
+      "document_id": 3,
+      "filename": "mirror-02-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Parental leave duration. Eligible employees receive 18 weeks of parental leave."
+    },
+    {
+      "document_id": 4,
+      "filename": "mirror-02-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Ebeveyn izni süresi. Uygun çalışanlara 18 hafta ebeveyn izni verilir."
+    },
+    {
+      "document_id": 5,
+      "filename": "mirror-03-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Medical note threshold. A medical note is required after 2 consecutive workdays of illness."
+    },
+    {
+      "document_id": 6,
+      "filename": "mirror-03-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Sağlık raporu eşiği. Hastalık nedeniyle art arda 2 iş günü devamsızlıktan sonra sağlık raporu gerekir."
+    },
+    {
+      "document_id": 7,
+      "filename": "mirror-04-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Personal API token lifetime. A personal API access token remains valid for 90 days after issuance."
+    },
+    {
+      "document_id": 8,
+      "filename": "mirror-04-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Kişisel API belirtecinin ömrü. Kişisel API erişim belirteci oluşturulduktan sonra 90 gün geçerlidir."
+    },
+    {
+      "document_id": 9,
+      "filename": "mirror-05-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Inactive browser session. An inactive browser session expires after 30 minutes."
+    },
+    {
+      "document_id": 10,
+      "filename": "mirror-05-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Etkin olmayan tarayıcı oturumu. Etkin olmayan tarayıcı oturumu 30 dakika sonra sona erer."
+    },
+    {
+      "document_id": 11,
+      "filename": "mirror-06-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Managed-device MFA interval. Managed devices must repeat multi-factor authentication every 12 hours."
+    },
+    {
+      "document_id": 12,
+      "filename": "mirror-06-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Yönetilen cihaz MFA aralığı. Yönetilen cihazlarda çok faktörlü doğrulama her 12 saatte bir yinelenmelidir."
+    },
+    {
+      "document_id": 13,
+      "filename": "mirror-07-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Account lockout threshold. An account is locked after 5 consecutive failed sign-in attempts."
+    },
+    {
+      "document_id": 14,
+      "filename": "mirror-07-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Hesap kilidi eşiği. Bir hesap art arda 5 başarısız giriş denemesinden sonra kilitlenir."
+    },
+    {
+      "document_id": 15,
+      "filename": "mirror-08-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Personnel-file retention. Personnel files are retained for 7 years after an employee leaves."
+    },
+    {
+      "document_id": 16,
+      "filename": "mirror-08-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Personel dosyası saklama süresi. Personel dosyaları çalışan ayrıldıktan sonra 7 yıl saklanır."
+    },
+    {
+      "document_id": 17,
+      "filename": "mirror-09-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Audit-log search window. Security audit events remain searchable for 400 days after creation."
+    },
+    {
+      "document_id": 18,
+      "filename": "mirror-09-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Denetim kaydı arama süresi. Güvenlik denetim olayları oluşturulduktan sonra 400 gün aranabilir kalır."
+    },
+    {
+      "document_id": 19,
+      "filename": "mirror-10-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Backup snapshot retention. Backup snapshots are retained for 45 days from their creation date."
+    },
+    {
+      "document_id": 20,
+      "filename": "mirror-10-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Yedek anlık görüntüsü saklama süresi. Yedek anlık görüntüleri oluşturulma tarihinden itibaren 45 gün saklanır."
+    },
+    {
+      "document_id": 21,
+      "filename": "mirror-11-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Recovery restore-test interval. The operations team performs a recovery restore test every 90 days."
+    },
+    {
+      "document_id": 22,
+      "filename": "mirror-11-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Kurtarma testi aralığı. Operasyon ekibi her 90 günde bir kurtarma geri yükleme testi yapar."
+    },
+    {
+      "document_id": 23,
+      "filename": "mirror-12-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Purchase approval threshold. A purchase above $2,500 requires department-manager approval before ordering."
+    },
+    {
+      "document_id": 24,
+      "filename": "mirror-12-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Satın alma onay eşiği. 2.500 ABD dolarını aşan bir satın alma siparişten önce bölüm yöneticisi onayı gerektirir."
+    },
+    {
+      "document_id": 25,
+      "filename": "mirror-13-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Travel receipt deadline. Travel receipts must be submitted within 10 business days after returning."
+    },
+    {
+      "document_id": 26,
+      "filename": "mirror-13-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Seyahat fişi teslim süresi. Seyahat fişleri dönüşten sonraki 10 iş günü içinde teslim edilmelidir."
+    },
+    {
+      "document_id": 27,
+      "filename": "mirror-14-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Daily meal allowance. The daily meal allowance on approved international travel is 45 euros."
+    },
+    {
+      "document_id": 28,
+      "filename": "mirror-14-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Günlük yemek ödeneği. Onaylı uluslararası seyahatlerde günlük yemek ödeneği 45 avrodur."
+    },
+    {
+      "document_id": 29,
+      "filename": "mirror-15-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Hotel nightly reimbursement cap. Hotel reimbursement is capped at 160 euros per night."
+    },
+    {
+      "document_id": 30,
+      "filename": "mirror-15-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Otel gecelik geri ödeme sınırı. Otel masrafı geri ödemesi gecelik 160 avro ile sınırlıdır."
+    },
+    {
+      "document_id": 31,
+      "filename": "mirror-16-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Supplier security-review period. An active supplier receives a security review once every 12 months."
+    },
+    {
+      "document_id": 32,
+      "filename": "mirror-16-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Tedarikçi güvenlik inceleme aralığı. Etkin bir tedarikçi her 12 ayda bir güvenlik incelemesinden geçirilir."
+    },
+    {
+      "document_id": 33,
+      "filename": "mirror-17-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Approved invoice payment term. A complete approved supplier invoice is paid within 30 days of registration."
+    },
+    {
+      "document_id": 34,
+      "filename": "mirror-17-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Onaylı fatura ödeme vadesi. Eksiksiz ve onaylı bir tedarikçi faturası kayıttan sonra 30 gün içinde ödenir."
+    },
+    {
+      "document_id": 35,
+      "filename": "mirror-18-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "API page-size limit. A list API endpoint returns at most 100 records on one page."
+    },
+    {
+      "document_id": 36,
+      "filename": "mirror-18-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "API sayfa boyutu sınırı. Bir liste API uç noktası tek sayfada en fazla 100 kayıt döndürür."
+    },
+    {
+      "document_id": 37,
+      "filename": "mirror-19-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Rate-limit retry budget. After an HTTP 429 response, a client may retry at most 3 times."
+    },
+    {
+      "document_id": 38,
+      "filename": "mirror-19-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Hız sınırı yeniden deneme hakkı. HTTP 429 yanıtından sonra istemci en fazla 3 kez yeniden deneyebilir."
+    },
+    {
+      "document_id": 39,
+      "filename": "mirror-20-en.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "en",
+      "text": "Critical security-patch deadline. A validated critical security patch must be deployed within 72 hours."
+    },
+    {
+      "document_id": 40,
+      "filename": "mirror-20-tr.md",
+      "knowledge_base_ids": [
+        1
+      ],
+      "language": "tr",
+      "text": "Kritik güvenlik yaması süresi. Doğrulanmış kritik bir güvenlik yaması 72 saat içinde dağıtılmalıdır."
+    }
+  ]
+}
