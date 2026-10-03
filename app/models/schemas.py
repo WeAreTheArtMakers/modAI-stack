@@ -190,7 +190,7 @@ class MembershipResponse(BaseModel):
 
 
 class MembershipCreate(BaseModel):
-    user_id: int = Field(gt=0)
+    user_email: EmailStr
     organization_id: int = Field(gt=0)
     workspace_id: int | None = Field(default=None, gt=0)
     role: TenantRole = "user"

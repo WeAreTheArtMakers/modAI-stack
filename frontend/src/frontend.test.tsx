@@ -9,13 +9,14 @@ import { UploadDropzone } from "./components/UploadDropzone";
 import { connectIndexing, streamRag } from "./api/websocket";
 import { ModelsPage } from "./pages/ModelsPage";
 import { AdminPage } from "./pages/AdminPage";
+import { InviteAcceptPage } from "./pages/InviteAcceptPage";
 import type { ModelSystemStatus, Source, UserContext } from "./types";
 
-const mocks = vi.hoisted(() => ({ login: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn(), listAdminUsers: vi.fn(), updatePlatformRole: vi.fn() }));
+const mocks = vi.hoisted(() => ({ login: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn(), listAdminUsers: vi.fn(), updatePlatformRole: vi.fn(), acceptInvitation: vi.fn() }));
 vi.mock("./auth/AuthContext", () => ({ useAuth: () => ({ user: mocks.user, loading: false, error: null, login: mocks.login, logout: vi.fn() }) }));
 vi.mock("./api/documents", () => ({ uploadDocuments: mocks.uploadDocuments, reindexDocument: vi.fn(), deleteDocument: vi.fn() }));
 vi.mock("./api/models", () => ({ getModelStatus: mocks.getModelStatus, listManagedModels: mocks.listManagedModels, deleteManagedModel: mocks.deleteManagedModel }));
-vi.mock("./api/admin", () => ({ listAdminUsers: mocks.listAdminUsers, updatePlatformRole: mocks.updatePlatformRole, listAdminOrganizations: vi.fn(), listAdminWorkspaces: vi.fn(), createAdminWorkspace: vi.fn(), listMemberships: vi.fn(), createMembership: vi.fn(), updateMembership: vi.fn(), removeMembership: vi.fn(), listInvitations: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), listAuditEvents: vi.fn(), getPlatformStatus: vi.fn() }));
+vi.mock("./api/admin", () => ({ listAdminUsers: mocks.listAdminUsers, updatePlatformRole: mocks.updatePlatformRole, listAdminOrganizations: vi.fn(), listAdminWorkspaces: vi.fn(), createAdminWorkspace: vi.fn(), listMemberships: vi.fn(), createMembership: vi.fn(), updateMembership: vi.fn(), removeMembership: vi.fn(), listInvitations: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), acceptInvitation: mocks.acceptInvitation, listAuditEvents: vi.fn(), getPlatformStatus: vi.fn() }));
 vi.mock("./api/websocket", async (importOriginal) => ({ ...(await importOriginal<typeof import("./api/websocket")>()), streamModelPull: mocks.streamModelPull }));
 
 const modelStatus: ModelSystemStatus = { providers: [{ provider: "ollama", endpoint: "http://localhost:11434", ready: true }], generation: { provider: "ollama", configured_model: "llama3.2:3b", ready: true, running: true }, embedding: { configured_model: "sentence-transformers/all-MiniLM-L6-v2", source: "huggingface_cache", download_allowed: false, cache_available: false, ready: false, status: "unavailable" } };
@@ -152,5 +153,15 @@ describe("Web Console critical UI", () => {
     await screen.findByText("person@example.com");
     await user.selectOptions(screen.getByLabelText("person@example.com platform rolü"), "admin");
     await waitFor(() => expect(mocks.updatePlatformRole).toHaveBeenCalledWith(8, "admin"));
+  });
+
+  it("accepts an invitation only through the authenticated acceptance view", async () => {
+    mocks.user = member;
+    mocks.acceptInvitation.mockResolvedValue({ id: 1, email: "member@example.com" });
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={["/invite/accept?token=single-use-token-that-is-long-enough"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
+    await user.click(screen.getByRole("button", { name: "Daveti kabul et" }));
+    await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith("single-use-token-that-is-long-enough"));
+    expect(await screen.findByText("Davet kabul edildi")).toBeInTheDocument();
   });
 });

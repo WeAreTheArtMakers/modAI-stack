@@ -15,13 +15,14 @@ export function createAdminWorkspace(payload: { organization_id: number; name: s
 export function updateAdminWorkspace(id: number, payload: { name?: string; slug?: string }): Promise<AdminWorkspace> { return request<AdminWorkspace>(`/admin/workspaces/${id}`, { method: "PATCH", body: JSON.stringify(payload) }); }
 
 export function listMemberships(organizationId: number): Promise<AdminMembership[]> { return request<AdminMembership[]>(`/admin/memberships?organization_id=${organizationId}`); }
-export function createMembership(payload: { user_id: number; organization_id: number; workspace_id?: number; role: Role }): Promise<AdminMembership> { return request<AdminMembership>("/admin/memberships", { method: "POST", body: JSON.stringify(payload) }); }
+export function createMembership(payload: { user_email: string; organization_id: number; workspace_id?: number; role: Role }): Promise<AdminMembership> { return request<AdminMembership>("/admin/memberships", { method: "POST", body: JSON.stringify(payload) }); }
 export function updateMembership(id: number, role: Role): Promise<AdminMembership> { return request<AdminMembership>(`/admin/memberships/${id}`, { method: "PATCH", body: JSON.stringify({ role }) }); }
 export function removeMembership(id: number): Promise<void> { return request<void>(`/admin/memberships/${id}`, { method: "DELETE" }); }
 
 export function listInvitations(organizationId: number): Promise<Invitation[]> { return request<Invitation[]>(`/admin/invitations?organization_id=${organizationId}`); }
 export function createInvitation(payload: { email: string; organization_id: number; workspace_id?: number; role: Role; expires_in_hours?: number }): Promise<CreatedInvitation> { return request<CreatedInvitation>("/admin/invitations", { method: "POST", body: JSON.stringify(payload) }); }
 export function revokeInvitation(id: number): Promise<void> { return request<void>(`/admin/invitations/${id}`, { method: "DELETE" }); }
+export function acceptInvitation(token: string): Promise<Invitation> { return request<Invitation>("/admin/invitations/accept", { method: "POST", body: JSON.stringify({ token }) }); }
 
 export function listAuditEvents(): Promise<AuditEvent[]> { return request<AuditEvent[]>("/audit?limit=100"); }
 export function getPlatformStatus(): Promise<PlatformStatus> { return request<PlatformStatus>("/admin/platform"); }

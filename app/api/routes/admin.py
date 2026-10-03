@@ -240,14 +240,19 @@ async def create_membership(payload: MembershipCreate, user=Depends(current_user
     await _require_organization_admin(db, user, payload.organization_id)
     await _organization_or_404(db, payload.organization_id)
     await _workspace_for_organization(db, payload.workspace_id, payload.organization_id)
-    account = await db.get(User, payload.user_id)
+    account = await db.scalar(select(User).where(func.lower(User.email) == str(payload.user_email).lower()))
     if not account:
         raise HTTPException(404, "User not found")
-    statement = select(Membership).where(Membership.user_id == payload.user_id, Membership.organization_id == payload.organization_id)
+    statement = select(Membership).where(Membership.user_id == account.id, Membership.organization_id == payload.organization_id)
     statement = statement.where(Membership.workspace_id == payload.workspace_id) if payload.workspace_id else statement.where(Membership.workspace_id.is_(None))
     if await db.scalar(statement):
         raise HTTPException(409, "Membership already exists")
-    membership = Membership(**payload.model_dump())
+    membership = Membership(
+        user_id=account.id,
+        organization_id=payload.organization_id,
+        workspace_id=payload.workspace_id,
+        role=payload.role,
+    )
     db.add(membership)
     await db.flush()
     record_audit_event(db, action="membership_created", resource_type="membership", resource_id=membership.id, actor_user_id=int(user["sub"]), organization_id=membership.organization_id, workspace_id=membership.workspace_id, metadata={"role": membership.role, "member_user_id": membership.user_id})

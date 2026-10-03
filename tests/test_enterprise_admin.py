@@ -100,7 +100,7 @@ async def test_tenant_admin_is_limited_to_its_organization_and_manager_cannot_ad
 async def test_membership_management_cannot_escape_tenant_or_grant_platform_authority(enterprise_session):
     db, ids = enterprise_session
     membership = await admin.create_membership(
-        MembershipCreate(user_id=ids["invitee_id"], organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="manager"),
+        MembershipCreate(user_email="invitee@example.com", organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="manager"),
         user=ids["tenant_admin"],
         db=db,
     )
