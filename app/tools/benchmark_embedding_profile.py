@@ -1,4 +1,4 @@
-"""Run one pinned embedding profile against private data in an isolated Qdrant index.
+"""Run one pinned embedding profile against versioned data in isolated Qdrant.
 
 The command is offline-only: callers must provision and pass a local model path.
 Only aggregate metrics are written; raw cases, documents, and retrieved text stay
@@ -28,6 +28,7 @@ from app.services.evaluation.embedding_profiles import (
 )
 from app.services.evaluation.metrics import supported_fact_count
 from app.services.evaluation.models import EvaluationDataset, dataset_fingerprint
+from app.services.evaluation.synthetic_corpus import corpus_fingerprint
 from app.services.rag.chunker import chunk_text
 
 TOP_K = 3
@@ -40,10 +41,13 @@ def _read_json(path: Path) -> object:
         raise ValueError("benchmark input could not be read or parsed") from exc
 
 
-def _load_documents(path: Path) -> list[dict]:
+def _load_documents(path: Path) -> tuple[str, list[dict]]:
     raw = _read_json(path)
     if not isinstance(raw, dict) or not isinstance(raw.get("documents"), list):
         raise ValueError("documents input must be an object with a documents array")
+    corpus_version = raw.get("corpus_version", "unspecified")
+    if not isinstance(corpus_version, str) or not corpus_version.strip():
+        raise ValueError("documents input must declare a non-empty corpus_version")
     documents: list[dict] = []
     seen: set[int] = set()
     for item in raw["documents"]:
@@ -78,7 +82,7 @@ def _load_documents(path: Path) -> list[dict]:
         seen.add(document_id)
     if not documents:
         raise ValueError("benchmark documents must not be empty")
-    return documents
+    return corpus_version, documents
 
 
 def _load_dataset(path: Path) -> EvaluationDataset:
@@ -102,6 +106,19 @@ def _peak_rss_bytes() -> int | None:
     except (AttributeError, OSError):
         return None
     return int(value if sys.platform == "darwin" else value * 1024)
+
+
+def _resolve_device() -> tuple[str, str]:
+    """Use MPS only when this exact PyTorch runtime reports it available."""
+    try:
+        import torch
+    except ImportError:
+        return "cpu", "PyTorch MPS availability could not be checked; CPU selected."
+    if torch.backends.mps.is_built() and torch.backends.mps.is_available():
+        return "mps", "Apple MPS is available in this PyTorch runtime."
+    if not torch.backends.mps.is_built():
+        return "cpu", "PyTorch was not built with MPS support; CPU selected."
+    return "cpu", "MPS is built but unavailable in this runtime; CPU selected."
 
 
 def _directory_size(path: Path) -> int:
@@ -149,40 +166,66 @@ def _group_metrics(records: list[dict]) -> dict:
     }
 
 
+def _validate_profile_preprocessing(profile: EmbeddingProfileSpec) -> None:
+    if profile.model_id == "intfloat/multilingual-e5-small":
+        if profile.query_prefix != "query: " or profile.passage_prefix != "passage: ":
+            raise ValueError("E5 benchmark runs require the documented query and passage prefixes")
+    elif profile.model_id == "sentence-transformers/all-MiniLM-L6-v2":
+        if profile.query_prefix or profile.passage_prefix:
+            raise ValueError("MiniLM benchmark inputs must remain unprefixed")
+
+
 def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, documents_path: Path) -> dict:
+    _validate_profile_preprocessing(profile)
     if not model_path.is_dir():
         raise ValueError("model path is not a local directory; downloads are disabled")
     if model_path.name != profile.revision:
         raise ValueError("model path must be the exact pinned local snapshot revision")
+    weights_path = model_path / "model.safetensors"
+    if not weights_path.is_file() or weights_path.stat().st_size <= 0:
+        raise ValueError("the pinned local model.safetensors artifact is missing or empty")
     dataset = _load_dataset(dataset_path)
-    documents = _load_documents(documents_path)
+    corpus_version, documents = _load_documents(documents_path)
+    if corpus_version != "unspecified" and dataset.name != corpus_version:
+        raise ValueError("dataset name and document corpus_version do not match")
+    full_corpus_fingerprint = corpus_fingerprint(corpus_version, dataset, documents)
     by_document_id = {document["document_id"]: document for document in documents}
 
     for case in dataset.cases:
-        for document_id in case.expected_document_ids:
+        for document_id in (*case.expected_document_ids, *case.confusable_document_ids):
             document = by_document_id.get(document_id)
             if document is None:
-                raise ValueError("an expected source document is missing from the private document set")
+                raise ValueError("an expected or confusable document is missing from the corpus")
             if not set(document["knowledge_base_ids"]).intersection(case.knowledge_base_ids):
-                raise ValueError("an expected source is outside the case Knowledge Base scope")
+                raise ValueError("an expected or confusable source is outside the case Knowledge Base scope")
 
+    device, device_note = _resolve_device()
+    model_load_started = time.perf_counter()
     try:
         from sentence_transformers import SentenceTransformer
 
         model = SentenceTransformer(
             str(model_path),
-            device="cpu",
+            device=device,
             local_files_only=True,
             trust_remote_code=False,
             model_kwargs={"use_safetensors": True, "local_files_only": True},
         )
     except Exception as exc:
         raise ValueError("the pinned local embedding model could not be loaded offline") from exc
+    model_load_ms = (time.perf_counter() - model_load_started) * 1000
 
     actual_max_length = int(model.max_seq_length)
     if actual_max_length != profile.max_input_tokens:
         raise ValueError("local model maximum input length does not match pinned profile metadata")
     space_guard = EmbeddingSpaceGuard(profile)
+    smoke_vector = model.encode(
+        [profile.preprocess_query("offline embedding dimension check")],
+        normalize_embeddings=True,
+        convert_to_numpy=True,
+        show_progress_bar=False,
+    )[0]
+    space_guard.validate_vector(profile, smoke_vector)
 
     settings = get_settings()
     chunk_size = int(settings.chunk_size)
@@ -201,7 +244,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
                 }
             )
     if not chunks:
-        raise ValueError("private document set produced no chunks")
+        raise ValueError("benchmark corpus produced no chunks")
 
     index_started = time.perf_counter()
     document_embed_started = time.perf_counter()
@@ -224,6 +267,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
     hard_negative_records: list[dict] = []
     by_language: dict[str, list[dict]] = {"en": [], "tr": []}
     cross_language: dict[str, list[dict]] = {"tr_query_to_en_document": [], "en_query_to_tr_document": []}
+    no_answer_by_language: dict[str, list[dict]] = {"en": [], "tr": []}
 
     with tempfile.TemporaryDirectory(prefix="modai-embedding-benchmark-") as temporary_dir:
         qdrant_path = Path(temporary_dir) / profile.collection_name
@@ -319,6 +363,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
             records.append(record)
             if case.case_type == "no_answer":
                 no_answer_records.append(record)
+                no_answer_by_language[case.language].append(record)
             elif case.expect_answer:
                 by_language[case.language].append(record)
                 if case.case_type == "hard_negative":
@@ -350,9 +395,12 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
         "inference": {
             "backend": "sentence-transformers / PyTorch",
             "device": str(model.device),
-            "device_note": "MPS unavailable in the verified local PyTorch runtime; CPU used.",
+            "device_note": device_note,
             "offline_only": True,
+            "dimension_smoke_test": len(smoke_vector) == profile.dimensions,
         },
+        "corpus_version": corpus_version,
+        "corpus_fingerprint": full_corpus_fingerprint,
         "dataset_fingerprint": dataset_fingerprint(dataset),
         "case_count": len(dataset.cases),
         "authorization_probe_case_count": sum(
@@ -374,10 +422,31 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
         },
         "no_answer": {
             "case_count": len(no_answer_records),
-            "confusable_case_count": sum(bool(record["retrieved_ids"]) for record in no_answer_records),
-            "confusable_source_count": sum(len(record["retrieved_ids"]) for record in no_answer_records),
+            "confusable_case_count": sum(
+                bool(set(record["retrieved_ids"]) & record["confusable_ids"])
+                for record in no_answer_records
+            ),
+            "confusable_source_count": sum(
+                len(set(record["retrieved_ids"]) & record["confusable_ids"])
+                for record in no_answer_records
+            ),
+            "by_query_language": {
+                language: {
+                    "case_count": len(language_records),
+                    "confusable_case_count": sum(
+                        bool(set(record["retrieved_ids"]) & record["confusable_ids"])
+                        for record in language_records
+                    ),
+                    "confusable_source_count": sum(
+                        len(set(record["retrieved_ids"]) & record["confusable_ids"])
+                        for record in language_records
+                    ),
+                }
+                for language, language_records in no_answer_by_language.items()
+            },
         },
         "latency_ms": {
+            "model_load": round(model_load_ms, 3),
             "query_embedding_median": _median(query_embedding_latencies),
             "query_embedding_p95": round(sorted(query_embedding_latencies)[int(0.95 * (len(query_embedding_latencies) - 1))], 3) if query_embedding_latencies else None,
             "retrieval_median": _median(retrieval_latencies),
@@ -407,9 +476,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=("minilm", "e5-small"), required=True)
     parser.add_argument("--model-path", type=Path, required=True, help="Already-provisioned local model directory; never downloads")
-    parser.add_argument("--dataset", type=Path, required=True, help="Private versioned EvaluationDataset JSON")
-    parser.add_argument("--documents", type=Path, required=True, help="Private document JSON with texts, IDs, KB scopes, and languages")
-    parser.add_argument("--output", type=Path, required=True, help="Private aggregate-only JSON result path")
+    parser.add_argument("--dataset", type=Path, required=True, help="Versioned EvaluationDataset JSON")
+    parser.add_argument("--documents", type=Path, required=True, help="Document JSON with text, IDs, KB scopes, and languages")
+    parser.add_argument("--output", type=Path, required=True, help="Aggregate-only JSON result path")
     args = parser.parse_args()
     profile = MINILM_BASELINE if args.profile == "minilm" else MULTILINGUAL_E5_SMALL
     result = _run(profile, args.model_path, args.dataset, args.documents)
