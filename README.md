@@ -23,7 +23,7 @@ Bu nedenle bir kullanıcı platform rolü `user` iken kendi workspace’inde üy
 
 ## v0.3 — Enterprise Local AI Platform
 
-v0.3, yerel-öncelikli kurumsal RAG platformu kilometre taşıdır. Production hardening ve Model Manager v0.3 bu sürümde tamamlandı. Backend doğrulama paketi şu anda **64 test** içerir ve son doğrulamada geçmiştir.
+v0.3, yerel-öncelikli kurumsal RAG platformu kilometre taşıdır. Production hardening ve Model Manager v0.3 bu sürümde tamamlandı. Mevcut backend doğrulama paketi **85 test** içerir ve son doğrulamada geçmiştir.
 
 - Çok tenantlı Organization → Workspace → Knowledge Base hiyerarşisi, Membership tabanlı yetkilendirme ve tenant izolasyonu kullanılmaktadır.
 - Gerçek canlı RAG kabulü tamamlandı: TXT, PDF ve DOCX yükleme/çıkarma, Qdrant retrieval, kaynaklı HTTP ve WebSocket yanıtları doğrulandı.
@@ -42,9 +42,11 @@ Enterprise Administration; platform kullanıcı dizini, Organization ve Workspac
 - Yönetim arayüzü Organization-geneli işlemleri yalnızca gerçek Organization-geneli admin üyelerine veya platform admin’lere gösterir. Backend bu sınırı ayrıca zorunlu olarak uygular.
 - Yerleşik SMTP dağıtımı yoktur; davet token’ı yalnızca oluşturulurken bir kez gösterilir ve kurumun seçtiği güvenli kanal üzerinden iletilir.
 
-### Sonraki kilometre taşı: v0.5 — RAG Evaluation & Quality
+## v0.5 geliştirme — RAG Evaluation & Quality
 
-v0.5, retrieval ve cevap kalitesini ölçülebilir, tekrar çalıştırılabilir ve regresyona dayanıklı hale getirecek insan tanımlı evaluation dataset’leri, deterministik metrikler ve CLI odağıyla ilerleyecektir.
+Bu geliştirme dalı, mevcut RAG davranışını değiştirmeden retrieval ve cevap desteğini ölçülebilir, tekrar çalıştırılabilir hale getirir. Sürümlü, insan gözden geçirmeli evaluation dataset’leri; deterministik kaynak/fact metrikleri; JSON sonuç şeması; eşik kontrollü CLI ve baseline/candidate karşılaştırması bulunur. Bulut LLM judge kullanılmaz. Değerlendirme çalıştıran kullanıcı, RAG endpoint’iyle aynı Knowledge Base yetkilendirmesine tabidir; sonuç dosyaları belge gövdesi, prompt veya üretilmiş tam yanıt içermez.
+
+Detaylı şema, metrik sınırları, embedding modeli değiştiğinde reindex uyarısı ve komut örnekleri için [evaluation/README.md](evaluation/README.md) dosyasına bakın.
 
 ## Kullanılan teknolojiler
 
@@ -182,6 +184,18 @@ npm run lint
 npm run test
 ```
 
+### RAG kalite değerlendirmesi
+
+Önce kendi tenant’ınızdaki insan tarafından doğrulanmış soru, kaynak belge ve olgu beklentileriyle sürümlü bir dataset oluşturun. Local çalıştırma access JWT’yi yalnızca ortam değişkeninden alır ve normal Knowledge Base yetkilendirmesini uygular:
+
+```bash
+export MODAI_EVALUATION_ACCESS_TOKEN='<access-jwt>'
+python -m app.tools.evaluate_rag --dataset evaluation/sample_dataset.json --output baseline.json
+python -m app.tools.compare_rag_evaluations baseline.json candidate.json
+```
+
+Varsayılan değerlendirme yalnızca retrieval/source/fact metriklerini çalıştırır. Yerel Ollama ile üretilmiş yanıttaki deterministic destek sinyalini ölçmek için açıkça `--generate` ekleyin. CI ve model indirmeyen geliştirme denemeleri `--mode fixture --fixture retrieval-fixture.json` ile yapılabilir. Eşikler (`--min-hit-at-k`, `--min-source-accuracy`, `--min-fact-coverage`, `--max-median-total-ms`) yalnızca verildiğinde komutu başarısız yapar.
+
 Gerçek JWT secret ve parolaları yalnızca `.env` içine yazın. `.env`, `.venv`, yerel veritabanı ve eğitim çıktıları Git’e alınmaz.
 
 Şema değişiklikleri için uzun vadeli migration aracı Alembic’tir:
@@ -271,7 +285,7 @@ Geri yükleme sırası: önce aynı sürümde PostgreSQL’i geri yükleyin, son
 
 ## Test ve LoRA eğitimi
 
-`pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile testleri çalıştırın; v0.3 durumunda backend paketi 64 test içerir. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
+`pip install -r requirements-dev.txt` sonrasında `python -m pytest -v` ile testleri çalıştırın; mevcut backend paketi 85 test içerir. LoRA eğitimi için önce `pip install -r requirements-training.txt`, sonra `python training/train_lora.py` kullanın. LoRA, Ollama Modelfile ayarı değildir: prompt/system ayarı çalışma anındaki talimatı değiştirir, RAG bilgiyi sorgu anında sağlar, LoRA adapter ağırlıkları öğrenir, tam fine-tuning ise tüm model ağırlıklarını günceller. Ayrıntılar [`training/README.md`](training/README.md) dosyasındadır.
 
 ## Bilinen sınırlamalar
 
