@@ -98,17 +98,22 @@ Adaptive eşik seçimi, benzer/tekrarlı soruları aynı tarafta tutan determini
 
 Reranking yalnızca açık CLI seçeneğiyle evaluation sırasında çalışır; API/production RAG yoluna bağlı değildir ve model otomatik indirilmez. Bu deneydeki aday `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` olup model kartında yaklaşık 0,1B parametre ve Apache-2.0 lisansı belirtilmiştir. Model kartı 15 dili listeler; Türkçe eğitim kapsamını tek başına açıkça garanti etmez, bu nedenle Türkçe kalite ayrıca ölçülmelidir. Yalnızca kurumun onayladığı dosyaları önceden yerel cache’e provision edin. Loader `local_files_only=True` ve `trust_remote_code=False` ile açılır; dosyalar yoksa koşu açık hata verir, sessiz fallback yapmaz.
 
+Apple Silicon için bu deney, aynı modelin resmi `onnx/model_qint8_arm64.onnx` artifact’ini Sentence Transformers `CrossEncoder` ONNX backend’i ve `CPUExecutionProvider` ile çalıştırabilir. ONNX istenmedikçe runtime bağımlılığı yüklenmez. Geliştirme ortamında önce `requirements-dev.txt`, sonra isteğe bağlı `requirements-evaluation-onnx.txt` kurun; bu dosya production API/worker kurulumlarına dahil değildir. Loader belirli ONNX dosya adını açıkça verir ve export’u kapatır; artifact eksikse PyTorch’e, başka ONNX varyantına veya vector-only sonuca düşmez.
+
 Önce sabit baseline’ı `--top-k 3` ile çalıştırın; sonra aynı veri kümesi/fingerprint ve embedding modeliyle aday havuzlarını 6, 8 ve 10 olarak ayrı ayrı kıyaslayın. Her reranker koşusu yine yalnızca son üç kaynağı döndürür. Beklenen kaynak iyileşmesinin yanı sıra değişen rank-1 sonucu, düzelen/bozulan K=3 isabeti, hard-negative ve no-answer davranışı ile reranker/toplam gecikmesini inceleyin. Adaptif eşiklerle reranker’ı aynı koşuda birleştirmeyin.
 
 ```bash
 python -m app.tools.evaluate_rag \
   --dataset /private/path/evaluation-dataset.json \
   --top-k 3 \
+  --reranker-backend onnx \
   --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 \
-  --reranker-revision 1427fd652930e4ba29e8149678df786c240d8825 \
+  --reranker-revision a000c9bddd7d35fafc3b0b0fb4d1c1950ba6bd54 \
   --candidate-pool-size 6 \
   --output /private/path/reranker-pool-6.json
 ```
+
+Bu revision, `onnx/model_qint8_arm64.onnx` dosyasını içerir. Yalnızca gerekli root tokenizer/config dosyalarını ve bu tek ONNX artifact’ini indirin; FP32 PyTorch ağırlıkları ve diğer ONNX/OpenVINO varyantlarını indirmeyin. Resmî artifact boyutu 118,620,017 bayt, SHA-256 `1825907d6c1a9001ff78124780bbde20a614a8c3df3b63409cf3c72c6fe5c8b4`.
 
 `--reranker-cache-dir` yalnızca model cache’i varsayılan Hugging Face cache’inden farklıysa kullanılır. Reranker seçilmediğinde hiçbir reranker ağırlığı yüklenmez; `RAG_TOP_K` ve production davranışı değişmez. Model kartı ve kullanım örneği: [Hugging Face — multilingual mMARCO MiniLM Cross-Encoder](https://huggingface.co/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1).
 
@@ -116,4 +121,4 @@ python -m app.tools.evaluate_rag \
 
 Yerel sentetik korpusta 92 senaryolu, sabit K=3 baseline ve ayrı calibration/holdout adaptive değerlendirmesi tamamlandı. Toplu, içerik içermeyen sonuçlar [retrieval robustness raporunda](experiments/retrieval-robustness-v1.md) bulunur. Gap, ratio ve three-tier seçenekleri holdout ölçütlerini korumadığı için reddedildi; üretim ayarları değiştirilmedi.
 
-Reranker kodu ve offline yükleyici test edildi; ancak cache denetiminde yüklenebilir bir CrossEncoder bulunmadı. Pinned mMARCO modelinin ağırlık dosyası hâlâ `.incomplete`, mevcut MiniLM ise embedding bi-encoder’dır. Bu nedenle gerçek reranker ölçümü **BLOCKED BY MODEL PROVISIONING**; kalite, aday havuzu kıyaslamaları (6/8/10) ve gecikme ölçülmedi. Model tamamen provision edilip değerlendirilene kadar production reranker önerisi yapılamaz. Ayrıntı ve cache envanteri: [local reranker durumu](experiments/local-reranker-v1.md). Adaptive retrieval etkinleştirilmedi; production `RAG_TOP_K=3` olarak kalır.
+Reranker kodu, sabit dosya adıyla ONNX backend’i ve offline/hata yolu test edildi; fakat gerçek model yükleyicisi çalıştırılamadı. Doğru revision `a000c9bddd7d35fafc3b0b0fb4d1c1950ba6bd54` içindeki resmi ARM64 qint8 dosyasının indirmesi ilerleme durduğu için iptal edildi; yerel artifact tamamlanmadı. Mevcut MiniLM embedding bi-encoder’dır. Bu nedenle gerçek reranker ölçümü **BLOCKED BY MODEL PROVISIONING**; kalite, aday havuzu kıyaslamaları (6/8/10), sıralama hareketleri ve gecikme ölçülmedi. Model tamamen provision edilip çevrimdışı yükleme doğrulanana kadar production reranker önerisi yapılamaz. Ayrıntı ve cache envanteri: [local reranker durumu](experiments/local-reranker-v1.md). Adaptive retrieval etkinleştirilmedi; production `RAG_TOP_K=3` olarak kalır.

@@ -26,6 +26,7 @@ from app.services.evaluation.quality import (
     result_quality_summary,
 )
 from app.services.evaluation.reranker import (
+    ARM64_ONNX_FILE,
     LocalCrossEncoderReranker,
     RerankerEvaluationError,
     ScoredCandidate,
@@ -315,6 +316,21 @@ async def test_reranker_handles_empty_and_small_candidate_sets(candidate_count):
     )
 
 
+@pytest.mark.asyncio
+async def test_reranker_stable_ties_preserve_vector_order_and_truncate_top_n():
+    class TiedModel:
+        def predict(self, pairs, **_kwargs):
+            return [0.9, 0.9, 0.8, 0.7][:len(pairs)]
+
+    candidates = [
+        RetrievedEvidence(document=f"{index}.txt", document_id=index, text=f"text {index}", score=1.0 - index / 10)
+        for index in range(1, 5)
+    ]
+    reranked = await LocalCrossEncoderReranker("local/tied", model=TiedModel()).rerank("question", candidates, 3)
+    assert [item.evidence.document_id for item in reranked] == [1, 2, 3]
+    assert len(reranked) == 3
+
+
 def test_cross_encoder_loading_is_offline_and_disallows_remote_code(monkeypatch, tmp_path):
     captured = {}
 
@@ -333,6 +349,58 @@ def test_cross_encoder_loading_is_offline_and_disallows_remote_code(monkeypatch,
     assert captured["cache_folder"] == str(tmp_path)
 
 
+def test_onnx_cross_encoder_loads_pinned_file_with_cpu_and_offline_options(monkeypatch, tmp_path):
+    captured = {}
+
+    class FakeCrossEncoder:
+        def __init__(self, model_name, **kwargs):
+            captured["model_name"] = model_name
+            captured.update(kwargs)
+
+    monkeypatch.setitem(sys.modules, "sentence_transformers", types.SimpleNamespace(CrossEncoder=FakeCrossEncoder))
+    provider = LocalCrossEncoderReranker(
+        "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+        revision="a000c9bddd7d35fafc3b0b0fb4d1c1950ba6bd54",
+        cache_dir=tmp_path,
+        backend="onnx",
+    )
+    provider.load()
+
+    assert captured["model_name"] == "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    assert captured["revision"] == "a000c9bddd7d35fafc3b0b0fb4d1c1950ba6bd54"
+    assert captured["cache_folder"] == str(tmp_path)
+    assert captured["backend"] == "onnx"
+    assert captured["model_kwargs"] == {
+        "file_name": ARM64_ONNX_FILE,
+        "provider": "CPUExecutionProvider",
+        "export": False,
+    }
+    assert captured["local_files_only"] is True
+    assert captured["trust_remote_code"] is False
+
+
+def test_onnx_cross_encoder_rejects_empty_missing_artifact_without_export(monkeypatch):
+    captured = {}
+
+    class MissingOnnxArtifact:
+        def __init__(self, _model_name, **kwargs):
+            captured.update(kwargs)
+            assert kwargs["model_kwargs"]["export"] is False
+            raise FileNotFoundError("onnx/model_qint8_arm64.onnx is not cached")
+
+    monkeypatch.setitem(sys.modules, "sentence_transformers", types.SimpleNamespace(CrossEncoder=MissingOnnxArtifact))
+    provider = LocalCrossEncoderReranker("cross-encoder/model", backend="onnx")
+    with pytest.raises(RerankerEvaluationError, match="Local reranker unavailable"):
+        provider.load()
+    assert captured["local_files_only"] is True
+    assert captured["model_kwargs"]["export"] is False
+
+
+def test_invalid_reranker_backend_is_rejected():
+    with pytest.raises(ValueError, match="backend must be one of"):
+        LocalCrossEncoderReranker("org/model", backend="openvino")
+
+
 @pytest.mark.asyncio
 async def test_reranker_model_failure_is_explicit_and_never_falls_back():
     class BrokenModel:
@@ -343,6 +411,28 @@ async def test_reranker_model_failure_is_explicit_and_never_falls_back():
     candidate = RetrievedEvidence(document="a.txt", document_id=1, text="source", score=0.5)
     with pytest.raises(RerankerEvaluationError, match="inference failed"):
         await provider.rerank("question", [candidate], 1)
+
+
+@pytest.mark.asyncio
+async def test_reranker_failure_never_returns_vector_only_candidates():
+    retrieval_calls = 0
+
+    async def retrieve(_case):
+        nonlocal retrieval_calls
+        retrieval_calls += 1
+        return RetrievalResult(
+            evidence=[RetrievedEvidence(document="vector.txt", document_id=1, text="candidate", score=0.8)]
+        )
+
+    class BrokenModel:
+        def predict(self, _pairs, **_kwargs):
+            raise OSError("offline ONNX artifact missing")
+
+    provider = LocalCrossEncoderReranker("local/broken", backend="onnx", model=BrokenModel())
+    wrapped = RerankedContextRetriever(retrieve, provider, candidate_pool_size=6, top_n=3)
+    with pytest.raises(RerankerEvaluationError, match="inference failed"):
+        await wrapped(_case("reranker-failure"))
+    assert retrieval_calls == 1
 
 
 @pytest.mark.asyncio
@@ -412,6 +502,7 @@ def test_reranker_is_disabled_by_default_and_requires_explicit_candidate_configu
     args = parse_args()
     assert args.reranker_model is None
     assert args.reranker_revision is None
+    assert args.reranker_backend == "torch"
     assert args.candidate_pool_size is None
     _validate_threshold_arguments(args)
 
@@ -423,12 +514,14 @@ def test_reranker_is_disabled_by_default_and_requires_explicit_candidate_configu
             "--dataset", "private.json",
             "--reranker-model", "org/model",
             "--reranker-revision", "abc123",
+            "--reranker-backend", "onnx",
             "--candidate-pool-size", "6",
         ],
     )
     args = parse_args()
     assert args.reranker_model == "org/model"
     assert args.reranker_revision == "abc123"
+    assert args.reranker_backend == "onnx"
     assert args.candidate_pool_size == 6
     _validate_threshold_arguments(args)
 
@@ -446,6 +539,14 @@ def test_reranker_is_disabled_by_default_and_requires_explicit_candidate_configu
         ["evaluate_rag", "--dataset", "private.json", "--reranker-revision", "abc123"],
     )
     with pytest.raises(ValueError, match="--reranker-revision requires"):
+        _validate_threshold_arguments(parse_args())
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["evaluate_rag", "--dataset", "private.json", "--reranker-backend", "onnx"],
+    )
+    with pytest.raises(ValueError, match="--reranker-backend requires"):
         _validate_threshold_arguments(parse_args())
 
 

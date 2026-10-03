@@ -16,6 +16,10 @@ class RerankerEvaluationError(RuntimeError):
     """A reranker could not produce a valid result; evaluation must stop."""
 
 
+ARM64_ONNX_FILE = "onnx/model_qint8_arm64.onnx"
+SUPPORTED_BACKENDS = {"torch", "onnx"}
+
+
 @dataclass(frozen=True)
 class ScoredCandidate:
     evidence: RetrievedEvidence
@@ -41,14 +45,24 @@ class LocalCrossEncoderReranker:
         revision: str | None = None,
         cache_dir: str | Path | None = None,
         device: str | None = None,
+        backend: str = "torch",
+        onnx_file_name: str | None = None,
         model=None,
     ):
         if not model_name.strip():
             raise ValueError("model_name must not be blank")
+        if backend not in SUPPORTED_BACKENDS:
+            raise ValueError(f"backend must be one of: {', '.join(sorted(SUPPORTED_BACKENDS))}")
+        if backend == "onnx" and onnx_file_name is not None and not onnx_file_name.strip():
+            raise ValueError("onnx_file_name must not be blank")
+        if backend == "torch" and onnx_file_name is not None:
+            raise ValueError("onnx_file_name is only valid for the ONNX backend")
         self.model_name = model_name
         self.revision = revision
         self.cache_dir = str(cache_dir) if cache_dir is not None else None
         self.device = device
+        self.backend = backend
+        self.onnx_file_name = onnx_file_name or (ARM64_ONNX_FILE if backend == "onnx" else None)
         self._model = model
 
     def load(self) -> None:
@@ -58,14 +72,32 @@ class LocalCrossEncoderReranker:
         try:
             from sentence_transformers import CrossEncoder
 
-            self._model = CrossEncoder(
-                self.model_name,
-                revision=self.revision,
-                cache_folder=self.cache_dir,
-                device=self.device,
-                local_files_only=True,
-                trust_remote_code=False,
-            )
+            options = {
+                "revision": self.revision,
+                "cache_folder": self.cache_dir,
+                "device": self.device,
+                "local_files_only": True,
+                "trust_remote_code": False,
+            }
+            if self.backend == "onnx":
+                options.update(
+                    backend="onnx",
+                    model_kwargs={
+                        "file_name": self.onnx_file_name,
+                        "provider": "CPUExecutionProvider",
+                        "export": False,
+                    },
+                )
+            self._model = CrossEncoder(self.model_name, **options)
+        except TypeError as exc:
+            if self.backend == "onnx":
+                raise RerankerEvaluationError(
+                    "ONNX reranking requires the optional requirements-evaluation-onnx.txt dependencies"
+                ) from exc
+            raise RerankerEvaluationError(
+                f"Local reranker unavailable for evaluation: {self.model_name}; "
+                "provision compatible weights explicitly before running this experiment"
+            ) from exc
         except Exception as exc:
             raise RerankerEvaluationError(
                 f"Local reranker unavailable for evaluation: {self.model_name}; "

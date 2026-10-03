@@ -1,0 +1,4 @@
+# Optional local evaluation only. Install after requirements-dev.txt.
+# This upgrades Sentence Transformers only in the developer/evaluation environment;
+# production API and worker images do not install this file.
+sentence-transformers[onnx]==5.7.0

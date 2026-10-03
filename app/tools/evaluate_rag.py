@@ -18,7 +18,7 @@ from app.services.evaluation.runner import (
     RerankedContextRetriever,
     load_dataset,
 )
-from app.services.evaluation.reranker import LocalCrossEncoderReranker
+from app.services.evaluation.reranker import ARM64_ONNX_FILE, LocalCrossEncoderReranker
 from app.services.llm.ollama import OllamaProvider
 
 
@@ -43,6 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adaptive-second-threshold", type=float)
     parser.add_argument("--reranker-model", help="Explicitly provisioned local CrossEncoder model ID or path")
     parser.add_argument("--reranker-revision", help="Pinned local model revision (for reproducible cache-only loading)")
+    parser.add_argument("--reranker-backend", choices=("torch", "onnx"), default="torch")
     parser.add_argument("--reranker-cache-dir", help="Local model cache directory; no model download is attempted")
     parser.add_argument("--candidate-pool-size", type=int, choices=(6, 8, 10))
     parser.add_argument("--json", action="store_true", help="Print the complete versioned result as JSON")
@@ -83,6 +84,7 @@ async def _run_local(
     reranker_revision: str | None = None,
     reranker_cache_dir: str | None = None,
     candidate_pool_size: int | None = None,
+    reranker_backend: str = "torch",
 ):
     # Keep CLI fixture mode importable in test/air-gapped environments where a
     # production DATABASE_URL driver has intentionally not been installed.
@@ -110,6 +112,7 @@ async def _run_local(
                 reranker_model,
                 revision=reranker_revision,
                 cache_dir=reranker_cache_dir,
+                backend=reranker_backend,
             )
             # Load explicitly before timing cases; local_files_only=True forbids downloads.
             provider.load()
@@ -119,7 +122,12 @@ async def _run_local(
                 candidate_pool_size=candidate_pool_size or 6,
                 top_n=3,
             )
-            models = {"reranker_model": reranker_model, "reranker_revision": reranker_revision}
+            models = {
+                "reranker_model": reranker_model,
+                "reranker_revision": reranker_revision,
+                "reranker_backend": reranker_backend,
+                "reranker_onnx_file": ARM64_ONNX_FILE if reranker_backend == "onnx" else None,
+            }
         generator = None
         if generate:
             provider = OllamaProvider()
@@ -148,6 +156,7 @@ async def _run_fixture(
     reranker_revision: str | None = None,
     reranker_cache_dir: str | None = None,
     candidate_pool_size: int | None = None,
+    reranker_backend: str = "torch",
 ):
     if not fixture_path:
         raise ValueError("Fixture mode requires --fixture")
@@ -166,6 +175,7 @@ async def _run_fixture(
             reranker_model,
             revision=reranker_revision,
             cache_dir=reranker_cache_dir,
+            backend=reranker_backend,
         )
         provider.load()
         retriever = RerankedContextRetriever(
@@ -174,7 +184,12 @@ async def _run_fixture(
             candidate_pool_size=candidate_pool_size or 6,
             top_n=3,
         )
-        models = {"reranker_model": reranker_model, "reranker_revision": reranker_revision}
+        models = {
+            "reranker_model": reranker_model,
+            "reranker_revision": reranker_revision,
+            "reranker_backend": reranker_backend,
+            "reranker_onnx_file": ARM64_ONNX_FILE if reranker_backend == "onnx" else None,
+        }
     return await EvaluationRunner(retriever).run(
         dataset,
         mode="fixture",
@@ -226,11 +241,14 @@ def _validate_threshold_arguments(args: argparse.Namespace) -> None:
         raise ValueError("adaptive context evaluation requires --top-k 3")
     reranker_model = getattr(args, "reranker_model", None)
     reranker_revision = getattr(args, "reranker_revision", None)
+    reranker_backend = getattr(args, "reranker_backend", "torch")
     candidate_pool_size = getattr(args, "candidate_pool_size", None)
     if reranker_model is None and candidate_pool_size is not None:
         raise ValueError("--candidate-pool-size requires --reranker-model")
     if reranker_model is None and reranker_revision is not None:
         raise ValueError("--reranker-revision requires --reranker-model")
+    if reranker_backend != "torch" and reranker_model is None:
+        raise ValueError("--reranker-backend requires --reranker-model")
     if reranker_model is not None and candidate_pool_size is None:
         raise ValueError("--reranker-model requires --candidate-pool-size")
     if reranker_model is not None and policy is not None:
@@ -265,6 +283,7 @@ def main() -> None:
                 args.reranker_revision,
                 args.reranker_cache_dir,
                 args.candidate_pool_size,
+                args.reranker_backend,
             )
             if args.mode == "fixture"
             else _run_local(
@@ -279,6 +298,7 @@ def main() -> None:
                 args.reranker_revision,
                 args.reranker_cache_dir,
                 args.candidate_pool_size,
+                args.reranker_backend,
             )
         )
         payload = result.model_dump(mode="json")

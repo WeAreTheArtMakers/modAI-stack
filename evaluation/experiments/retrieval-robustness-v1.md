@@ -36,3 +36,7 @@ All three candidates (gap, ratio, and three-tier) retained calibration Hit@3, MR
 ## Limitations
 
 This is a small synthetic, local benchmark, not a customer-data or production workload evaluation. Timing is a single local run and is hardware/service dependent. No LLM answer generation, refusal behavior, or semantic judge was evaluated. Production configuration remains unchanged at `RAG_TOP_K=3`.
+
+## Reranker follow-up
+
+The exact corpus fingerprint above remains the comparison target. The selected multilingual mMARCO model's official ARM64 qint8 ONNX artifact exists at revision `a000c9bddd7d35fafc3b0b0fb4d1c1950ba6bd54` (118,620,017 bytes; SHA-256 `1825907d6c1a9001ff78124780bbde20a614a8c3df3b63409cf3c72c6fe5c8b4`), but a minimal local provisioning attempt stalled before the model file arrived and was cancelled. No real reranker loading or candidate-pool 6/8/10 benchmark ran, so no claims about English/Turkish reranking, no-answer behavior, rank movement, or added latency can be made. Fixed vector K=3 is the only measured retrieval configuration; production remains unchanged. See [local reranker status](local-reranker-v1.md).
