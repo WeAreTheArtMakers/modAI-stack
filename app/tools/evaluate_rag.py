@@ -15,8 +15,10 @@ from app.services.evaluation.runner import (
     AdaptiveContextRetriever,
     AuthorizedRagRetriever,
     EvaluationRunner,
+    RerankedContextRetriever,
     load_dataset,
 )
+from app.services.evaluation.reranker import LocalCrossEncoderReranker
 from app.services.llm.ollama import OllamaProvider
 
 
@@ -39,6 +41,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adaptive-policy", choices=("gap", "ratio", "three_tier"))
     parser.add_argument("--adaptive-threshold", type=float)
     parser.add_argument("--adaptive-second-threshold", type=float)
+    parser.add_argument("--reranker-model", help="Explicitly provisioned local CrossEncoder model ID or path")
+    parser.add_argument("--reranker-revision", help="Pinned local model revision (for reproducible cache-only loading)")
+    parser.add_argument("--reranker-cache-dir", help="Local model cache directory; no model download is attempted")
+    parser.add_argument("--candidate-pool-size", type=int, choices=(6, 8, 10))
     parser.add_argument("--json", action="store_true", help="Print the complete versioned result as JSON")
     parser.add_argument("--output", help="Write the complete versioned result to this JSON path")
     parser.add_argument("--min-hit-at-k", type=float)
@@ -73,6 +79,10 @@ async def _run_local(
     adaptive_policy: AdaptivePolicy | None = None,
     adaptive_threshold: float | None = None,
     adaptive_second_threshold: float | None = None,
+    reranker_model: str | None = None,
+    reranker_revision: str | None = None,
+    reranker_cache_dir: str | None = None,
+    candidate_pool_size: int | None = None,
 ):
     # Keep CLI fixture mode importable in test/air-gapped environments where a
     # production DATABASE_URL driver has intentionally not been installed.
@@ -94,6 +104,22 @@ async def _run_local(
                 threshold=adaptive_threshold,
                 second_threshold=adaptive_second_threshold,
             )
+        models = None
+        if reranker_model is not None:
+            provider = LocalCrossEncoderReranker(
+                reranker_model,
+                revision=reranker_revision,
+                cache_dir=reranker_cache_dir,
+            )
+            # Load explicitly before timing cases; local_files_only=True forbids downloads.
+            provider.load()
+            retriever = RerankedContextRetriever(
+                retriever,
+                provider,
+                candidate_pool_size=candidate_pool_size or 6,
+                top_n=3,
+            )
+            models = {"reranker_model": reranker_model, "reranker_revision": reranker_revision}
         generator = None
         if generate:
             provider = OllamaProvider()
@@ -104,7 +130,10 @@ async def _run_local(
                 return await provider.generate(result.prompt)
 
         return await EvaluationRunner(retriever, generator).run(
-            dataset, mode="local", top_k_override=top_k_override
+            dataset,
+            mode="local",
+            models=models,
+            top_k_override=(3 if reranker_model is not None else top_k_override),
         )
 
 
@@ -115,6 +144,10 @@ async def _run_fixture(
     adaptive_policy: AdaptivePolicy | None = None,
     adaptive_threshold: float | None = None,
     adaptive_second_threshold: float | None = None,
+    reranker_model: str | None = None,
+    reranker_revision: str | None = None,
+    reranker_cache_dir: str | None = None,
+    candidate_pool_size: int | None = None,
 ):
     if not fixture_path:
         raise ValueError("Fixture mode requires --fixture")
@@ -127,8 +160,26 @@ async def _run_fixture(
             threshold=adaptive_threshold,
             second_threshold=adaptive_second_threshold,
         )
+    models = None
+    if reranker_model is not None:
+        provider = LocalCrossEncoderReranker(
+            reranker_model,
+            revision=reranker_revision,
+            cache_dir=reranker_cache_dir,
+        )
+        provider.load()
+        retriever = RerankedContextRetriever(
+            retriever,
+            provider,
+            candidate_pool_size=candidate_pool_size or 6,
+            top_n=3,
+        )
+        models = {"reranker_model": reranker_model, "reranker_revision": reranker_revision}
     return await EvaluationRunner(retriever).run(
-        dataset, mode="fixture", top_k_override=top_k_override
+        dataset,
+        mode="fixture",
+        models=models,
+        top_k_override=(3 if reranker_model is not None else top_k_override),
     )
 
 
@@ -173,6 +224,19 @@ def _validate_threshold_arguments(args: argparse.Namespace) -> None:
         raise ValueError("--adaptive-second-threshold is only valid for three_tier")
     if policy is not None and getattr(args, "top_k", None) not in (None, 3):
         raise ValueError("adaptive context evaluation requires --top-k 3")
+    reranker_model = getattr(args, "reranker_model", None)
+    reranker_revision = getattr(args, "reranker_revision", None)
+    candidate_pool_size = getattr(args, "candidate_pool_size", None)
+    if reranker_model is None and candidate_pool_size is not None:
+        raise ValueError("--candidate-pool-size requires --reranker-model")
+    if reranker_model is None and reranker_revision is not None:
+        raise ValueError("--reranker-revision requires --reranker-model")
+    if reranker_model is not None and candidate_pool_size is None:
+        raise ValueError("--reranker-model requires --candidate-pool-size")
+    if reranker_model is not None and policy is not None:
+        raise ValueError("adaptive selection and reranking must be evaluated separately")
+    if reranker_model is not None and getattr(args, "top_k", None) not in (None, 3):
+        raise ValueError("reranker evaluation requires final --top-k 3")
 
 
 def _print_summary(result) -> None:
@@ -180,7 +244,8 @@ def _print_summary(result) -> None:
     print(
         f"{result.dataset_name}: cases={summary.case_count} hit_at_k={summary.hit_at_k} "
         f"mrr={summary.mean_reciprocal_rank} source_accuracy={summary.source_accuracy} "
-        f"fact_coverage={summary.fact_coverage} median_total_ms={summary.median_total_ms}"
+        f"fact_coverage={summary.fact_coverage} median_reranker_ms={summary.median_reranker_ms} "
+        f"median_total_ms={summary.median_total_ms}"
     )
 
 
@@ -196,6 +261,10 @@ def main() -> None:
                 args.adaptive_policy,
                 args.adaptive_threshold,
                 args.adaptive_second_threshold,
+                args.reranker_model,
+                args.reranker_revision,
+                args.reranker_cache_dir,
+                args.candidate_pool_size,
             )
             if args.mode == "fixture"
             else _run_local(
@@ -206,6 +275,10 @@ def main() -> None:
                 args.adaptive_policy,
                 args.adaptive_threshold,
                 args.adaptive_second_threshold,
+                args.reranker_model,
+                args.reranker_revision,
+                args.reranker_cache_dir,
+                args.candidate_pool_size,
             )
         )
         payload = result.model_dump(mode="json")

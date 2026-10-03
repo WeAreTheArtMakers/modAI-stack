@@ -1,4 +1,4 @@
-# RAG Evaluation & Quality v0.5
+# RAG Evaluation & Quality
 
 Bu dizin, insan tarafından gözden geçirilmiş RAG değerlendirme veri setlerini saklar. Her veri seti sürümlüdür ve her kayıt; soru, yetkili Knowledge Base kimlikleri, beklenen kaynak belge kimlikleri, geriye uyumlu belge adları, beklenen doğrulanabilir olgular ve `top_k` değerini içerir. Çalıştırılan doğrulanmış veri setinin tamamı, alan sırası veya biçimlendirmeden etkilenmeyen canonical JSON SHA-256 fingerprint’i ile sonuçta kaydedilir.
 
@@ -76,3 +76,44 @@ python -m app.tools.evaluate_rag \
 ```
 
 Evaluation case sonuçları yalnızca ilk üç retrieval skorunu, gap/ratio özetlerini, kaynak rank/eşleşme bayraklarını ve rank başına fact coverage değerlerini sayısal metadata olarak tutar. Kaynak metni, soru, prompt veya tam yanıt bu skor alanlarına eklenmez. Skor eşikleri her sorgunun kendi sıralı skorları üzerinde uygulanmalıdır; mutlak cosine skorlarının sorgular arasında kalibre edildiği varsayılmaz.
+
+## Retrieval robustness ve no-answer
+
+Kalite korpusunu yerel/özel tutun; gerçek dokümanlar, sorular ve beklenen olgular değerlendirme JSON’unda bulunur. Korpusun repo içine eklenmesi gerekmez. Aggregate-only rapor aracı; soru, belge metni, prompt, cevap veya case kimliği yazdırmadan kategori/dil/tür dağılımını, senaryo gruplarını ve veri kümesi fingerprint’ini verir:
+
+```bash
+python -m app.tools.report_rag_evaluation_quality --dataset /private/path/evaluation-dataset.json
+python -m app.tools.report_rag_evaluation_quality \
+  --dataset /private/path/evaluation-dataset.json \
+  --result /private/path/local-result.json
+```
+
+Sonuç raporu genel metriklerin yanında `normal`, `hard_negative`, `no_answer` ve erişim-probu gruplarını; İngilizce/Türkçe kırılımını; beklenen kaynağın K=3 içindeki sırasını; cevapsız sorularda benzer kaynak dönme sayılarını; retrieval ve reranker gecikmelerini de aggregate olarak verir. JSON sonuç dosyaları belge adları/ID’leri gibi yerel işaretleyiciler içerebilir; bunları özel değerlendirme çıktısı olarak ele alın, Git’e eklemeyin.
+
+`case_type="no_answer"` açıkça cevapsız olması beklenen yetkili sorgudur; beklenen kaynak/olgu tanımlanmaz ve evaluation runner bu kayıtlar için LLM üretimi çalıştırmaz. Sistem cevabının reddetme kalitesi bu retrieval metriğinden çıkarılamaz. Cloud/LLM judge veya kırılgan ret anahtar-kelime metriği yoktur. Cevapsız sorgularda benzer belge/chunk’ların yine de bulunup bulunmadığı ayrı sayılır.
+
+Adaptive eşik seçimi, benzer/tekrarlı soruları aynı tarafta tutan deterministik scenario split kullanır. Eşikler yalnızca calibration bölümünde seçilir ve holdout bir kez ayrı raporlanır. Korpusun tamamını eşik ayarlamada kullanıp aynı veriyi “final” olarak sunmayın. Gap, ratio ve three-tier seçimleri holdout’ta baseline Hit@K, MRR veya fact coverage’ı korumazsa adaptive yaklaşımı reddedin. Üretim varsayılanı `RAG_TOP_K=3` kalır.
+
+## Yerel reranker deneyi (varsayılan kapalı)
+
+Reranking yalnızca açık CLI seçeneğiyle evaluation sırasında çalışır; API/production RAG yoluna bağlı değildir ve model otomatik indirilmez. Bu deneydeki aday `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` olup model kartında yaklaşık 0,1B parametre ve Apache-2.0 lisansı belirtilmiştir. Model kartı 15 dili listeler; Türkçe eğitim kapsamını tek başına açıkça garanti etmez, bu nedenle Türkçe kalite ayrıca ölçülmelidir. Yalnızca kurumun onayladığı dosyaları önceden yerel cache’e provision edin. Loader `local_files_only=True` ve `trust_remote_code=False` ile açılır; dosyalar yoksa koşu açık hata verir, sessiz fallback yapmaz.
+
+Önce sabit baseline’ı `--top-k 3` ile çalıştırın; sonra aynı veri kümesi/fingerprint ve embedding modeliyle aday havuzlarını 6, 8 ve 10 olarak ayrı ayrı kıyaslayın. Her reranker koşusu yine yalnızca son üç kaynağı döndürür. Beklenen kaynak iyileşmesinin yanı sıra değişen rank-1 sonucu, düzelen/bozulan K=3 isabeti, hard-negative ve no-answer davranışı ile reranker/toplam gecikmesini inceleyin. Adaptif eşiklerle reranker’ı aynı koşuda birleştirmeyin.
+
+```bash
+python -m app.tools.evaluate_rag \
+  --dataset /private/path/evaluation-dataset.json \
+  --top-k 3 \
+  --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 \
+  --reranker-revision 1427fd652930e4ba29e8149678df786c240d8825 \
+  --candidate-pool-size 6 \
+  --output /private/path/reranker-pool-6.json
+```
+
+`--reranker-cache-dir` yalnızca model cache’i varsayılan Hugging Face cache’inden farklıysa kullanılır. Reranker seçilmediğinde hiçbir reranker ağırlığı yüklenmez; `RAG_TOP_K` ve production davranışı değişmez. Model kartı ve kullanım örneği: [Hugging Face — multilingual mMARCO MiniLM Cross-Encoder](https://huggingface.co/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1).
+
+### Bu dalın ölçüm durumu
+
+Yerel sentetik korpusta 92 senaryolu, sabit K=3 baseline ve ayrı calibration/holdout adaptive değerlendirmesi tamamlandı. Toplu, içerik içermeyen sonuçlar [retrieval robustness raporunda](experiments/retrieval-robustness-v1.md) bulunur. Gap, ratio ve three-tier seçenekleri holdout ölçütlerini korumadığı için reddedildi; üretim ayarları değiştirilmedi.
+
+Reranker kodu ve offline yükleyici test edildi, ancak model ağırlıklarının indirilmesi tekrarlayan CDN zaman aşımı/proxy hataları nedeniyle tamamlanamadı. Bu nedenle reranker kalitesi, aday havuzu kıyaslamaları (6/8/10) ve gecikmesi ölçülmedi. Ayrıntı: [local reranker durumu](experiments/local-reranker-v1.md). Bu deneme production yoluna bağlı değildir ve `RAG_TOP_K=3` olarak kalır.
