@@ -1,10 +1,13 @@
 import hashlib
 import os
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 # The application module imports the shared engine through the health route.
@@ -39,13 +42,15 @@ async def enterprise_session():
         tenant_admin = User(email="tenant-admin@example.com", password_hash="x", role="user")
         tenant_manager = User(email="tenant-manager@example.com", password_hash="x", role="user")
         tenant_user = User(email="tenant-user@example.com", password_hash="x", role="user")
+        workspace_admin = User(email="workspace-admin@example.com", password_hash="x", role="user")
         external_user = User(email="invitee@example.com", password_hash="x", role="user")
-        db.add_all([org_a, org_b, workspace_a, workspace_b, kb_a, platform_admin, tenant_admin, tenant_manager, tenant_user, external_user])
+        db.add_all([org_a, org_b, workspace_a, workspace_b, kb_a, platform_admin, tenant_admin, tenant_manager, tenant_user, workspace_admin, external_user])
         await db.flush()
         db.add_all([
             Membership(user_id=tenant_admin.id, organization_id=org_a.id, workspace_id=None, role="admin"),
             Membership(user_id=tenant_manager.id, organization_id=org_a.id, workspace_id=workspace_a.id, role="manager"),
             Membership(user_id=tenant_user.id, organization_id=org_a.id, workspace_id=workspace_a.id, role="user"),
+            Membership(user_id=workspace_admin.id, organization_id=org_a.id, workspace_id=workspace_a.id, role="admin"),
         ])
         await db.commit()
         yield db, {
@@ -53,12 +58,14 @@ async def enterprise_session():
             "tenant_admin": {"sub": str(tenant_admin.id), "role": "user"},
             "tenant_manager": {"sub": str(tenant_manager.id), "role": "user"},
             "tenant_user": {"sub": str(tenant_user.id), "role": "user"},
+            "workspace_admin": {"sub": str(workspace_admin.id), "role": "user"},
             "invitee": {"sub": str(external_user.id), "role": "user"},
             "org_a": org_a.id,
             "org_b": org_b.id,
             "workspace_a": workspace_a.id,
             "workspace_b": workspace_b.id,
             "tenant_user_id": tenant_user.id,
+            "workspace_admin_id": workspace_admin.id,
             "invitee_id": external_user.id,
             "platform_id": platform_admin.id,
         }
@@ -88,11 +95,11 @@ async def test_tenant_admin_is_limited_to_its_organization_and_manager_cannot_ad
     )
     assert created.organization_id == ids["org_a"]
 
-    with pytest.raises(HTTPException, match="Organization access denied"):
+    with pytest.raises(HTTPException, match="Organization administrator access denied"):
         await admin.create_workspace(
             WorkspaceCreate(organization_id=ids["org_b"], name="Forbidden", slug="forbidden"), user=ids["tenant_admin"], db=db
         )
-    with pytest.raises(HTTPException, match="Organization access denied"):
+    with pytest.raises(HTTPException, match="Organization administrator access denied"):
         await admin.list_memberships(organization_id=ids["org_a"], user=ids["tenant_manager"], db=db)
 
 
@@ -144,8 +151,145 @@ async def test_invitation_listing_and_revocation_are_tenant_scoped(enterprise_se
     created = await admin.create_invitation(
         InvitationCreate(email="new@example.com", organization_id=ids["org_a"]), user=ids["tenant_admin"], db=db
     )
-    with pytest.raises(HTTPException, match="Organization access denied"):
+    with pytest.raises(HTTPException, match="Organization administrator access denied"):
         await admin.list_invitations(organization_id=ids["org_b"], user=ids["tenant_admin"], db=db)
     await admin.revoke_invitation(created.id, user=ids["tenant_admin"], db=db)
     assert await db.get(Invitation, created.id) is None
     assert await db.scalar(select(AuditEvent).where(AuditEvent.action == "invitation_revoked"))
+
+
+@pytest.mark.asyncio
+async def test_last_organization_admin_cannot_be_demoted_or_removed(enterprise_session):
+    db, ids = enterprise_session
+    membership = await db.scalar(select(Membership).where(Membership.user_id == int(ids["tenant_admin"]["sub"])))
+    assert membership is not None and membership.workspace_id is None and membership.role == "admin"
+
+    with pytest.raises(HTTPException, match="last organization administrator"):
+        await admin.update_membership(membership.id, MembershipUpdate(role="manager"), user=ids["tenant_admin"], db=db)
+    with pytest.raises(HTTPException, match="last organization administrator"):
+        await admin.delete_membership(membership.id, user=ids["tenant_admin"], db=db)
+
+
+@pytest.mark.asyncio
+async def test_one_of_two_organization_admins_can_be_changed_or_removed(enterprise_session):
+    db, ids = enterprise_session
+    second = await admin.create_membership(
+        MembershipCreate(user_email="tenant-user@example.com", organization_id=ids["org_a"], role="admin"),
+        user=ids["tenant_admin"],
+        db=db,
+    )
+    await admin.create_membership(
+        MembershipCreate(user_email="invitee@example.com", organization_id=ids["org_a"], role="admin"),
+        user=ids["tenant_admin"],
+        db=db,
+    )
+    original = await db.scalar(select(Membership).where(Membership.user_id == int(ids["tenant_admin"]["sub"])))
+    assert original is not None
+    changed = await admin.update_membership(original.id, MembershipUpdate(role="manager"), user=ids["tenant_admin"], db=db)
+    assert changed.role == "manager"
+    await admin.delete_membership(second.id, user=ids["tenant_user"], db=db)
+
+
+@pytest.mark.asyncio
+async def test_workspace_admin_is_not_an_organization_administrator(enterprise_session):
+    db, ids = enterprise_session
+    with pytest.raises(HTTPException, match="Organization administrator access denied"):
+        await admin.create_workspace(
+            WorkspaceCreate(organization_id=ids["org_a"], name="Forbidden", slug="forbidden"),
+            user=ids["workspace_admin"],
+            db=db,
+        )
+    assert await admin.list_organizations(user=ids["workspace_admin"], db=db) == []
+
+
+@pytest.mark.asyncio
+async def test_duplicate_organization_and_workspace_memberships_are_rejected(enterprise_session):
+    db, ids = enterprise_session
+    await admin.create_membership(
+        MembershipCreate(user_email="invitee@example.com", organization_id=ids["org_a"], role="user"),
+        user=ids["tenant_admin"],
+        db=db,
+    )
+    with pytest.raises(HTTPException, match="Membership already exists"):
+        await admin.create_membership(
+            MembershipCreate(user_email="invitee@example.com", organization_id=ids["org_a"], role="user"),
+            user=ids["tenant_admin"],
+            db=db,
+        )
+    await admin.create_membership(
+        MembershipCreate(user_email="invitee@example.com", organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="user"),
+        user=ids["tenant_admin"],
+        db=db,
+    )
+    with pytest.raises(HTTPException, match="Membership already exists"):
+        await admin.create_membership(
+            MembershipCreate(user_email="invitee@example.com", organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="user"),
+            user=ids["tenant_admin"],
+            db=db,
+        )
+
+
+@pytest.mark.asyncio
+async def test_membership_integrity_error_becomes_safe_conflict(enterprise_session, monkeypatch):
+    db, ids = enterprise_session
+
+    async def duplicate_flush():
+        raise IntegrityError("INSERT memberships", {}, Exception("duplicate"))
+
+    monkeypatch.setattr(db, "flush", duplicate_flush)
+    with pytest.raises(HTTPException, match="Membership already exists") as error:
+        await admin.create_membership(
+            MembershipCreate(user_email="invitee@example.com", organization_id=ids["org_a"], role="user"),
+            user=ids["tenant_admin"],
+            db=db,
+        )
+    assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_invitation_expiration_and_email_normalization_are_enforced(enterprise_session):
+    db, ids = enterprise_session
+    created = await admin.create_invitation(
+        InvitationCreate(email="INVITEE@example.com", organization_id=ids["org_a"]), user=ids["tenant_admin"], db=db
+    )
+    invitation = await db.get(Invitation, created.id)
+    assert invitation is not None
+    invitation.email = "  INVITEE@EXAMPLE.COM  "
+    await db.commit()
+    accepted = await admin.accept_invitation(InvitationAcceptRequest(token=created.delivery_token), user=ids["invitee"], db=db)
+    assert accepted.accepted_at is not None
+
+    expired = await admin.create_invitation(
+        InvitationCreate(email="invitee@example.com", organization_id=ids["org_a"]), user=ids["tenant_admin"], db=db
+    )
+    expired_row = await db.get(Invitation, expired.id)
+    assert expired_row is not None
+    expired_row.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    await db.commit()
+    with pytest.raises(HTTPException, match="expired"):
+        await admin.accept_invitation(InvitationAcceptRequest(token=expired.delivery_token), user=ids["invitee"], db=db)
+
+
+@pytest.mark.asyncio
+async def test_invitation_lock_is_compiled_for_postgresql_and_replay_consumes_once(enterprise_session):
+    db, ids = enterprise_session
+    statement = admin._locked_invitation_statement("hash")
+    assert "FOR UPDATE" in str(statement.compile(dialect=postgresql.dialect()))
+
+    created = await admin.create_invitation(
+        InvitationCreate(email="invitee@example.com", organization_id=ids["org_a"]), user=ids["tenant_admin"], db=db
+    )
+    await admin.accept_invitation(InvitationAcceptRequest(token=created.delivery_token), user=ids["invitee"], db=db)
+    with pytest.raises(HTTPException, match="already been used"):
+        await admin.accept_invitation(InvitationAcceptRequest(token=created.delivery_token), user=ids["invitee"], db=db)
+    accepted_events = list((await db.scalars(select(AuditEvent).where(AuditEvent.action == "invitation_accepted"))).all())
+    assert len(accepted_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_database_partial_index_rejects_duplicate_organization_memberships(enterprise_session):
+    db, ids = enterprise_session
+    db.add(Membership(user_id=int(ids["tenant_admin"]["sub"]), organization_id=ids["org_a"], workspace_id=None, role="admin"))
+    with pytest.raises(IntegrityError):
+        await db.flush()
+    await db.rollback()

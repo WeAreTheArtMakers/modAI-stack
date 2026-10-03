@@ -10,6 +10,7 @@ class OrganizationAccess(BaseModel):
     name: str
     slug: str
     membership_role: str
+    organization_admin: bool = False
 
 class WorkspaceResponse(BaseModel):
     id: int

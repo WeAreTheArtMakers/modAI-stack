@@ -17,9 +17,9 @@ Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge
 Sistemde birbirinden bağımsız iki yetki alanı bulunur:
 
 - **Platform rolü** (`User.role`): Makine genelindeki işlemleri belirler. Yalnızca platform `admin`, Ollama model çekme/silme ve gelecekteki platform yönetimi gibi host düzeyindeki işlemleri yapabilir.
-- **Organization / Workspace üyelik rolü** (`Membership.role`): Tenant kaynaklarını belirler. `admin`, `manager` ve `user` rolleri yalnızca yetkili Organization, Workspace ve Knowledge Base içindeki belge/RAG işlemlerini yönetir.
+- **Tenant üyelik rolü** (`Membership.role`): `workspace_id=NULL` olan kayıt Organization-genelidir; belirli bir `workspace_id` ise yalnızca o Workspace için geçerlidir. `admin`, `manager` ve `user` rolleri yalnızca yetkili Organization, Workspace ve Knowledge Base içindeki belge/RAG işlemlerini yönetir.
 
-Bu nedenle bir kullanıcı platform rolü `user` iken kendi workspace’inde üyelik rolü `admin` olabilir. Bu beklenen davranıştır; workspace yöneticiliği platform yöneticiliği vermez.
+Bu nedenle bir kullanıcı platform rolü `user` iken kendi workspace’inde üyelik rolü `admin` olabilir. Bu beklenen davranıştır; workspace yöneticiliği platform yöneticiliği vermez. Ayrıca workspace-scoped `admin`, Organization yöneticisi değildir: workspace oluşturma, Organization-geneli üyelik yönetimi ve davet yönetimi yalnızca platform `admin` veya `workspace_id=NULL` olan Organization-geneli `admin` üyeliğiyle yapılabilir. Organization yöneticiliği de platform yöneticiliği vermez.
 
 ## v0.3 — Enterprise Local AI Platform
 
@@ -33,9 +33,18 @@ v0.3, yerel-öncelikli kurumsal RAG platformu kilometre taşıdır. Production h
 
 Bu durum bir güvenlik veya uyumluluk sertifikası iddiası değildir. Dağıtımın TLS, yedekleme, erişim sınırları ve secret yönetimi gereksinimleri işletmecinin sorumluluğundadır.
 
-### Sonraki kilometre taşı: v0.4 — Enterprise Administration
+## v0.4 — Enterprise Administration
 
-v0.4 odağı; kullanıcılar, Organizations, Workspaces, Membership rollerı, davetler, Audit Log arayüzü, platform yönetimi, kayıt politikası görünürlüğü ve güvenli oturum yönetimidir. Kapsam, mevcut platform rolü ile tenant üyelik rollerinin sıkı ayrımını koruyacaktır.
+Enterprise Administration; platform kullanıcı dizini, Organization ve Workspace yönetimi, scope’lu Membership yönetimi, Audit Log ve yönetim arayüzünü ekler. Davet token’ları yüksek entropili üretilir, yalnızca SHA-256 hash’i saklanır, tek kullanım ve son kullanma süresiyle korunur. Kabul sırasında hedef e-posta karşılaştırması normalize edilir ve davet satırı transaction içinde kilitlenir.
+
+- Son platform yöneticisi düşürülemez; her Organization’da en az bir Organization-geneli `admin` üyeliği korunur.
+- PostgreSQL’de `workspace_id IS NULL` Organization üyelikleri için kısmi unique index bulunur. Migration, önceden oluşmuş çift Organization-geneli üyelikleri silmez; operatörden önce bunları düzeltmesini ister.
+- Yönetim arayüzü Organization-geneli işlemleri yalnızca gerçek Organization-geneli admin üyelerine veya platform admin’lere gösterir. Backend bu sınırı ayrıca zorunlu olarak uygular.
+- Yerleşik SMTP dağıtımı yoktur; davet token’ı yalnızca oluşturulurken bir kez gösterilir ve kurumun seçtiği güvenli kanal üzerinden iletilir.
+
+### Sonraki kilometre taşı: v0.5 — RAG Evaluation & Quality
+
+v0.5, retrieval ve cevap kalitesini ölçülebilir, tekrar çalıştırılabilir ve regresyona dayanıklı hale getirecek insan tanımlı evaluation dataset’leri, deterministik metrikler ve CLI odağıyla ilerleyecektir.
 
 ## Kullanılan teknolojiler
 
@@ -112,7 +121,7 @@ Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını
 
 ### Kayıt ve ilk platform yöneticisi
 
-Geliştirme varsayılanında `ALLOW_REGISTRATION=true` ile kullanıcılar `POST /auth/register` üzerinden kaydolabilir. Yeni kullanıcıların **platform rolü `user`** olur; kendi oluşturdukları Organization/Workspace için Membership rolü `admin` kalır.
+Geliştirme varsayılanında `ALLOW_REGISTRATION=true` ile kullanıcılar `POST /auth/register` üzerinden kaydolabilir. Yeni kullanıcıların **platform rolü `user`** olur; kendi oluşturdukları Organization için `workspace_id=NULL` olan Organization-geneli Membership rolü `admin` atanır. Bu üyelik mevcut Workspace’e erişim verir, ancak platform rolünü yükseltmez.
 
 Kurumsal üretimde `ALLOW_REGISTRATION=false` ayarlanmalıdır. Bu durumda kayıt endpoint’i `403` döndürür, mevcut kullanıcıların girişi çalışmaya devam eder. İlk platform yöneticisini public bir HTTP endpoint’i kullanmadan, uygulamanın erişebildiği güvenli terminalde oluşturun veya yükseltin:
 

@@ -5,6 +5,7 @@ export interface OrganizationAccess {
   name: string;
   slug: string;
   membership_role: Role;
+  organization_admin: boolean;
 }
 
 export interface Workspace {

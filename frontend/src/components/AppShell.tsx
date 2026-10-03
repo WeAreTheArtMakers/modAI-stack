@@ -33,7 +33,7 @@ function ShellContent() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [socketState, setSocketState] = useState<"connecting" | "open" | "closed">("closed");
-  const canAdministerTenant = user?.role === "admin" || user?.organizations.some((organization) => organization.membership_role === "admin");
+  const canAdministerTenant = user?.role === "admin" || user?.organizations.some((organization) => organization.organization_admin);
   const visibleAdminItems = adminNavItems.filter((item) => !item.platformOnly || user?.role === "admin");
 
   useEffect(() => {

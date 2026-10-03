@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from uuid import uuid4
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 class Base(DeclarativeBase): pass
@@ -48,7 +48,20 @@ class Membership(Base):
     workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
     role: Mapped[str] = mapped_column(String(20), default="user")
     user: Mapped[User] = relationship(back_populates="memberships")
-    __table_args__ = (UniqueConstraint("user_id", "organization_id", "workspace_id"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "organization_id", "workspace_id"),
+        # PostgreSQL needs a partial index because NULL values in a normal
+        # unique constraint are distinct. The migration owns deployment;
+        # metadata mirrors it for development/test create_all environments.
+        Index(
+            "uq_memberships_user_org_orglevel",
+            "user_id",
+            "organization_id",
+            unique=True,
+            postgresql_where=workspace_id.is_(None),
+            sqlite_where=workspace_id.is_(None),
+        ),
+    )
 
 
 class Invitation(Base):
