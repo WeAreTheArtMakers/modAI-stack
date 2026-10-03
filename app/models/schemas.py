@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class RegisterRequest(BaseModel): email: EmailStr; password: str = Field(min_length=8, max_length=128)
@@ -9,6 +10,7 @@ class OrganizationAccess(BaseModel):
     name: str
     slug: str
     membership_role: str
+    organization_admin: bool = False
 
 class WorkspaceResponse(BaseModel):
     id: int
@@ -131,3 +133,107 @@ class AuditEventResponse(BaseModel):
     metadata_json: dict = Field(default_factory=dict)
     request_id: str | None = None
     source_ip: str | None = None
+
+
+TenantRole = Literal["admin", "manager", "user"]
+PlatformRole = Literal["admin", "user"]
+
+
+class AdminUserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    email: EmailStr
+    role: PlatformRole
+    created_at: datetime | None = None
+
+
+class PlatformRoleUpdate(BaseModel):
+    role: PlatformRole
+
+
+class OrganizationAdminResponse(BaseModel):
+    id: int
+    name: str
+    slug: str
+    created_at: datetime | None = None
+    workspace_count: int = 0
+    knowledge_base_count: int = 0
+    document_count: int = 0
+    member_count: int = 0
+
+
+class WorkspaceAdminResponse(BaseModel):
+    id: int
+    organization_id: int
+    name: str
+    slug: str
+
+
+class WorkspaceCreate(BaseModel):
+    organization_id: int = Field(gt=0)
+    name: str = Field(min_length=1, max_length=150)
+    slug: str = Field(min_length=1, max_length=150, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+class WorkspaceUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    slug: str | None = Field(default=None, min_length=1, max_length=150, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+class MembershipResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    user_id: int
+    organization_id: int
+    workspace_id: int | None = None
+    role: TenantRole
+    user_email: EmailStr
+
+
+class MembershipCreate(BaseModel):
+    user_email: EmailStr
+    organization_id: int = Field(gt=0)
+    workspace_id: int | None = Field(default=None, gt=0)
+    role: TenantRole = "user"
+
+
+class MembershipUpdate(BaseModel):
+    role: TenantRole
+
+
+class InvitationCreate(BaseModel):
+    email: EmailStr
+    organization_id: int = Field(gt=0)
+    workspace_id: int | None = Field(default=None, gt=0)
+    role: TenantRole = "user"
+    expires_in_hours: int = Field(default=168, ge=1, le=24 * 30)
+
+
+class InvitationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    email: EmailStr
+    organization_id: int
+    workspace_id: int | None = None
+    role: TenantRole
+    expires_at: datetime
+    accepted_at: datetime | None = None
+    created_by_user_id: int | None = None
+    created_at: datetime | None = None
+
+
+class InvitationCreatedResponse(InvitationResponse):
+    delivery_token: str
+
+
+class InvitationAcceptRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=512)
+
+
+class PlatformStatusResponse(BaseModel):
+    registration_enabled: bool
+    configured_provider: str
+    configured_model: str
+    embedding_model: str
+    readiness: dict
+    metrics_endpoint: str = "/metrics"

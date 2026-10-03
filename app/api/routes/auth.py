@@ -104,7 +104,9 @@ async def register(req: RegisterRequest, request: Request, response: Response, d
     knowledge_base = KnowledgeBase(name="General", slug="general", workspace=workspace)
     db.add_all([user, organization, workspace, knowledge_base])
     await db.flush()
-    db.add(Membership(user_id=user.id, organization_id=organization.id, workspace_id=workspace.id, role="admin"))
+    # The creator needs explicit organization-wide administration. A workspace
+    # admin alone is intentionally not equivalent to an organization admin.
+    db.add(Membership(user_id=user.id, organization_id=organization.id, workspace_id=None, role="admin"))
     record_audit_event(db, action="registration", resource_type="user", actor_user_id=user.id, organization_id=organization.id, workspace_id=workspace.id, resource_id=user.id, request=request)
     await db.commit(); await db.refresh(user); _set_refresh_cookie(response, await _issue_refresh_token(user)); return tokens(user)
 @router.post("/login", response_model=TokenResponse)
@@ -188,6 +190,11 @@ async def me(user=Depends(current_user), db: AsyncSession = Depends(get_db)):
         select(Organization).where(Organization.id.in_(organization_ids)).order_by(Organization.id)
     )).all()) if organization_ids else []
     organization_roles: dict[int, str] = {}
+    organization_admin_ids = {
+        membership.organization_id
+        for membership in memberships
+        if membership.workspace_id is None and membership.role == "admin"
+    }
     for membership in memberships:
         current = organization_roles.get(membership.organization_id)
         if current is None or ROLE_ORDER.get(membership.role, 0) > ROLE_ORDER.get(current, 0):
@@ -204,6 +211,7 @@ async def me(user=Depends(current_user), db: AsyncSession = Depends(get_db)):
                 name=organization.name,
                 slug=organization.slug,
                 membership_role=organization_roles[organization.id],
+                organization_admin=organization.id in organization_admin_ids,
             )
             for organization in organizations
         ],

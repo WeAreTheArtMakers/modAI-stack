@@ -34,6 +34,7 @@ jobs:
       - run: pip install --dry-run -r requirements-training.txt
       - run: python -m compileall app alembic tests training
       - run: alembic upgrade head
+      - run: PGPASSWORD=ci-password psql -h localhost -U postgres -d rag_platform -tAc "SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uq_memberships_user_org_orglevel'" | grep -qx 1
       - run: python -m pytest -v
       - run: git diff --check
       - run: cp .env.example .env

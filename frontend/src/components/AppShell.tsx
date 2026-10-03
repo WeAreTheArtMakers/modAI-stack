@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate } from "react-router";
-import { Activity, BookOpen, ChevronDown, Cpu, FileText, LayoutDashboard, LogOut, MessageSquare, Menu, Server, X } from "lucide-react";
+import { Activity, BookOpen, ChevronDown, Cpu, FileText, LayoutDashboard, LogOut, MessageSquare, Menu, Server, ShieldCheck, Users, X } from "lucide-react";
 import { connectIndexing } from "../api/websocket";
 import { Logo } from "./Logo";
 import { useAuth } from "../auth/AuthContext";
@@ -16,6 +16,16 @@ const navItems = [
   { to: "/system", label: "Sistem", icon: Server },
 ];
 
+const adminNavItems = [
+  { to: "/admin/users", label: "Kullanıcılar", icon: Users, platformOnly: true },
+  { to: "/admin/organizations", label: "Organization'lar", icon: ShieldCheck },
+  { to: "/admin/workspaces", label: "Workspaceler", icon: ShieldCheck },
+  { to: "/admin/memberships", label: "Üyelikler", icon: Users },
+  { to: "/admin/invitations", label: "Davetler", icon: ShieldCheck },
+  { to: "/admin/audit", label: "Denetim günlüğü", icon: ShieldCheck, platformOnly: true },
+  { to: "/admin/platform", label: "Platform", icon: Server, platformOnly: true },
+];
+
 function ShellContent() {
   const { user, logout } = useAuth();
   const { current, workspaces, setCurrentId } = useWorkspace();
@@ -23,6 +33,8 @@ function ShellContent() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [socketState, setSocketState] = useState<"connecting" | "open" | "closed">("closed");
+  const canAdministerTenant = user?.role === "admin" || user?.organizations.some((organization) => organization.organization_admin);
+  const visibleAdminItems = adminNavItems.filter((item) => !item.platformOnly || user?.role === "admin");
 
   useEffect(() => {
     if (!current) return;
@@ -34,7 +46,7 @@ function ShellContent() {
   const sidebar = <aside className={`${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-200 bg-white px-5 py-6 transition-transform lg:static lg:shrink-0`}>
     <div className="flex items-center justify-between"><Logo /><button className="rounded-lg p-2 text-slate-500 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Menüyü kapat"><X size={19} /></button></div>
     <div className="mt-9"><p className="eyebrow px-3">Çalışma alanı</p><label className="relative mt-2 block"><select aria-label="Workspace seç" className="field appearance-none pr-9" value={current?.id ?? ""} onChange={(event) => setCurrentId(Number(event.target.value))}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-3.5 text-slate-400" size={16} /></label>{current && <p className="mt-2 px-1 text-xs text-slate-500">{user?.organizations.find((org) => org.id === current.organization_id)?.name ?? "Organization"} · {current.membership_role}</p>}</div>
-    <nav className="mt-9 space-y-1" aria-label="Ana menü">{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${isActive ? "bg-ink text-white shadow-sm" : "text-slate-600 hover:bg-cloud hover:text-ink"}`}><Icon size={18} strokeWidth={1.8} />{label}</NavLink>)}</nav>
+    <nav className="mt-9 space-y-1" aria-label="Ana menü">{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${isActive ? "bg-ink text-white shadow-sm" : "text-slate-600 hover:bg-cloud hover:text-ink"}`}><Icon size={18} strokeWidth={1.8} />{label}</NavLink>)}{canAdministerTenant && <><p className="eyebrow px-3 pt-6">Yönetim</p>{visibleAdminItems.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-ink text-white shadow-sm" : "text-slate-600 hover:bg-cloud hover:text-ink"}`}><Icon size={17} strokeWidth={1.8} />{label}</NavLink>)}</>}</nav>
     <div className="mt-auto border-t border-slate-100 pt-5"><div className="flex items-center gap-3 px-2"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan/10 text-sm font-bold text-cyan">{user?.email.slice(0, 1).toUpperCase()}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{user?.email}</p><p className="text-xs text-slate-500">{current?.membership_role ?? user?.role}</p></div><button className="rounded-lg p-2 text-slate-400 hover:bg-cloud hover:text-ink" title="Çıkış yap" onClick={() => { logout(); navigate("/login"); }}><LogOut size={17} /></button></div></div>
   </aside>;
 

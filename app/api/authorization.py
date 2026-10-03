@@ -16,10 +16,36 @@ def _stronger_membership(first: Membership, second: Membership) -> Membership:
     return first if role_allows(first.role, second.role) else second
 
 async def require_organization_access(db: AsyncSession, user: dict, organization_id: int, minimum_role: str = "user") -> Membership:
+    """Authorize general organization access, including a workspace membership.
+
+    This remains suitable for read/RAG flows.  It intentionally does *not*
+    establish organization-wide administrative authority; use
+    ``require_organization_admin`` for that stricter boundary.
+    """
     membership = await db.scalar(select(Membership).where(Membership.user_id == int(user["sub"]), Membership.organization_id == organization_id, Membership.workspace_id.is_(None)))
     if not membership:
         membership = await db.scalar(select(Membership).where(Membership.user_id == int(user["sub"]), Membership.organization_id == organization_id))
     if not membership or not role_allows(membership.role, minimum_role): raise HTTPException(403, "Organization access denied")
+    return membership
+
+
+async def require_organization_admin(db: AsyncSession, user: dict, organization_id: int) -> Membership:
+    """Require an organization-wide tenant administrator membership.
+
+    A membership for a particular workspace is never a fallback here.  Platform
+    role checks deliberately live at the route boundary so a platform admin is
+    not represented as a synthetic tenant membership.
+    """
+    membership = await db.scalar(
+        select(Membership).where(
+            Membership.user_id == int(user["sub"]),
+            Membership.organization_id == organization_id,
+            Membership.workspace_id.is_(None),
+            Membership.role == "admin",
+        )
+    )
+    if not membership:
+        raise HTTPException(403, "Organization administrator access denied")
     return membership
 
 async def require_workspace_access(db: AsyncSession, user: dict, workspace_id: int, minimum_role: str = "user") -> Membership:

@@ -8,18 +8,22 @@ import { SourceCard } from "./pages/ChatPage";
 import { UploadDropzone } from "./components/UploadDropzone";
 import { connectIndexing, streamRag } from "./api/websocket";
 import { ModelsPage } from "./pages/ModelsPage";
+import { AdminPage } from "./pages/AdminPage";
+import { InviteAcceptPage } from "./pages/InviteAcceptPage";
 import type { ModelSystemStatus, Source, UserContext } from "./types";
 
-const mocks = vi.hoisted(() => ({ login: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn() }));
+const mocks = vi.hoisted(() => ({ login: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn(), listAdminUsers: vi.fn(), updatePlatformRole: vi.fn(), acceptInvitation: vi.fn() }));
 vi.mock("./auth/AuthContext", () => ({ useAuth: () => ({ user: mocks.user, loading: false, error: null, login: mocks.login, logout: vi.fn() }) }));
 vi.mock("./api/documents", () => ({ uploadDocuments: mocks.uploadDocuments, reindexDocument: vi.fn(), deleteDocument: vi.fn() }));
 vi.mock("./api/models", () => ({ getModelStatus: mocks.getModelStatus, listManagedModels: mocks.listManagedModels, deleteManagedModel: mocks.deleteManagedModel }));
+vi.mock("./api/admin", () => ({ listAdminUsers: mocks.listAdminUsers, updatePlatformRole: mocks.updatePlatformRole, listAdminOrganizations: vi.fn(), listAdminWorkspaces: vi.fn(), createAdminWorkspace: vi.fn(), listMemberships: vi.fn(), createMembership: vi.fn(), updateMembership: vi.fn(), removeMembership: vi.fn(), listInvitations: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), acceptInvitation: mocks.acceptInvitation, listAuditEvents: vi.fn(), getPlatformStatus: vi.fn() }));
 vi.mock("./api/websocket", async (importOriginal) => ({ ...(await importOriginal<typeof import("./api/websocket")>()), streamModelPull: mocks.streamModelPull }));
 
 const modelStatus: ModelSystemStatus = { providers: [{ provider: "ollama", endpoint: "http://localhost:11434", ready: true }], generation: { provider: "ollama", configured_model: "llama3.2:3b", ready: true, running: true }, embedding: { configured_model: "sentence-transformers/all-MiniLM-L6-v2", source: "huggingface_cache", download_allowed: false, cache_available: false, ready: false, status: "unavailable" } };
 const admin: UserContext = { id: 1, email: "admin@example.com", role: "admin", organizations: [], workspaces: [] };
-const member: UserContext = { ...admin, id: 2, email: "member@example.com", role: "user", organizations: [{ id: 1, name: "Tenant", slug: "tenant", membership_role: "admin" }], workspaces: [{ id: 1, organization_id: 1, name: "Workspace", slug: "workspace", membership_role: "admin" }] };
+const member: UserContext = { ...admin, id: 2, email: "member@example.com", role: "user", organizations: [{ id: 1, name: "Tenant", slug: "tenant", membership_role: "admin", organization_admin: true }], workspaces: [{ id: 1, organization_id: 1, name: "Workspace", slug: "workspace", membership_role: "admin" }] };
 function renderModels() { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><ModelsPage /></QueryClientProvider>); }
+function renderAdmin(section: "users" | "organizations" | "workspaces" | "memberships" | "invitations" | "audit" | "platform") { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><AdminPage section={section} /></QueryClientProvider>); }
 
 describe("Web Console critical UI", () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.user = null; });
@@ -131,5 +135,33 @@ describe("Web Console critical UI", () => {
     await user.click(screen.getByRole("button", { name: "Vazgeç" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await act(async () => { finishPull?.(); });
+  });
+
+  it("keeps platform user management out of tenant administrator views", async () => {
+    mocks.user = member;
+    renderAdmin("users");
+    expect(screen.getByText("Platform yetkisi gerekli")).toBeInTheDocument();
+    expect(mocks.listAdminUsers).not.toHaveBeenCalled();
+  });
+
+  it("lets a platform admin review users and change only platform roles", async () => {
+    mocks.user = admin;
+    mocks.listAdminUsers.mockResolvedValue([{ id: 8, email: "person@example.com", role: "user", created_at: null }]);
+    mocks.updatePlatformRole.mockResolvedValue({ id: 8, email: "person@example.com", role: "admin", created_at: null });
+    const user = userEvent.setup();
+    renderAdmin("users");
+    await screen.findByText("person@example.com");
+    await user.selectOptions(screen.getByLabelText("person@example.com platform rolü"), "admin");
+    await waitFor(() => expect(mocks.updatePlatformRole).toHaveBeenCalledWith(8, "admin"));
+  });
+
+  it("accepts an invitation only through the authenticated acceptance view", async () => {
+    mocks.user = member;
+    mocks.acceptInvitation.mockResolvedValue({ id: 1, email: "member@example.com" });
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={["/invite/accept?token=single-use-token-that-is-long-enough"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
+    await user.click(screen.getByRole("button", { name: "Daveti kabul et" }));
+    await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith("single-use-token-that-is-long-enough"));
+    expect(await screen.findByText("Davet kabul edildi")).toBeInTheDocument();
   });
 });

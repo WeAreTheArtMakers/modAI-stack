@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from uuid import uuid4
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 class Base(DeclarativeBase): pass
@@ -48,7 +48,35 @@ class Membership(Base):
     workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
     role: Mapped[str] = mapped_column(String(20), default="user")
     user: Mapped[User] = relationship(back_populates="memberships")
-    __table_args__ = (UniqueConstraint("user_id", "organization_id", "workspace_id"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "organization_id", "workspace_id"),
+        # PostgreSQL needs a partial index because NULL values in a normal
+        # unique constraint are distinct. The migration owns deployment;
+        # metadata mirrors it for development/test create_all environments.
+        Index(
+            "uq_memberships_user_org_orglevel",
+            "user_id",
+            "organization_id",
+            unique=True,
+            postgresql_where=workspace_id.is_(None),
+            sqlite_where=workspace_id.is_(None),
+        ),
+    )
+
+
+class Invitation(Base):
+    """A one-time tenant invitation with no stored raw credential."""
+    __tablename__ = "invitations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
+    role: Mapped[str] = mapped_column(String(20), default="user")
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
