@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "local-rag-sample",
+  "cases": [
+    {
+      "id": "engineering-retention",
+      "category": "technical",
+      "question": "Mühendislik belgelerinin saklama süresi nedir?",
+      "knowledge_base_ids": [1],
+      "expected_documents": ["engineering-policy.pdf"],
+      "expected_facts": ["saklama süresi 24 aydır"],
+      "top_k": 5
+    },
+    {
+      "id": "hr-onboarding",
+      "category": "policy",
+      "question": "Onboarding sırasında hangi erişim onayı gereklidir?",
+      "knowledge_base_ids": [1],
+      "expected_documents": ["hr-onboarding.docx"],
+      "expected_facts": ["yönetici onayı gereklidir"],
+      "top_k": 5
+    }
+  ]
+}

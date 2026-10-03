@@ -25,6 +25,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: "redis://redis:6379/0"
       QDRANT_URL: "http://qdrant:6333"
+      # API upload paths must be readable by the asynchronous worker.
+      DATA_DIR: "/data/modai"
 
       # Ollama Mac üzerinde çalışıyor.
       OLLAMA_BASE_URL: "http://host.docker.internal:11434"
@@ -41,6 +43,7 @@ services:
         condition: service_healthy
 
     volumes:
+      - modaidata:/data/modai
       - ${MODEL_DIR:-./models}:/models
 
     restart: unless-stopped
