@@ -20,11 +20,13 @@ This is the canonical reproducible benchmark. The former private 92-case robustn
 - `compact-multilingual-v1` is reproducible and committed with its fingerprint and manifest.
 - MiniLM was rerun alongside the pinned E5-small candidate in an offline paired experiment.
 - E5-small improved overall, English, and Turkish answerable retrieval on this corpus, and improved English-query → Turkish-source retrieval. It did not improve Turkish-query → English-source retrieval (still 0/22); no-answer confusability and hard-negative confusable-source frequency increased. See the complete measured comparison in [`compact-multilingual-e5-paired-v1.md`](../../evaluation/experiments/compact-multilingual-e5-paired-v1.md).
-- E5-small is **not a validated Compact Multilingual candidate**: the asymmetric cross-language result and increased confusability do not clear the product gate.
+- Deep-rank and mirrored-set diagnostics are recorded in [`cross-language-diagnostics-v1.md`](../../evaluation/experiments/cross-language-diagnostics-v1.md). The canonical corpus has uneven directional query templates/lengths, but the separate 20-fact mirror also shows E5-small's TR-query → EN-source deficit. On canonical E5-small cases, only 7/22 expected sources rank within top 10 and 15/22 are below the top-20 window or absent. No prefix, truncation, normalization, or indexing bug was found.
+- E5-small is **not a validated Compact Multilingual candidate**: aggregate and EN→TR gains are promising, but the persistent TR→EN retrieval weakness and increased no-answer confusability do not clear the product gate.
 
 ### Current / next
 
-- Evaluate the exact pinned `intfloat/multilingual-e5-base` snapshot as the next multilingual embedding candidate, using the same corpus and paired offline protocol.
+- Next embedding candidate: evaluate the exact pinned `intfloat/multilingual-e5-base` revision using the same corpus and paired offline protocol after its weights are deliberately provisioned. Do not automatically download it or change production as part of this diagnostics milestone.
+- A reranker cannot recover sources absent from its candidate pool. Since most canonical E5-small TR→EN expected sources fall outside top 10, first compare embedding candidate recall; a bounded top-20 reranking/candidate-pool experiment may follow if the stronger embedding changes candidate coverage.
 - Keep E5-small and Compact Multilingual experimental, inactive, and non-selectable. Do not change production `EMBEDDING_MODEL` or `RAG_TOP_K=3` based on these results.
 
 ### If a future candidate passes review
@@ -39,7 +41,7 @@ This is the canonical reproducible benchmark. The former private 92-case robustn
 
 ### Later
 
-- Evaluate no-answer and abstention quality as a separate capability; do not infer abstention from similarity alone.
+- Evaluate no-answer and abstention quality as a separate capability; do not infer abstention from similarity alone or introduce a threshold from the current scores.
 - Evaluate a reranker.
 - Consider dense+sparse/hybrid retrieval only if measured results justify it.
 

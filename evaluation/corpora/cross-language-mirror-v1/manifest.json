@@ -1,0 +1,12 @@
+{
+  "all_facts_numeric_or_threshold_based": true,
+  "case_count": 40,
+  "corpus_version": "cross-language-mirror-v1",
+  "directional_case_counts": {
+    "en_query_to_tr_document": 20,
+    "tr_query_to_en_document": 20
+  },
+  "document_count": 40,
+  "fingerprint_sha256": "95e188795dd5c493f10d1b6139559e9ffcd71c8dd5f6b8469865b833595e188c",
+  "mirrored_fact_pair_count": 20
+}
