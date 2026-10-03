@@ -1,31 +1,53 @@
-# Retrieval profile embedding benchmark — next experiment
+# Retrieval profile embedding benchmark roadmap
 
-## Goal
+## Purpose
 
-Determine whether a multilingual embedding profile materially improves retrieval over the current production baseline. This is a planned experiment only: do not download candidate models or change production configuration as part of product-profile presentation work.
+Evaluate whether a multilingual embedding profile materially improves retrieval over the current production baseline. This roadmap tracks the benchmark and any later controlled migration; it does not authorize a production profile change.
 
-## Candidate sequence
+## Canonical benchmark corpus
 
-1. Baseline: `sentence-transformers/all-MiniLM-L6-v2`.
-2. First candidate: `intfloat/multilingual-e5-small`.
-3. Later, only if local resources and network policy permit: `intfloat/multilingual-e5-base` and `BAAI/bge-m3`.
+Use the versioned, deterministic, fictional corpus `compact-multilingual-v1` for embedding comparisons. Its expected fingerprint is `81d4546f3564171fd9f8a73ce82dd1f0a97e7ffde83660f9d972284f286f320b` and it contains 44 documents and 156 cases: 132 answerable and 24 no-answer. The answerable split is balanced at 66 English and 66 Turkish queries, including 22 Turkish-query → English-source cases and 22 English-query → Turkish-source cases.
 
-Pin exact model revisions and licenses, provision weights outside Git, and run fully offline after provisioning. Do not expose a candidate as an active production profile until the measurements and reindex implications are reviewed.
+This is the canonical reproducible benchmark. The former private 92-case robustness corpus is not a repository dependency and must not be used as the canonical future comparison set. Keep all benchmark inputs and outputs fictional and safe for repository use; never commit private company data, local caches, or model weights.
 
-## Evaluation design
+## Living milestone status
 
-Use the same private 92-case robustness corpus and its existing fingerprint, with identical documents, splits, Qdrant settings, chunking, and fixed `K=3`. Keep raw questions, documents, per-case outputs, and model caches outside the repository. Do not tune thresholds on the holdout set.
+### Completed
 
-Report, per model:
+- MiniLM production baseline architecture is in place.
+- Production retrieval uses fixed `RAG_TOP_K=3`; benchmark comparisons also use fixed `K=3`.
+- Retrieval Profile product abstraction is implemented, with profile switching disabled.
+- `compact-multilingual-v1` is reproducible and committed with its fingerprint and manifest.
+- A MiniLM baseline has been run on this canonical corpus. Its results are useful context, not a substitute for rerunning MiniLM alongside a candidate in a paired experiment.
 
-- overall Hit@3, MRR, source accuracy, and fact coverage;
-- English and Turkish Hit@3 separately;
-- cross-language retrieval: Turkish query → English document and English query → Turkish document;
-- embedding latency, peak RAM, vector dimension, and Qdrant storage/index impact;
-- whether results are comparable under each model's required query/document prompting or normalization.
+### Current
 
-Include confidence/context for this small synthetic corpus and do not infer answer quality from retrieval metrics alone. A language-specific regression must remain visible rather than being hidden by a global average.
+- Provision the exact pinned `intfloat/multilingual-e5-small` snapshot outside Git.
+- Once provisioned and verified, run a paired, offline MiniLM vs E5-small benchmark on `compact-multilingual-v1` using the same documents, cases, chunking, Qdrant configuration, and fixed `K=3`, with isolated vector collections.
 
-## Productization gate
+### Next if E5 passes review
 
-The profile catalog remains read-only until a candidate has been benchmarked and selected. Switching profiles must be an explicit, controlled migration: embedding spaces and dimensions are not interchangeable, so existing vectors must be rebuilt and activated consistently before the new profile serves queries. Never change only `EMBEDDING_MODEL` while retaining vectors from another model.
+- Validate the Compact Multilingual candidate-to-profile mapping.
+- Design a controlled profile migration with an isolated new vector index, complete reindex, atomic profile/index activation, and rollback capability.
+- Keep the candidate non-selectable and inactive until the migration is implemented and explicitly approved.
+
+### Next if E5 fails review
+
+- Evaluate `intfloat/multilingual-e5-base` as the next multilingual candidate.
+- Consider `BAAI/bge-m3` only if the evidence justifies its additional footprint and complexity.
+
+### Later
+
+- Evaluate no-answer and abstention quality.
+- Evaluate a reranker.
+- Consider dense+sparse/hybrid retrieval only if measured results justify it.
+
+## Benchmark principles
+
+- Pin exact model revisions and record model identity, revision, license, artifact provenance, preprocessing, and corpus fingerprint.
+- Provision model artifacts outside Git and run inference fully offline after provisioning.
+- Compare models with the same corpus, chunking, cases, fixed `K=3`, and Qdrant configuration; isolate their vector collections and verify vector-space identity before retrieval. Equal dimensions do not make different embedding spaces compatible.
+- Apply each model's documented preprocessing consistently. Report English, Turkish, and both cross-language directions separately so an overall average cannot hide a language regression.
+- Report retrieval quality alongside latency, memory, indexing cost, and storage; do not infer answer quality from retrieval metrics alone or fabricate unavailable measurements.
+- Keep production on its current embedding model and `RAG_TOP_K=3`. Do not activate a candidate, switch profiles, or reindex real user documents based only on a benchmark.
+- Any eventual embedding-space change requires a controlled full reindex and a consistent, atomic index/profile activation with a rollback path. Never change only `EMBEDDING_MODEL` while serving vectors from another model.
