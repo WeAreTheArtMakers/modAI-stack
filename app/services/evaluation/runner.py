@@ -14,6 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.authorization import resolve_knowledge_base_scope
 from app.core.config import get_settings
 from app.models.schemas import Source
+from app.services.evaluation.adaptive import (
+    AdaptivePolicy,
+    adaptive_context_k,
+    retrieval_score_features,
+)
 from app.services.evaluation.metrics import (
     answer_fact_groundedness,
     fact_coverage,
@@ -31,7 +36,7 @@ from app.services.evaluation.models import (
     RetrievedEvidence,
     dataset_fingerprint,
 )
-from app.services.rag.pipeline import retrieve_rag_context
+from app.services.rag.pipeline import build_rag_prompt, retrieve_rag_context
 
 Retriever = Callable[[EvaluationCase], Awaitable[RetrievalResult]]
 Generator = Callable[[EvaluationCase, RetrievalResult], Awaitable[str]]
@@ -70,6 +75,43 @@ class AuthorizedRagRetriever:
             prompt=context.prompt,
             embedding_latency_ms=context.embedding_latency_ms,
             retrieval_latency_ms=context.retrieval_latency_ms,
+            retrieval_scores=[source.score for source in context.sources[: case.top_k]],
+        )
+
+
+class AdaptiveContextRetriever:
+    """Evaluation-only wrapper that selects a context prefix from a K=3 result."""
+
+    def __init__(
+        self,
+        retrieve: Retriever,
+        *,
+        policy: AdaptivePolicy,
+        threshold: float,
+        second_threshold: float | None = None,
+    ):
+        self.retrieve = retrieve
+        self.policy = policy
+        self.threshold = threshold
+        self.second_threshold = second_threshold
+
+    async def __call__(self, case: EvaluationCase) -> RetrievalResult:
+        result = await self.retrieve(case)
+        evidence = result.evidence[: case.top_k]
+        scores = result.retrieval_scores or [item.score for item in evidence]
+        selected_count = adaptive_context_k(
+            scores,
+            policy=self.policy,
+            threshold=self.threshold,
+            second_threshold=self.second_threshold,
+        )
+        selected = evidence[:selected_count]
+        return RetrievalResult(
+            evidence=selected,
+            prompt=build_rag_prompt(case.question, [item.text or "" for item in selected]),
+            embedding_latency_ms=result.embedding_latency_ms,
+            retrieval_latency_ms=result.retrieval_latency_ms,
+            retrieval_scores=scores,
         )
 
 
@@ -139,6 +181,10 @@ class EvaluationRunner:
         evidence = retrieval.evidence[: case.top_k]
         returned_documents = [item.document for item in evidence]
         source_matches = _source_matches(case, evidence)
+        scores = retrieval.retrieval_scores
+        if scores is None:
+            scores = [item.score for item in evidence]
+        score_features = retrieval_score_features(scores)
         has_expected_source_identity = bool(case.expected_document_ids or case.expected_documents)
         source_hit = any(source_matches) if has_expected_source_identity else None
         first_match_index = next((index for index, matched in enumerate(source_matches, start=1) if matched), None)
@@ -169,6 +215,15 @@ class EvaluationRunner:
             fact_coverage=fact_coverage(case.expected_facts, source_texts),
             answer_fact_groundedness=answer_fact_groundedness(case.expected_facts, source_texts, answer),
             generated_answer_char_count=len(answer) if answer is not None else None,
+            **score_features.__dict__,
+            expected_source_rank=next(
+                (rank for rank, matched in enumerate(source_matches, start=1) if matched), None
+            ),
+            relevant_source_by_rank=source_matches,
+            fact_coverage_by_rank=[
+                fact_coverage(case.expected_facts, source_texts[:rank])
+                for rank in range(1, len(source_texts) + 1)
+            ],
             latencies=CaseLatencies(
                 embedding_ms=retrieval.embedding_latency_ms,
                 retrieval_ms=retrieval.retrieval_latency_ms,

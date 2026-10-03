@@ -106,6 +106,7 @@ class RetrievalResult(BaseModel):
     prompt: str | None = None
     embedding_latency_ms: float | None = Field(default=None, ge=0)
     retrieval_latency_ms: float | None = Field(default=None, ge=0)
+    retrieval_scores: list[float] | None = None
 
 
 class CaseLatencies(BaseModel):
@@ -138,6 +139,17 @@ class EvaluationCaseResult(BaseModel):
     answer_fact_groundedness: float | None = None
     # Safe output-size fallback; generated answer text is never persisted.
     generated_answer_char_count: int | None = Field(default=None, ge=0)
+    top1_score: float | None = None
+    top2_score: float | None = None
+    top3_score: float | None = None
+    score_gap_1_2: float | None = None
+    score_gap_2_3: float | None = None
+    score_ratio_2_1: float | None = None
+    score_ratio_3_1: float | None = None
+    score_ratio_3_2: float | None = None
+    expected_source_rank: int | None = Field(default=None, gt=0)
+    relevant_source_by_rank: list[bool] = Field(default_factory=list)
+    fact_coverage_by_rank: list[float | None] = Field(default_factory=list)
     latencies: CaseLatencies
 
 

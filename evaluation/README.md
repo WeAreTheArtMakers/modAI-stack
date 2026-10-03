@@ -61,3 +61,18 @@ python -m app.tools.compare_rag_evaluations baseline.json candidate.json
 ```
 
 Araç “daha iyi” yorumu yapmaz; embedding modeli değiştiğinde yeniden indeksleme, fingerprint eksik olduğunda eşitliğin kanıtlanamadığı, fingerprint değiştiğinde ise aggregate delta’ların doğrudan karşılaştırılamayacağı uyarısını verir.
+
+## Adaptive context experiment (evaluation only)
+
+Evaluation CLI, K=3 retrieval listesinden sorgu içi score-gap, score-ratio veya three-tier kurallarıyla 1–3 kaynaklık bir prefix seçebilir. Bu mod production RAG yollarında kullanılmaz ve `RAG_TOP_K` ayarını değiştirmez. Adaptive koşuda retrieval tabanı açıkça `--top-k 3` olmalıdır.
+
+```bash
+python -m app.tools.evaluate_rag \
+  --dataset private-acceptance-dataset.json \
+  --top-k 3 \
+  --adaptive-policy gap \
+  --adaptive-threshold 0.02 \
+  --output adaptive-candidate.json
+```
+
+Evaluation case sonuçları yalnızca ilk üç retrieval skorunu, gap/ratio özetlerini, kaynak rank/eşleşme bayraklarını ve rank başına fact coverage değerlerini sayısal metadata olarak tutar. Kaynak metni, soru, prompt veya tam yanıt bu skor alanlarına eklenmez. Skor eşikleri her sorgunun kendi sıralı skorları üzerinde uygulanmalıdır; mutlak cosine skorlarının sorgular arasında kalibre edildiği varsayılmaz.
