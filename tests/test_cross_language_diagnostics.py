@@ -15,7 +15,7 @@ from app.tools.diagnose_cross_language_retrieval import (
     audit_canonical_directionality,
 )
 from app.core.config import Settings
-from app.services.evaluation.embedding_profiles import MINILM_BASELINE, MULTILINGUAL_E5_SMALL
+from app.services.evaluation.embedding_profiles import MINILM_BASELINE, MULTILINGUAL_E5_SMALL, MULTILINGUAL_E5_BASE
 from evaluation.corpora.cross_language_mirror_v1.generator import build_corpus
 
 
@@ -179,3 +179,5 @@ def test_model_prefix_contract_preserves_turkish_unicode_without_double_prefixin
     assert passage == f"passage: {text}"
     assert query.count("query: ") == 1
     assert passage.count("passage: ") == 1
+    assert MULTILINGUAL_E5_BASE.preprocess_query(text) == query
+    assert MULTILINGUAL_E5_BASE.preprocess_passage(text) == passage

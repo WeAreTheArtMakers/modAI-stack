@@ -20,6 +20,9 @@ MINILM_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
 E5_PROFILE_ID = "compact-multilingual-candidate"
 E5_MODEL_ID = "intfloat/multilingual-e5-small"
 E5_REVISION = "614241f622f53c4eeff9890bdc4f31cfecc418b3"
+E5_BASE_PROFILE_ID = "compact-multilingual-e5-base-candidate"
+E5_BASE_MODEL_ID = "intfloat/multilingual-e5-base"
+E5_BASE_REVISION = "d128750597153bb5987e10b1c3493a34e5a4502a"
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,18 @@ MULTILINGUAL_E5_SMALL = EmbeddingProfileSpec(
     dimensions=384,
     max_input_tokens=512,
     language_scope="94 languages (upstream model card)",
+    query_prefix="query: ",
+    passage_prefix="passage: ",
+)
+
+MULTILINGUAL_E5_BASE = EmbeddingProfileSpec(
+    profile_id=E5_BASE_PROFILE_ID,
+    model_id=E5_BASE_MODEL_ID,
+    revision=E5_BASE_REVISION,
+    license="MIT",
+    dimensions=768,
+    max_input_tokens=512,
+    language_scope="Multilingual (upstream model card)",
     query_prefix="query: ",
     passage_prefix="passage: ",
 )

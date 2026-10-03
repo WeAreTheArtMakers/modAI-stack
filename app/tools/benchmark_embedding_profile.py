@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import resource
 import statistics
 import sys
@@ -24,6 +25,7 @@ from app.core.config import get_settings
 from app.services.evaluation.embedding_profiles import (
     MINILM_BASELINE,
     MULTILINGUAL_E5_SMALL,
+    MULTILINGUAL_E5_BASE,
     EmbeddingProfileSpec,
     EmbeddingSpaceGuard,
 )
@@ -45,6 +47,8 @@ E5_REQUIRED_SNAPSHOT_FILES = (
     "model.safetensors",
 )
 E5_MODEL_SAFETENSORS_SHA256 = "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477"
+E5_BASE_MODEL_SAFETENSORS_SHA256 = "a18a44fad1d0b46ded15928144138cff1135d5cc8233bdd90be5f18822de09a7"
+E5_BASE_MODEL_SAFETENSORS_SIZE = 1_112_201_288
 
 
 def _read_json(path: Path) -> object:
@@ -155,6 +159,11 @@ def _validate_local_model_snapshot(profile: EmbeddingProfileSpec, model_path: Pa
             raise ValueError("E5 benchmark requires the exact pinned model revision")
         expected_directory_name = f"e5-small-{profile.revision}"
         required_files = E5_REQUIRED_SNAPSHOT_FILES
+    elif profile.model_id == MULTILINGUAL_E5_BASE.model_id:
+        if profile.revision != MULTILINGUAL_E5_BASE.revision:
+            raise ValueError("E5-base benchmark requires the exact pinned model revision")
+        expected_directory_name = f"e5-base-{profile.revision}"
+        required_files = E5_REQUIRED_SNAPSHOT_FILES
     elif profile.model_id == MINILM_BASELINE.model_id:
         if profile.revision != MINILM_BASELINE.revision:
             raise ValueError("MiniLM benchmark requires the exact pinned model revision")
@@ -177,12 +186,23 @@ def _validate_local_model_snapshot(profile: EmbeddingProfileSpec, model_path: Pa
             + ", ".join(missing_or_empty)
         )
 
+    if (
+        profile.model_id == MULTILINGUAL_E5_BASE.model_id
+        and (model_path / "model.safetensors").stat().st_size != E5_BASE_MODEL_SAFETENSORS_SIZE
+    ):
+        raise ValueError("pinned E5-base model.safetensors size does not match")
+
     safetensors_sha256 = _sha256_file(model_path / "model.safetensors")
     if (
         profile.model_id == MULTILINGUAL_E5_SMALL.model_id
         and safetensors_sha256 != E5_MODEL_SAFETENSORS_SHA256
     ):
         raise ValueError("pinned E5 model.safetensors SHA-256 does not match the expected digest")
+    if (
+        profile.model_id == MULTILINGUAL_E5_BASE.model_id
+        and safetensors_sha256 != E5_BASE_MODEL_SAFETENSORS_SHA256
+    ):
+        raise ValueError("pinned E5-base model.safetensors SHA-256 does not match the expected digest")
     return safetensors_sha256
 
 
@@ -228,7 +248,7 @@ def _group_metrics(records: list[dict]) -> dict:
 
 
 def _validate_profile_preprocessing(profile: EmbeddingProfileSpec) -> None:
-    if profile.model_id == "intfloat/multilingual-e5-small":
+    if profile.model_id in {MULTILINGUAL_E5_SMALL.model_id, MULTILINGUAL_E5_BASE.model_id}:
         if profile.query_prefix != "query: " or profile.passage_prefix != "passage: ":
             raise ValueError("E5 benchmark runs require the documented query and passage prefixes")
     elif profile.model_id == "sentence-transformers/all-MiniLM-L6-v2":
@@ -236,7 +256,15 @@ def _validate_profile_preprocessing(profile: EmbeddingProfileSpec) -> None:
             raise ValueError("MiniLM benchmark inputs must remain unprefixed")
 
 
-def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, documents_path: Path) -> dict:
+def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, documents_path: Path,
+         device_override: str | None = None) -> dict:
+    os.environ.update({
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "HF_DATASETS_OFFLINE": "1",
+        "HF_HUB_DISABLE_TELEMETRY": "1",
+        "TOKENIZERS_PARALLELISM": "false",
+    })
     _validate_profile_preprocessing(profile)
     safetensors_sha256 = _validate_local_model_snapshot(profile, model_path)
     dataset = _load_dataset(dataset_path)
@@ -254,7 +282,11 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
             if not set(document["knowledge_base_ids"]).intersection(case.knowledge_base_ids):
                 raise ValueError("an expected or confusable source is outside the case Knowledge Base scope")
 
-    device, device_note = _resolve_device()
+    if device_override not in {None, "cpu", "mps"}:
+        raise ValueError("device must be cpu or mps")
+    device, device_note = _resolve_device() if device_override is None else (
+        device_override, f"Explicit common benchmark device: {device_override}."
+    )
     model_load_started = time.perf_counter()
     try:
         from sentence_transformers import SentenceTransformer
@@ -327,7 +359,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
     with tempfile.TemporaryDirectory(prefix="modai-embedding-benchmark-") as temporary_dir:
         qdrant_path = Path(temporary_dir) / profile.collection_name
         client = QdrantClient(path=str(qdrant_path))
-        collection_name = profile.collection_name
+        collection_name = f"{profile.collection_name}_{full_corpus_fingerprint[:12]}"
         client.create_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(size=profile.dimensions, distance=models.Distance.COSINE),
@@ -336,7 +368,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
         qdrant_started = time.perf_counter()
         points = [
             models.PointStruct(
-                id=str(uuid5(NAMESPACE_URL, f"{profile.vector_space_identity}:{item['document_id']}:{item['chunk_index']}")),
+                id=str(uuid5(NAMESPACE_URL, f"{profile.vector_space_identity}:{full_corpus_fingerprint}:{item['document_id']}:{item['chunk_index']}")),
                 vector=vector.tolist(),
                 payload={key: item[key] for key in (
                     "document_id", "filename", "language", "knowledge_base_ids", "chunk_index", "text"
@@ -457,6 +489,14 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
         },
         "corpus_version": corpus_version,
         "corpus_fingerprint": full_corpus_fingerprint,
+        "index_identity": {
+            "collection_name": collection_name,
+            "model_id": profile.model_id,
+            "revision": profile.revision,
+            "dimensions": profile.dimensions,
+            "vector_space_identity": profile.vector_space_identity,
+            "corpus_fingerprint": full_corpus_fingerprint,
+        },
         "dataset_fingerprint": dataset_fingerprint(dataset),
         "case_count": len(dataset.cases),
         "authorization_probe_case_count": sum(
@@ -530,14 +570,16 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profile", choices=("minilm", "e5-small"), required=True)
+    parser.add_argument("--profile", choices=("minilm", "e5-small", "e5-base"), required=True)
+    parser.add_argument("--device", choices=("cpu", "mps"), help="Pin one device across all profile runs")
     parser.add_argument("--model-path", type=Path, required=True, help="Already-provisioned local model directory; never downloads")
     parser.add_argument("--dataset", type=Path, required=True, help="Versioned EvaluationDataset JSON")
     parser.add_argument("--documents", type=Path, required=True, help="Document JSON with text, IDs, KB scopes, and languages")
     parser.add_argument("--output", type=Path, required=True, help="Aggregate-only JSON result path")
     args = parser.parse_args()
-    profile = MINILM_BASELINE if args.profile == "minilm" else MULTILINGUAL_E5_SMALL
-    result = _run(profile, args.model_path, args.dataset, args.documents)
+    profile = {"minilm": MINILM_BASELINE, "e5-small": MULTILINGUAL_E5_SMALL,
+               "e5-base": MULTILINGUAL_E5_BASE}[args.profile]
+    result = _run(profile, args.model_path, args.dataset, args.documents, args.device)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({"profile_id": profile.profile_id, "dataset_fingerprint": result["dataset_fingerprint"], "output": "aggregate-only"}, sort_keys=True))

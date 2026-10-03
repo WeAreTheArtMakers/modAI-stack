@@ -137,6 +137,9 @@ def test_runner_uses_ephemeral_profile_isolated_qdrant_and_serializes_aggregates
     assert report["corpus_version"] == "runner-test-v1"
     assert report["inference"]["offline_only"] is True
     assert report["inference"]["dimension_smoke_test"] is True
+    assert report["index_identity"]["collection_name"] == clients[0].collection_name
+    assert report["index_identity"]["corpus_fingerprint"] == report["corpus_fingerprint"]
+    assert report["index_identity"]["vector_space_identity"] == MINILM_BASELINE.vector_space_identity
     assert report["no_answer"]["confusable_case_count"] == 1
     assert report["no_answer"]["confusable_source_count"] == 1
     assert len(clients) == 1

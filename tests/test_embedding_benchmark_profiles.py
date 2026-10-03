@@ -9,8 +9,11 @@ from app.tools import benchmark_embedding_profile
 from app.services.evaluation.embedding_profiles import (
     E5_MODEL_ID,
     E5_REVISION,
+    E5_BASE_MODEL_ID,
+    E5_BASE_REVISION,
     MINILM_BASELINE,
     MULTILINGUAL_E5_SMALL,
+    MULTILINGUAL_E5_BASE,
     EmbeddingSpaceGuard,
     EmbeddingSpaceMismatchError,
     assert_same_embedding_space,
@@ -67,6 +70,51 @@ def test_profile_revision_and_safe_metadata_are_pinned_and_path_free():
     assert metadata["passage_prefix"] == "passage: "
     assert not {"model_path", "cache_dir", "cache_path"}.intersection(metadata)
     assert "/private/tmp" not in str(metadata)
+
+
+def test_e5_base_profile_metadata_preprocessing_and_vector_isolation():
+    profile = MULTILINGUAL_E5_BASE
+    metadata = profile.safe_metadata()
+    assert (profile.model_id, profile.revision, profile.license) == (
+        E5_BASE_MODEL_ID, E5_BASE_REVISION, "MIT"
+    )
+    assert (profile.dimensions, profile.max_input_tokens) == (768, 512)
+    assert profile.preprocess_query("İzin nedir?") == "query: İzin nedir?"
+    assert profile.preprocess_passage("Annual leave") == "passage: Annual leave"
+    assert metadata["vector_space_identity"] == profile.vector_space_identity
+    assert not {"model_path", "cache_dir", "cache_path"}.intersection(metadata)
+    assert len({p.collection_name for p in (MINILM_BASELINE, MULTILINGUAL_E5_SMALL, profile)}) == 3
+    validate_vector([0.0] * 768, profile)
+    with pytest.raises(EmbeddingSpaceMismatchError, match="expected 768"):
+        validate_vector([0.0] * 384, profile)
+    for other in (MINILM_BASELINE, MULTILINGUAL_E5_SMALL):
+        with pytest.raises(EmbeddingSpaceMismatchError, match="does not match"):
+            assert_same_embedding_space(profile, other)
+
+
+def test_e5_base_snapshot_requires_complete_artifacts_size_and_sha256(tmp_path, monkeypatch):
+    profile = MULTILINGUAL_E5_BASE
+    model_path = tmp_path / f"e5-base-{profile.revision}"
+    for filename in benchmark_embedding_profile.E5_REQUIRED_SNAPSHOT_FILES:
+        artifact = model_path / filename
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_bytes(b"test-only snapshot artifact")
+    weights = model_path / "model.safetensors"
+    monkeypatch.setattr(benchmark_embedding_profile, "E5_BASE_MODEL_SAFETENSORS_SIZE", weights.stat().st_size)
+    expected = hashlib.sha256(weights.read_bytes()).hexdigest()
+    monkeypatch.setattr(benchmark_embedding_profile, "E5_BASE_MODEL_SAFETENSORS_SHA256", expected)
+    assert benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path) == expected
+    (model_path / "tokenizer.json").unlink()
+    with pytest.raises(ValueError, match="tokenizer.json"):
+        benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path)
+    (model_path / "tokenizer.json").write_bytes(b"test-only snapshot artifact")
+    monkeypatch.setattr(benchmark_embedding_profile, "E5_BASE_MODEL_SAFETENSORS_SIZE", 1)
+    with pytest.raises(ValueError, match="size"):
+        benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path)
+    monkeypatch.setattr(benchmark_embedding_profile, "E5_BASE_MODEL_SAFETENSORS_SIZE", weights.stat().st_size)
+    monkeypatch.setattr(benchmark_embedding_profile, "E5_BASE_MODEL_SAFETENSORS_SHA256", "0" * 64)
+    with pytest.raises(ValueError, match="SHA-256"):
+        benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path)
 
 
 def test_experiment_profiles_do_not_change_production_embedding_or_top_k_defaults():
