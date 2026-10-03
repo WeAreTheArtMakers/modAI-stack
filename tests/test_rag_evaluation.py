@@ -445,3 +445,55 @@ def test_evaluation_cli_runs_deterministically_without_models(tmp_path: Path):
     assert payload["effective_top_k"] == 1
     assert json.loads(output_path.read_text(encoding="utf-8"))["cases"][0]["returned_documents"] == ["Policy.PDF"]
     assert json.loads(dataset_path.read_text(encoding="utf-8"))["cases"][0]["top_k"] == 2
+
+
+def test_evaluation_cli_runs_adaptive_fixture_without_persisting_source_text(tmp_path: Path):
+    dataset_path = tmp_path / "dataset.json"
+    fixture_path = tmp_path / "fixture.json"
+    output_path = tmp_path / "adaptive-result.json"
+    one_case = dataset().model_copy(update={"cases": [dataset().cases[0]]})
+    dataset_path.write_text(one_case.model_dump_json(), encoding="utf-8")
+    fixture_path.write_text(
+        json.dumps(
+            {
+                "case-a": [
+                    {"document": "Policy.PDF", "score": 0.9, "text": "private fact text"},
+                    {"document": "second.txt", "score": 0.8, "text": "private extra text"},
+                    {"document": "third.txt", "score": 0.79, "text": "private third text"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "app.tools.evaluate_rag",
+            "--dataset",
+            str(dataset_path),
+            "--mode",
+            "fixture",
+            "--fixture",
+            str(fixture_path),
+            "--adaptive-policy",
+            "gap",
+            "--adaptive-threshold",
+            "0.005",
+            "--output",
+            str(output_path),
+            "--json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["top_k_override"] == 3
+    assert payload["cases"][0]["retrieved_source_count"] == 2
+    assert payload["cases"][0]["top3_score"] == pytest.approx(0.79)
+    serialized = json.dumps(payload)
+    assert "private fact text" not in serialized
+    assert "private extra text" not in serialized
+    assert "private third text" not in serialized

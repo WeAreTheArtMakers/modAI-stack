@@ -10,7 +10,13 @@ from pathlib import Path
 
 from app.core.security import decode_token
 from app.services.evaluation.models import EvaluationCase, RetrievalResult, RetrievedEvidence
-from app.services.evaluation.runner import AuthorizedRagRetriever, EvaluationRunner, load_dataset
+from app.services.evaluation.adaptive import AdaptivePolicy
+from app.services.evaluation.runner import (
+    AdaptiveContextRetriever,
+    AuthorizedRagRetriever,
+    EvaluationRunner,
+    load_dataset,
+)
 from app.services.llm.ollama import OllamaProvider
 
 
@@ -30,6 +36,9 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Evaluation-only override for every case's top_k; does not change the dataset or production RAG_TOP_K",
     )
+    parser.add_argument("--adaptive-policy", choices=("gap", "ratio", "three_tier"))
+    parser.add_argument("--adaptive-threshold", type=float)
+    parser.add_argument("--adaptive-second-threshold", type=float)
     parser.add_argument("--json", action="store_true", help="Print the complete versioned result as JSON")
     parser.add_argument("--output", help="Write the complete versioned result to this JSON path")
     parser.add_argument("--min-hit-at-k", type=float)
@@ -56,7 +65,15 @@ def _fixture_retriever(path: str):
     return retrieve
 
 
-async def _run_local(dataset_path: str, token_env: str, generate: bool, top_k_override: int | None = None):
+async def _run_local(
+    dataset_path: str,
+    token_env: str,
+    generate: bool,
+    top_k_override: int | None = None,
+    adaptive_policy: AdaptivePolicy | None = None,
+    adaptive_threshold: float | None = None,
+    adaptive_second_threshold: float | None = None,
+):
     # Keep CLI fixture mode importable in test/air-gapped environments where a
     # production DATABASE_URL driver has intentionally not been installed.
     from app.db.session import SessionLocal
@@ -70,6 +87,13 @@ async def _run_local(dataset_path: str, token_env: str, generate: bool, top_k_ov
     dataset = load_dataset(dataset_path)
     async with SessionLocal() as db:
         retriever = AuthorizedRagRetriever(db, user)
+        if adaptive_policy is not None:
+            retriever = AdaptiveContextRetriever(
+                retriever,
+                policy=adaptive_policy,
+                threshold=adaptive_threshold,
+                second_threshold=adaptive_second_threshold,
+            )
         generator = None
         if generate:
             provider = OllamaProvider()
@@ -84,11 +108,26 @@ async def _run_local(dataset_path: str, token_env: str, generate: bool, top_k_ov
         )
 
 
-async def _run_fixture(dataset_path: str, fixture_path: str | None, top_k_override: int | None = None):
+async def _run_fixture(
+    dataset_path: str,
+    fixture_path: str | None,
+    top_k_override: int | None = None,
+    adaptive_policy: AdaptivePolicy | None = None,
+    adaptive_threshold: float | None = None,
+    adaptive_second_threshold: float | None = None,
+):
     if not fixture_path:
         raise ValueError("Fixture mode requires --fixture")
     dataset = load_dataset(dataset_path)
-    return await EvaluationRunner(_fixture_retriever(fixture_path)).run(
+    retriever = _fixture_retriever(fixture_path)
+    if adaptive_policy is not None:
+        retriever = AdaptiveContextRetriever(
+            retriever,
+            policy=adaptive_policy,
+            threshold=adaptive_threshold,
+            second_threshold=adaptive_second_threshold,
+        )
+    return await EvaluationRunner(retriever).run(
         dataset, mode="fixture", top_k_override=top_k_override
     )
 
@@ -121,6 +160,19 @@ def _validate_threshold_arguments(args: argparse.Namespace) -> None:
         raise ValueError("max_median_total_ms must be non-negative")
     if getattr(args, "top_k", None) is not None and not 1 <= args.top_k <= 50:
         raise ValueError("top_k must be between 1 and 50")
+    policy = getattr(args, "adaptive_policy", None)
+    threshold = getattr(args, "adaptive_threshold", None)
+    second_threshold = getattr(args, "adaptive_second_threshold", None)
+    if policy is None and (threshold is not None or second_threshold is not None):
+        raise ValueError("adaptive thresholds require --adaptive-policy")
+    if policy is not None and threshold is None:
+        raise ValueError("--adaptive-policy requires --adaptive-threshold")
+    if policy == "three_tier" and second_threshold is None:
+        raise ValueError("three_tier requires --adaptive-second-threshold")
+    if policy != "three_tier" and second_threshold is not None:
+        raise ValueError("--adaptive-second-threshold is only valid for three_tier")
+    if policy is not None and getattr(args, "top_k", None) not in (None, 3):
+        raise ValueError("adaptive context evaluation requires --top-k 3")
 
 
 def _print_summary(result) -> None:
@@ -137,9 +189,24 @@ def main() -> None:
     try:
         _validate_threshold_arguments(args)
         result = asyncio.run(
-            _run_fixture(args.dataset, args.fixture, args.top_k)
+            _run_fixture(
+                args.dataset,
+                args.fixture,
+                3 if args.adaptive_policy else args.top_k,
+                args.adaptive_policy,
+                args.adaptive_threshold,
+                args.adaptive_second_threshold,
+            )
             if args.mode == "fixture"
-            else _run_local(args.dataset, args.access_token_env, args.generate, args.top_k)
+            else _run_local(
+                args.dataset,
+                args.access_token_env,
+                args.generate,
+                3 if args.adaptive_policy else args.top_k,
+                args.adaptive_policy,
+                args.adaptive_threshold,
+                args.adaptive_second_threshold,
+            )
         )
         payload = result.model_dump(mode="json")
         if args.output:
