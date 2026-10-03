@@ -124,6 +124,35 @@ export interface EmbeddingModelStatus {
   status: "ready" | "available" | "unavailable" | "unverified" | string;
 }
 
+export type RetrievalProfileAvailability =
+  | "active"
+  | "available_after_provisioning"
+  | "experimental"
+  | "not_configured";
+
+export interface RetrievalProfile {
+  profile_id: string;
+  display_name: string;
+  description: string;
+  language_capabilities: string[];
+  hardware_class: string;
+  availability: RetrievalProfileAvailability;
+  active: boolean;
+  selectable: boolean;
+}
+
+export interface RetrievalProfileCatalog {
+  profiles: RetrievalProfile[];
+  active_profile_id: string | null;
+  profile_switching_enabled: boolean;
+}
+
+export interface RetrievalProfileStatus {
+  active_profile: RetrievalProfile | null;
+  profile_switching_enabled: boolean;
+  reindex_required_to_change_profile: boolean;
+}
+
 export interface ModelSystemStatus {
   providers: ModelProviderStatus[];
   generation: GenerationModelStatus;
