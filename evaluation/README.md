@@ -41,6 +41,19 @@ python -m app.tools.evaluate_rag --dataset evaluation/sample_dataset.json --mode
 
 Eşikler yalnızca açıkça verildiğinde process başarısız olur: `--min-hit-at-k`, `--min-source-accuracy`, `--min-fact-coverage` ve `--max-median-total-ms`.
 
+## Top-k deney override’ı
+
+`--top-k N`, yalnızca o evaluation koşusundaki **tüm** case’lerin `top_k` değerini `N` ile değiştirir. Bu davranış kasıtlı olarak case başına farklı `top_k` tanımlarını da ezer; sweep koşulları böylece doğrudan karşılaştırılabilir olur. Kaynak dataset dosyası, production `RAG_TOP_K` ve dataset fingerprint’i değişmez.
+
+```bash
+python -m app.tools.evaluate_rag \
+  --dataset private-acceptance-dataset.json \
+  --top-k 3 \
+  --output top-k-3.json
+```
+
+`N` 1–50 aralığında olmalıdır. Kaydedilen sonuçta `top_k_override` ve uniform koşulda `effective_top_k` bulunur; ayrıca case ve özet seviyesinde güvenli retrieved source/chunk sayıları kaydedilir. Bu sayımlar kaynak metni içermez. Karşılaştırma aracı, iki koşunun etkin top-k veya override metadatası farklıysa bunu açıkça uyarı olarak bildirir.
+
 İki koşuyu nesnel delta olarak karşılaştırın:
 
 ```bash
