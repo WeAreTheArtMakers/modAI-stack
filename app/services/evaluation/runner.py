@@ -94,13 +94,23 @@ class EvaluationRunner:
         *,
         mode: str,
         models: dict[str, str | None] | None = None,
+        top_k_override: int | None = None,
     ) -> EvaluationResult:
         if mode not in {"fixture", "local"}:
             raise ValueError("mode must be fixture or local")
-        cases = [await self._run_case(case) for case in dataset.cases]
+        if top_k_override is not None and not 1 <= top_k_override <= 50:
+            raise ValueError("top_k_override must be between 1 and 50")
+        # Do not mutate the validated dataset: its canonical fingerprint remains
+        # the identity of the authored evaluation corpus, not this runtime sweep.
+        runtime_cases = [
+            case.model_copy(update={"top_k": top_k_override}) if top_k_override is not None else case
+            for case in dataset.cases
+        ]
+        cases = [await self._run_case(case) for case in runtime_cases]
         configured = configured_models()
         configured.update(models or {})
         metadata = run_metadata(configured)
+        effective_values = {case.top_k for case in runtime_cases}
         return EvaluationResult(
             dataset_version=dataset.version,
             dataset_name=dataset.name,
@@ -108,6 +118,8 @@ class EvaluationRunner:
             mode=mode,
             models=configured,
             evaluation_mode=mode,
+            effective_top_k=next(iter(effective_values)) if len(effective_values) == 1 else None,
+            top_k_override=top_k_override,
             summary=_summarize(cases),
             cases=cases,
             **metadata,
@@ -140,6 +152,7 @@ class EvaluationRunner:
             case_id=case.id,
             category=case.category,
             knowledge_base_ids=case.knowledge_base_ids,
+            effective_top_k=case.top_k,
             expected_documents=case.expected_documents,
             expected_document_ids=case.expected_document_ids,
             returned_documents=returned_documents,
@@ -149,6 +162,8 @@ class EvaluationRunner:
             reciprocal_rank=(1.0 / first_match_index) if first_match_index is not None else (0.0 if has_expected_source_identity else None),
             unexpected_sources=unexpected,
             no_source_returned=not returned_documents,
+            retrieved_source_count=len(evidence),
+            retrieved_chunk_count=len(evidence),
             expected_fact_count=len(case.expected_facts),
             facts_supported_by_sources=supported_fact_count(case.expected_facts, source_texts),
             fact_coverage=fact_coverage(case.expected_facts, source_texts),
@@ -242,4 +257,6 @@ def _summarize(cases: list[EvaluationCaseResult]) -> EvaluationSummary:
         median_retrieval_ms=_median([case.latencies.retrieval_ms for case in cases]),
         median_generation_ms=_median([case.latencies.generation_ms for case in cases]),
         median_total_ms=_median([case.latencies.total_ms for case in cases]),
+        median_retrieved_source_count=_median([float(case.retrieved_source_count) for case in cases]),
+        median_retrieved_chunk_count=_median([float(case.retrieved_chunk_count) for case in cases]),
     )

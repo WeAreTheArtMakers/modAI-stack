@@ -25,6 +25,11 @@ def parse_args() -> argparse.Namespace:
         help="Environment variable containing an access JWT for local mode (default: MODAI_EVALUATION_ACCESS_TOKEN)",
     )
     parser.add_argument("--generate", action="store_true", help="Also generate answers with the configured local Ollama model")
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        help="Evaluation-only override for every case's top_k; does not change the dataset or production RAG_TOP_K",
+    )
     parser.add_argument("--json", action="store_true", help="Print the complete versioned result as JSON")
     parser.add_argument("--output", help="Write the complete versioned result to this JSON path")
     parser.add_argument("--min-hit-at-k", type=float)
@@ -51,7 +56,7 @@ def _fixture_retriever(path: str):
     return retrieve
 
 
-async def _run_local(dataset_path: str, token_env: str, generate: bool):
+async def _run_local(dataset_path: str, token_env: str, generate: bool, top_k_override: int | None = None):
     # Keep CLI fixture mode importable in test/air-gapped environments where a
     # production DATABASE_URL driver has intentionally not been installed.
     from app.db.session import SessionLocal
@@ -74,14 +79,18 @@ async def _run_local(dataset_path: str, token_env: str, generate: bool):
                     raise RuntimeError("Local retrieval did not return a RAG prompt")
                 return await provider.generate(result.prompt)
 
-        return await EvaluationRunner(retriever, generator).run(dataset, mode="local")
+        return await EvaluationRunner(retriever, generator).run(
+            dataset, mode="local", top_k_override=top_k_override
+        )
 
 
-async def _run_fixture(dataset_path: str, fixture_path: str | None):
+async def _run_fixture(dataset_path: str, fixture_path: str | None, top_k_override: int | None = None):
     if not fixture_path:
         raise ValueError("Fixture mode requires --fixture")
     dataset = load_dataset(dataset_path)
-    return await EvaluationRunner(_fixture_retriever(fixture_path)).run(dataset, mode="fixture")
+    return await EvaluationRunner(_fixture_retriever(fixture_path)).run(
+        dataset, mode="fixture", top_k_override=top_k_override
+    )
 
 
 def _validate_thresholds(args: argparse.Namespace, result) -> list[str]:
@@ -110,6 +119,8 @@ def _validate_threshold_arguments(args: argparse.Namespace) -> None:
             raise ValueError(f"{argument} must be between 0 and 1")
     if args.max_median_total_ms is not None and args.max_median_total_ms < 0:
         raise ValueError("max_median_total_ms must be non-negative")
+    if getattr(args, "top_k", None) is not None and not 1 <= args.top_k <= 50:
+        raise ValueError("top_k must be between 1 and 50")
 
 
 def _print_summary(result) -> None:
@@ -126,9 +137,9 @@ def main() -> None:
     try:
         _validate_threshold_arguments(args)
         result = asyncio.run(
-            _run_fixture(args.dataset, args.fixture)
+            _run_fixture(args.dataset, args.fixture, args.top_k)
             if args.mode == "fixture"
-            else _run_local(args.dataset, args.access_token_env, args.generate)
+            else _run_local(args.dataset, args.access_token_env, args.generate, args.top_k)
         )
         payload = result.model_dump(mode="json")
         if args.output:

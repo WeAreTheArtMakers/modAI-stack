@@ -39,6 +39,10 @@ def compare_evaluations(baseline: EvaluationResult, candidate: EvaluationResult)
         warnings.append("Embedding model changed; reindex knowledge bases before treating retrieval deltas as comparable.")
     if baseline.dataset_version != candidate.dataset_version:
         warnings.append("Dataset versions differ; metric deltas may not be directly comparable.")
+    if baseline.effective_top_k != candidate.effective_top_k:
+        warnings.append("Effective top_k differs; retrieval, context, and latency deltas reflect different result counts.")
+    if baseline.top_k_override != candidate.top_k_override:
+        warnings.append("top_k override metadata differs between runs.")
     baseline_ids = {case.case_id for case in baseline.cases}
     candidate_ids = {case.case_id for case in candidate.cases}
     return EvaluationComparison(

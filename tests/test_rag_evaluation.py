@@ -19,7 +19,7 @@ from app.services.evaluation.models import (
     dataset_fingerprint,
 )
 from app.services.evaluation.runner import AuthorizedRagRetriever, EvaluationRunner, load_dataset
-from app.tools.evaluate_rag import _fixture_retriever, _validate_thresholds
+from app.tools.evaluate_rag import _fixture_retriever, _validate_threshold_arguments, _validate_thresholds
 
 
 def dataset() -> EvaluationDataset:
@@ -217,6 +217,52 @@ async def test_source_accuracy_uses_only_cases_with_expected_source_identity():
 
 
 @pytest.mark.asyncio
+async def test_top_k_override_is_runtime_only_and_records_effective_metadata():
+    original = dataset()
+    original_fingerprint = dataset_fingerprint(original)
+    observed_top_k: list[int] = []
+
+    async def retrieve(case: EvaluationCase) -> RetrievalResult:
+        observed_top_k.append(case.top_k)
+        return RetrievalResult(
+            evidence=[
+                RetrievedEvidence(document="Policy.PDF", score=1),
+                RetrievedEvidence(document="extra.txt", score=0.5),
+            ]
+        )
+
+    result = await EvaluationRunner(retrieve).run(original, mode="fixture", top_k_override=1)
+
+    assert [case.top_k for case in original.cases] == [2, 2]
+    assert dataset_fingerprint(original) == original_fingerprint
+    assert observed_top_k == [1, 1]
+    assert result.dataset_fingerprint == original_fingerprint
+    assert result.top_k_override == 1
+    assert result.effective_top_k == 1
+    assert [case.effective_top_k for case in result.cases] == [1, 1]
+    assert result.summary.median_retrieved_source_count == 1.0
+    assert result.summary.median_retrieved_chunk_count == 1.0
+
+
+def test_top_k_override_validation_rejects_invalid_values():
+    class Args:
+        min_hit_at_k = None
+        min_source_accuracy = None
+        min_fact_coverage = None
+        max_median_total_ms = None
+        top_k = 0
+
+    with pytest.raises(ValueError, match="top_k"):
+        _validate_threshold_arguments(Args())
+
+    async def retrieve(_case: EvaluationCase) -> RetrievalResult:
+        return RetrievalResult()
+
+    with pytest.raises(ValueError, match="top_k_override"):
+        asyncio.run(EvaluationRunner(retrieve).run(dataset(), mode="fixture", top_k_override=51))
+
+
+@pytest.mark.asyncio
 async def test_results_remain_backward_compatible_and_do_not_serialize_sensitive_runtime_content():
     async def retrieve(_case: EvaluationCase) -> RetrievalResult:
         return RetrievalResult(
@@ -239,6 +285,8 @@ async def test_results_remain_backward_compatible_and_do_not_serialize_sensitive
         "generation_provider",
         "generation_model",
         "rag_top_k_default",
+        "effective_top_k",
+        "top_k_override",
         "application_version",
         "evaluation_mode",
     ):
@@ -247,6 +295,11 @@ async def test_results_remain_backward_compatible_and_do_not_serialize_sensitive
         case.pop("expected_document_ids")
         case.pop("returned_document_ids")
         case.pop("returned_chunk_indexes")
+        case.pop("effective_top_k")
+        case.pop("retrieved_source_count")
+        case.pop("retrieved_chunk_count")
+    legacy["summary"].pop("median_retrieved_source_count")
+    legacy["summary"].pop("median_retrieved_chunk_count")
     parsed = EvaluationResult.model_validate(legacy)
     assert parsed.dataset_fingerprint is None
 
@@ -301,6 +354,17 @@ def test_comparison_warns_when_fingerprints_are_missing_or_different():
     assert "Dataset fingerprint unavailable; dataset equality cannot be proven for this comparison." in legacy_comparison.warnings
 
 
+def test_comparison_clearly_reports_effective_top_k_metadata_differences():
+    async def retrieve(_case: EvaluationCase) -> RetrievalResult:
+        return RetrievalResult(evidence=[RetrievedEvidence(document="Policy.PDF", score=1)])
+
+    baseline = asyncio.run(EvaluationRunner(retrieve).run(dataset(), mode="fixture", top_k_override=5))
+    candidate = asyncio.run(EvaluationRunner(retrieve).run(dataset(), mode="fixture", top_k_override=2))
+    comparison = compare_evaluations(baseline, candidate)
+    assert "Effective top_k differs; retrieval, context, and latency deltas reflect different result counts." in comparison.warnings
+    assert "top_k override metadata differs between runs." in comparison.warnings
+
+
 @pytest.mark.asyncio
 async def test_authorized_retriever_never_calls_rag_for_an_unauthorized_knowledge_base(monkeypatch):
     async def reject_scope(_db, _user, knowledge_base_ids):
@@ -349,6 +413,8 @@ def test_evaluation_cli_runs_deterministically_without_models(tmp_path: Path):
             str(fixture_path),
             "--min-hit-at-k",
             "1",
+            "--top-k",
+            "1",
             "--output",
             str(output_path),
             "--json",
@@ -358,5 +424,9 @@ def test_evaluation_cli_runs_deterministically_without_models(tmp_path: Path):
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
-    assert json.loads(completed.stdout)["summary"]["hit_at_k"] == 1.0
+    payload = json.loads(completed.stdout)
+    assert payload["summary"]["hit_at_k"] == 1.0
+    assert payload["top_k_override"] == 1
+    assert payload["effective_top_k"] == 1
     assert json.loads(output_path.read_text(encoding="utf-8"))["cases"][0]["returned_documents"] == ["Policy.PDF"]
+    assert json.loads(dataset_path.read_text(encoding="utf-8"))["cases"][0]["top_k"] == 2

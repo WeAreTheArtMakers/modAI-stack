@@ -119,6 +119,7 @@ class EvaluationCaseResult(BaseModel):
     case_id: str
     category: str
     knowledge_base_ids: list[int]
+    effective_top_k: int | None = Field(default=None, gt=0)
     expected_documents: list[str]
     expected_document_ids: list[int] = Field(default_factory=list)
     returned_documents: list[str]
@@ -129,6 +130,8 @@ class EvaluationCaseResult(BaseModel):
     reciprocal_rank: float | None = None
     unexpected_sources: list[str] = Field(default_factory=list)
     no_source_returned: bool
+    retrieved_source_count: int = Field(default=0, ge=0)
+    retrieved_chunk_count: int = Field(default=0, ge=0)
     expected_fact_count: int
     facts_supported_by_sources: int
     fact_coverage: float | None = None
@@ -150,6 +153,8 @@ class EvaluationSummary(BaseModel):
     median_retrieval_ms: float | None = None
     median_generation_ms: float | None = None
     median_total_ms: float | None = None
+    median_retrieved_source_count: float | None = None
+    median_retrieved_chunk_count: float | None = None
 
 
 class EvaluationResult(BaseModel):
@@ -165,6 +170,9 @@ class EvaluationResult(BaseModel):
     generation_provider: str | None = None
     generation_model: str | None = None
     rag_top_k_default: int | None = Field(default=None, gt=0)
+    # ``effective_top_k`` is set when every evaluated case used the same K.
+    effective_top_k: int | None = Field(default=None, gt=0)
+    top_k_override: int | None = Field(default=None, gt=0)
     application_version: str | None = None
     evaluation_mode: Literal["fixture", "local"] | None = None
     summary: EvaluationSummary
