@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -94,6 +95,8 @@ async def test_groundedness_requires_a_fact_in_both_answer_and_retrieved_context
 
     result = await EvaluationRunner(retrieve, generate).run(dataset().model_copy(update={"cases": [dataset().cases[0]]}), mode="fixture")
     assert result.cases[0].answer_fact_groundedness == 1.0
+    assert result.cases[0].generated_answer_char_count == len("The retention is 24 months.")
+    assert result.summary.median_generated_answer_char_count == len("The retention is 24 months.")
     assert answer_fact_groundedness(["fact"], ["fact"], None) is None
 
 
@@ -217,7 +220,7 @@ async def test_source_accuracy_uses_only_cases_with_expected_source_identity():
 
 
 @pytest.mark.asyncio
-async def test_top_k_override_is_runtime_only_and_records_effective_metadata():
+async def test_top_k_override_is_runtime_only_and_records_effective_metadata(monkeypatch):
     original = dataset()
     original_fingerprint = dataset_fingerprint(original)
     observed_top_k: list[int] = []
@@ -231,6 +234,15 @@ async def test_top_k_override_is_runtime_only_and_records_effective_metadata():
             ]
         )
 
+    monkeypatch.setattr(
+        "app.services.evaluation.runner.get_settings",
+        lambda: SimpleNamespace(
+            embedding_model="test-embedding",
+            ollama_model="test-generation",
+            rag_top_k=3,
+        ),
+    )
+
     result = await EvaluationRunner(retrieve).run(original, mode="fixture", top_k_override=1)
 
     assert [case.top_k for case in original.cases] == [2, 2]
@@ -239,6 +251,7 @@ async def test_top_k_override_is_runtime_only_and_records_effective_metadata():
     assert result.dataset_fingerprint == original_fingerprint
     assert result.top_k_override == 1
     assert result.effective_top_k == 1
+    assert result.rag_top_k_default == 3
     assert [case.effective_top_k for case in result.cases] == [1, 1]
     assert result.summary.median_retrieved_source_count == 1.0
     assert result.summary.median_retrieved_chunk_count == 1.0
@@ -298,8 +311,10 @@ async def test_results_remain_backward_compatible_and_do_not_serialize_sensitive
         case.pop("effective_top_k")
         case.pop("retrieved_source_count")
         case.pop("retrieved_chunk_count")
+        case.pop("generated_answer_char_count")
     legacy["summary"].pop("median_retrieved_source_count")
     legacy["summary"].pop("median_retrieved_chunk_count")
+    legacy["summary"].pop("median_generated_answer_char_count")
     parsed = EvaluationResult.model_validate(legacy)
     assert parsed.dataset_fingerprint is None
 

@@ -136,6 +136,8 @@ class EvaluationCaseResult(BaseModel):
     facts_supported_by_sources: int
     fact_coverage: float | None = None
     answer_fact_groundedness: float | None = None
+    # Safe output-size fallback; generated answer text is never persisted.
+    generated_answer_char_count: int | None = Field(default=None, ge=0)
     latencies: CaseLatencies
 
 
@@ -155,6 +157,7 @@ class EvaluationSummary(BaseModel):
     median_total_ms: float | None = None
     median_retrieved_source_count: float | None = None
     median_retrieved_chunk_count: float | None = None
+    median_generated_answer_char_count: float | None = None
 
 
 class EvaluationResult(BaseModel):

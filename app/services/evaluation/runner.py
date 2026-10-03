@@ -168,6 +168,7 @@ class EvaluationRunner:
             facts_supported_by_sources=supported_fact_count(case.expected_facts, source_texts),
             fact_coverage=fact_coverage(case.expected_facts, source_texts),
             answer_fact_groundedness=answer_fact_groundedness(case.expected_facts, source_texts, answer),
+            generated_answer_char_count=len(answer) if answer is not None else None,
             latencies=CaseLatencies(
                 embedding_ms=retrieval.embedding_latency_ms,
                 retrieval_ms=retrieval.retrieval_latency_ms,
@@ -259,4 +260,7 @@ def _summarize(cases: list[EvaluationCaseResult]) -> EvaluationSummary:
         median_total_ms=_median([case.latencies.total_ms for case in cases]),
         median_retrieved_source_count=_median([float(case.retrieved_source_count) for case in cases]),
         median_retrieved_chunk_count=_median([float(case.retrieved_chunk_count) for case in cases]),
+        median_generated_answer_char_count=_median(
+            [float(case.generated_answer_char_count) if case.generated_answer_char_count is not None else None for case in cases]
+        ),
     )
