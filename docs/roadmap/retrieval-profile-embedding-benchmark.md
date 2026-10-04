@@ -37,10 +37,6 @@ This is the canonical reproducible benchmark. The former private 92-case robustn
 - Design a controlled profile migration with an isolated new vector index, full document reindex, validation, atomic profile/index activation, and rollback capability.
 - Keep the candidate inactive and non-selectable until the migration is implemented and explicitly approved.
 
-### After the next candidate
-
-- Consider `BAAI/bge-m3` only if the evidence justifies its additional footprint and complexity.
-
 ### Later
 
 - Evaluate no-answer and abstention quality as a separate capability; do not infer abstention from similarity alone or introduce a threshold from the current scores.
