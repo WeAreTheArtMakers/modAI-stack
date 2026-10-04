@@ -60,7 +60,12 @@ async def test_rag_pipeline_uses_configured_top_k_when_no_limit_is_supplied(monk
     monkeypatch.setattr(pipeline, "qdrant_service", FakeQdrantService())
     monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
 
-    context = await pipeline.retrieve_rag_context("question", user_id=1)
+    context = await pipeline.retrieve_rag_context(
+        "question", organization_id=1, workspace_id=2, knowledge_base_ids=[3]
+    )
 
     assert observed["limit"] == 3
+    assert observed["organization_id"] == 1
+    assert observed["workspace_id"] == 2
+    assert observed["knowledge_base_ids"] == [3]
     assert context.sources == []

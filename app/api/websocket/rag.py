@@ -34,10 +34,9 @@ async def websocket_rag(ws: WebSocket):
                     )
                     context = await retrieve_rag_context(
                         req.question,
-                        user_id=int(user["sub"]),
-                        organization_id=kb_scope[1].organization_id if kb_scope else None,
-                        workspace_id=kb_scope[1].id if kb_scope else None,
-                        knowledge_base_ids=authorized_kb_ids or None,
+                        organization_id=kb_scope[1].organization_id,
+                        workspace_id=kb_scope[1].id,
+                        knowledge_base_ids=authorized_kb_ids,
                     )
                 except EmbeddingModelUnavailableError:
                     await ws.send_json({"type": "error", "data": embedding_model_unavailable_detail()})

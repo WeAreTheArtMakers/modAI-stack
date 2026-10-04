@@ -20,10 +20,9 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
     try:
         context = await retrieve_rag_context(
             req.question,
-            user_id=int(user["sub"]),
-            organization_id=kb_scope[1].organization_id if kb_scope else None,
-            workspace_id=kb_scope[1].id if kb_scope else None,
-            knowledge_base_ids=authorized_kb_ids or None,
+            organization_id=kb_scope[1].organization_id,
+            workspace_id=kb_scope[1].id,
+            knowledge_base_ids=authorized_kb_ids,
         )
     except EmbeddingModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=embedding_model_unavailable_detail()) from exc
