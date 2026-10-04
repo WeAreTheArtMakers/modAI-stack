@@ -125,6 +125,12 @@ def test_e5_base_snapshot_requires_complete_artifacts_size_and_sha256(tmp_path, 
 def test_bge_m3_profile_is_pinned_dense_only_and_isolated():
     profile = BGE_M3_DENSE
     metadata = profile.safe_metadata()
+    assert BGE_M3_MODEL_ID == "BAAI/bge-m3"
+    assert BGE_M3_REVISION == "31e47391fcbda65be526abe98e646b3c6cd845a8"
+    assert benchmark_embedding_profile.BGE_M3_MODEL_SAFETENSORS_SIZE == 2_271_064_456
+    assert benchmark_embedding_profile.BGE_M3_MODEL_SAFETENSORS_SHA256 == (
+        "993b2248881724788dcab8c644a91dfd63584b6e5604ff2037cb5541e1e38e7e"
+    )
     assert (profile.profile_id, profile.model_id, profile.revision, profile.license) == (
         "balanced-multilingual-bge-m3-candidate",
         BGE_M3_MODEL_ID,
