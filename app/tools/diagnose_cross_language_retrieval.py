@@ -24,7 +24,12 @@ from app.services.evaluation.cross_language_diagnostics import (
     score_distribution,
     token_count_summary,
 )
-from app.services.evaluation.embedding_profiles import MINILM_BASELINE, MULTILINGUAL_E5_SMALL, MULTILINGUAL_E5_BASE
+from app.services.evaluation.embedding_profiles import (
+    BGE_M3_DENSE,
+    MINILM_BASELINE,
+    MULTILINGUAL_E5_SMALL,
+    MULTILINGUAL_E5_BASE,
+)
 from app.services.evaluation.models import EvaluationDataset, dataset_fingerprint
 from app.services.evaluation.synthetic_corpus import corpus_fingerprint
 from app.services.rag.chunker import chunk_text
@@ -484,7 +489,7 @@ def _run_one_corpus(profile: Any, model: Any, dataset: EvaluationDataset, versio
     }
 
 
-def run_diagnostics(minilm_path: Path, e5_path: Path, e5_base_path: Path, canonical_dataset_path: Path,
+def run_diagnostics(minilm_path: Path, e5_path: Path, e5_base_path: Path, bge_m3_path: Path, canonical_dataset_path: Path,
                     canonical_documents_path: Path, mirror_dataset_path: Path,
                     mirror_documents_path: Path, mirror_manifest_path: Path,
                     device_override: str | None = None) -> dict[str, Any]:
@@ -585,6 +590,7 @@ def run_diagnostics(minilm_path: Path, e5_path: Path, e5_base_path: Path, canoni
         (MINILM_BASELINE, minilm_path, "minilm"),
         (MULTILINGUAL_E5_SMALL, e5_path, "e5_small"),
         (MULTILINGUAL_E5_BASE, e5_base_path, "e5_base"),
+        (BGE_M3_DENSE, bge_m3_path, "bge_m3_dense"),
     ):
         safetensors_hash = _validate_local_model_snapshot(profile, model_path)
         device, device_note = common_device, f"Explicit common diagnostic device: {common_device}."
@@ -626,6 +632,7 @@ def main() -> None:
     parser.add_argument("--minilm-model-path", type=Path, required=True)
     parser.add_argument("--e5-model-path", type=Path, required=True)
     parser.add_argument("--e5-base-model-path", type=Path, required=True)
+    parser.add_argument("--bge-m3-model-path", type=Path, required=True)
     parser.add_argument("--device", choices=("cpu", "mps"), help="Pin one device across all models")
     parser.add_argument("--canonical-dataset", type=Path, required=True)
     parser.add_argument("--canonical-documents", type=Path, required=True)
@@ -635,7 +642,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True, help="aggregate-only JSON output")
     args = parser.parse_args()
     result = run_diagnostics(
-        args.minilm_model_path, args.e5_model_path, args.e5_base_model_path,
+        args.minilm_model_path, args.e5_model_path, args.e5_base_model_path, args.bge_m3_model_path,
         args.canonical_dataset, args.canonical_documents,
         args.mirror_dataset, args.mirror_documents, args.mirror_manifest, args.device,
     )

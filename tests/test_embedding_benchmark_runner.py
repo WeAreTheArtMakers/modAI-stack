@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from app.services.evaluation.embedding_profiles import MINILM_BASELINE
 from app.services.evaluation.models import EvaluationCase, EvaluationDataset
@@ -77,9 +78,17 @@ def test_runner_uses_ephemeral_profile_isolated_qdrant_and_serializes_aggregates
     class FakeModel:
         max_seq_length = MINILM_BASELINE.max_input_tokens
         device = "cpu"
+        bad_call = None
+        bad_value = 1.0
+
+        def __init__(self):
+            self.encode_calls = 0
 
         def encode(self, values, **kwargs):
-            return np.zeros((len(values), MINILM_BASELINE.dimensions), dtype=np.float32)
+            self.encode_calls += 1
+            vectors = np.zeros((len(values), MINILM_BASELINE.dimensions), dtype=np.float32)
+            vectors[:, 0] = self.bad_value if self.encode_calls == self.bad_call else 1.0
+            return vectors
 
     constructor_calls = []
 
@@ -154,3 +163,15 @@ def test_runner_uses_ephemeral_profile_isolated_qdrant_and_serializes_aggregates
         "use_safetensors": True,
         "local_files_only": True,
     }
+
+    # Fail before indexing/searching vectors that are nonfinite or not unit-normalized.
+    for call_number, expected_error in (
+        (1, "embedding vectors"),
+        (2, "document vectors"),
+        (3, "query vectors"),
+    ):
+        for invalid_value in (float("nan"), 0.5):
+            FakeModel.bad_call = call_number
+            FakeModel.bad_value = invalid_value
+            with pytest.raises(ValueError, match=expected_error):
+                benchmark._run(MINILM_BASELINE, model_path, dataset_path, documents_path)

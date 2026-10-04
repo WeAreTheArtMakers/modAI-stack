@@ -1,6 +1,8 @@
 import hashlib
 from dataclasses import replace
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -11,6 +13,9 @@ from app.services.evaluation.embedding_profiles import (
     E5_REVISION,
     E5_BASE_MODEL_ID,
     E5_BASE_REVISION,
+    BGE_M3_MODEL_ID,
+    BGE_M3_REVISION,
+    BGE_M3_DENSE,
     MINILM_BASELINE,
     MULTILINGUAL_E5_SMALL,
     MULTILINGUAL_E5_BASE,
@@ -115,6 +120,93 @@ def test_e5_base_snapshot_requires_complete_artifacts_size_and_sha256(tmp_path, 
     monkeypatch.setattr(benchmark_embedding_profile, "E5_BASE_MODEL_SAFETENSORS_SHA256", "0" * 64)
     with pytest.raises(ValueError, match="SHA-256"):
         benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path)
+
+
+def test_bge_m3_profile_is_pinned_dense_only_and_isolated():
+    profile = BGE_M3_DENSE
+    metadata = profile.safe_metadata()
+    assert BGE_M3_MODEL_ID == "BAAI/bge-m3"
+    assert BGE_M3_REVISION == "31e47391fcbda65be526abe98e646b3c6cd845a8"
+    assert benchmark_embedding_profile.BGE_M3_MODEL_SAFETENSORS_SIZE == 2_271_064_456
+    assert benchmark_embedding_profile.BGE_M3_MODEL_SAFETENSORS_SHA256 == (
+        "993b2248881724788dcab8c644a91dfd63584b6e5604ff2037cb5541e1e38e7e"
+    )
+    assert (profile.profile_id, profile.model_id, profile.revision, profile.license) == (
+        "balanced-multilingual-bge-m3-candidate",
+        BGE_M3_MODEL_ID,
+        BGE_M3_REVISION,
+        "MIT",
+    )
+    assert (profile.dimensions, profile.max_input_tokens) == (1024, 8192)
+    assert profile.query_prefix == profile.passage_prefix == ""
+    assert profile.preprocess_query("İzin nedir?") == "İzin nedir?"
+    assert profile.preprocess_passage("Annual leave") == "Annual leave"
+    assert len({
+        profile.vector_space_identity,
+        MINILM_BASELINE.vector_space_identity,
+        MULTILINGUAL_E5_SMALL.vector_space_identity,
+        MULTILINGUAL_E5_BASE.vector_space_identity,
+    }) == 4
+    assert metadata["vector_space_identity"] == profile.vector_space_identity
+    assert not {"model_path", "cache_dir", "cache_path"}.intersection(metadata)
+    validate_vector([0.0] * 1024, profile)
+    with pytest.raises(EmbeddingSpaceMismatchError, match="expected 1024"):
+        validate_vector([0.0] * 768, profile)
+
+
+def test_bge_m3_snapshot_validator_requires_exact_path_files_size_and_sha(tmp_path, monkeypatch):
+    profile = BGE_M3_DENSE
+    model_path = tmp_path / f"bge-m3-{profile.revision}"
+    for filename in benchmark_embedding_profile.BGE_M3_REQUIRED_SNAPSHOT_FILES:
+        artifact = model_path / filename
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_bytes(b"synthetic safe artifact")
+    weights = model_path / "model.safetensors"
+    expected_sha = hashlib.sha256(weights.read_bytes()).hexdigest()
+    monkeypatch.setattr(benchmark_embedding_profile, "BGE_M3_MODEL_SAFETENSORS_SIZE", weights.stat().st_size)
+    monkeypatch.setattr(benchmark_embedding_profile, "BGE_M3_MODEL_SAFETENSORS_SHA256", expected_sha)
+    assert benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path) == expected_sha
+
+    (model_path / "tokenizer.json").unlink()
+    with pytest.raises(ValueError, match="tokenizer.json"):
+        benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path)
+    (model_path / "tokenizer.json").write_bytes(b"synthetic safe artifact")
+
+    monkeypatch.setattr(benchmark_embedding_profile, "BGE_M3_MODEL_SAFETENSORS_SIZE", 1)
+    with pytest.raises(ValueError, match="size"):
+        benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path)
+    monkeypatch.setattr(benchmark_embedding_profile, "BGE_M3_MODEL_SAFETENSORS_SIZE", weights.stat().st_size)
+    monkeypatch.setattr(benchmark_embedding_profile, "BGE_M3_MODEL_SAFETENSORS_SHA256", "0" * 64)
+    with pytest.raises(ValueError, match="SHA-256"):
+        benchmark_embedding_profile._validate_local_model_snapshot(profile, model_path)
+
+    wrong_path = tmp_path / "wrong-model-dir"
+    wrong_path.mkdir()
+    with pytest.raises(ValueError, match="exact pinned local snapshot directory name"):
+        benchmark_embedding_profile._validate_local_model_snapshot(profile, wrong_path)
+
+
+def test_bge_m3_rejects_e5_prefix_preprocessing():
+    invalid_profile = replace(BGE_M3_DENSE, query_prefix="query: ", passage_prefix="passage: ")
+    with pytest.raises(ValueError, match="BGE-M3.*unprefixed"):
+        benchmark_embedding_profile._validate_profile_preprocessing(invalid_profile)
+
+
+def test_benchmark_clis_expose_bge_without_production_profile_activation():
+    root = Path(__file__).resolve().parents[1]
+    runner_help = subprocess.run(
+        [sys.executable, "-m", "app.tools.benchmark_embedding_profile", "--help"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout
+    diagnostic_help = subprocess.run(
+        [sys.executable, "-m", "app.tools.diagnose_cross_language_retrieval", "--help"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout
+    assert "bge-m3" in runner_help
+    assert "--bge-m3-model-path" in diagnostic_help
+    settings = Settings(_env_file=None)
+    assert settings.embedding_model == MINILM_BASELINE.model_id
+    assert settings.rag_top_k == 3
 
 
 def test_experiment_profiles_do_not_change_production_embedding_or_top_k_defaults():
