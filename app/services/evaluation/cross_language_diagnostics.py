@@ -52,7 +52,7 @@ def rank_metrics(ranks: Sequence[int | None]) -> dict[str, object]:
             "case_count": 0,
             "rank_buckets": {bucket: 0 for bucket in RANK_BUCKETS},
             "rank_11_plus_or_miss_count": 0,
-            "recall_at_k": {str(k): None for k in (1, 3, 5, 10)},
+            "recall_at_k": {str(k): None for k in (1, 3, 5, 10, 20)},
             "mrr_at_k": {str(k): None for k in (3, 5, 10)},
             "finite_rank_median": None,
         }
@@ -64,7 +64,7 @@ def rank_metrics(ranks: Sequence[int | None]) -> dict[str, object]:
         "rank_11_plus_or_miss_count": sum(rank is None or rank > 10 for rank in ranks),
         "recall_at_k": {
             str(k): round(sum(rank is not None and rank <= k for rank in ranks) / len(ranks), 4)
-            for k in (1, 3, 5, 10)
+            for k in (1, 3, 5, 10, 20)
         },
         "mrr_at_k": {
             str(k): round(

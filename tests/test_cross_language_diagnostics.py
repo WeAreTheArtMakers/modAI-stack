@@ -27,7 +27,7 @@ def test_rank_buckets_recall_and_truncated_mrr_are_deterministic():
     ]
     result = rank_metrics(ranks)
     assert result["rank_11_plus_or_miss_count"] == 3
-    assert result["recall_at_k"] == {"1": 0.1, "3": 0.3, "5": 0.5, "10": 0.7}
+    assert result["recall_at_k"] == {"1": 0.1, "3": 0.3, "5": 0.5, "10": 0.7, "20": 0.9}
     assert result["mrr_at_k"] == {"3": 0.1833, "5": 0.2283, "10": 0.255}
     with pytest.raises(ValueError, match="positive"):
         rank_bucket(0)

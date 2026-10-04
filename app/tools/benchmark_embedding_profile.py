@@ -20,12 +20,14 @@ from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
 from qdrant_client import QdrantClient, models
+import numpy as np
 
 from app.core.config import get_settings
 from app.services.evaluation.embedding_profiles import (
     MINILM_BASELINE,
     MULTILINGUAL_E5_SMALL,
     MULTILINGUAL_E5_BASE,
+    BGE_M3_DENSE,
     EmbeddingProfileSpec,
     EmbeddingSpaceGuard,
 )
@@ -49,6 +51,20 @@ E5_REQUIRED_SNAPSHOT_FILES = (
 E5_MODEL_SAFETENSORS_SHA256 = "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477"
 E5_BASE_MODEL_SAFETENSORS_SHA256 = "a18a44fad1d0b46ded15928144138cff1135d5cc8233bdd90be5f18822de09a7"
 E5_BASE_MODEL_SAFETENSORS_SIZE = 1_112_201_288
+BGE_M3_REQUIRED_SNAPSHOT_FILES = (
+    "1_Pooling/config.json",
+    "config.json",
+    "config_sentence_transformers.json",
+    "modules.json",
+    "sentence_bert_config.json",
+    "sentencepiece.bpe.model",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "model.safetensors",
+)
+BGE_M3_MODEL_SAFETENSORS_SIZE = 2_271_064_456
+BGE_M3_MODEL_SAFETENSORS_SHA256 = "993b2248881724788dcab8c644a91dfd63584b6e5604ff2037cb5541e1e38e7e"
 
 
 def _read_json(path: Path) -> object:
@@ -169,6 +185,11 @@ def _validate_local_model_snapshot(profile: EmbeddingProfileSpec, model_path: Pa
             raise ValueError("MiniLM benchmark requires the exact pinned model revision")
         expected_directory_name = profile.revision
         required_files = ("model.safetensors",)
+    elif profile.model_id == BGE_M3_DENSE.model_id:
+        if profile.revision != BGE_M3_DENSE.revision:
+            raise ValueError("BGE-M3 benchmark requires the exact pinned model revision")
+        expected_directory_name = f"bge-m3-{profile.revision}"
+        required_files = BGE_M3_REQUIRED_SNAPSHOT_FILES
     else:
         raise ValueError("unsupported model identity for offline embedding benchmark")
     if model_path.name != expected_directory_name:
@@ -192,6 +213,10 @@ def _validate_local_model_snapshot(profile: EmbeddingProfileSpec, model_path: Pa
     ):
         raise ValueError("pinned E5-base model.safetensors size does not match")
 
+    if profile.model_id == BGE_M3_DENSE.model_id:
+        if (model_path / "model.safetensors").stat().st_size != BGE_M3_MODEL_SAFETENSORS_SIZE:
+            raise ValueError("pinned BGE-M3 model.safetensors size does not match")
+
     safetensors_sha256 = _sha256_file(model_path / "model.safetensors")
     if (
         profile.model_id == MULTILINGUAL_E5_SMALL.model_id
@@ -203,6 +228,8 @@ def _validate_local_model_snapshot(profile: EmbeddingProfileSpec, model_path: Pa
         and safetensors_sha256 != E5_BASE_MODEL_SAFETENSORS_SHA256
     ):
         raise ValueError("pinned E5-base model.safetensors SHA-256 does not match the expected digest")
+    if profile.model_id == BGE_M3_DENSE.model_id and safetensors_sha256 != BGE_M3_MODEL_SAFETENSORS_SHA256:
+        raise ValueError("pinned BGE-M3 model.safetensors SHA-256 does not match the expected digest")
     return safetensors_sha256
 
 
@@ -254,6 +281,9 @@ def _validate_profile_preprocessing(profile: EmbeddingProfileSpec) -> None:
     elif profile.model_id == "sentence-transformers/all-MiniLM-L6-v2":
         if profile.query_prefix or profile.passage_prefix:
             raise ValueError("MiniLM benchmark inputs must remain unprefixed")
+    elif profile.model_id == BGE_M3_DENSE.model_id:
+        if profile.query_prefix or profile.passage_prefix:
+            raise ValueError("BGE-M3 dense benchmark inputs must remain unprefixed")
 
 
 def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, documents_path: Path,
@@ -313,6 +343,8 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
         show_progress_bar=False,
     )[0]
     space_guard.validate_vector(profile, smoke_vector)
+    if not np.isfinite(smoke_vector).all() or not np.isclose(np.linalg.norm(smoke_vector), 1.0, atol=1e-4):
+        raise ValueError("embedding vectors must be finite and normalized")
 
     settings = get_settings()
     chunk_size = int(settings.chunk_size)
@@ -346,6 +378,10 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
     if len(document_vectors) != len(chunks):
         raise ValueError("embedding model returned an unexpected number of document vectors")
     space_guard.validate_vectors(profile, document_vectors)
+    if not np.isfinite(document_vectors).all() or not np.allclose(
+        np.linalg.norm(document_vectors, axis=1), 1.0, atol=1e-4
+    ):
+        raise ValueError("document vectors must be finite and normalized")
 
     records: list[dict] = []
     query_embedding_latencies: list[float] = []
@@ -408,6 +444,8 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
             )[0]
             query_ms = (time.perf_counter() - query_started) * 1000
             space_guard.validate_vector(profile, query_vector)
+            if not np.isfinite(query_vector).all() or not np.isclose(np.linalg.norm(query_vector), 1.0, atol=1e-4):
+                raise ValueError("query vectors must be finite and normalized")
             query_embedding_latencies.append(query_ms)
 
             retrieval_started = time.perf_counter()
@@ -479,7 +517,10 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
     report = {
         "schema_version": 1,
         "profile": profile.safe_metadata(),
-        "model_artifacts": {"safetensors_sha256": safetensors_sha256},
+        "model_artifacts": {
+            "safetensors_sha256": safetensors_sha256,
+            "safetensors_bytes": (model_path / "model.safetensors").stat().st_size,
+        },
         "inference": {
             "backend": "sentence-transformers / PyTorch",
             "device": str(model.device),
@@ -515,6 +556,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
         "hard_negative": {
             **hard_metrics,
             "confusable_document_hits_in_top_3": confusable_documents_in_hard_negative,
+            "expected_source_recovered_in_top_3": hard_metrics["case_count"] - hard_metrics["miss_count"],
         },
         "no_answer": {
             "case_count": len(no_answer_records),
@@ -570,7 +612,7 @@ def _run(profile: EmbeddingProfileSpec, model_path: Path, dataset_path: Path, do
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profile", choices=("minilm", "e5-small", "e5-base"), required=True)
+    parser.add_argument("--profile", choices=("minilm", "e5-small", "e5-base", "bge-m3"), required=True)
     parser.add_argument("--device", choices=("cpu", "mps"), help="Pin one device across all profile runs")
     parser.add_argument("--model-path", type=Path, required=True, help="Already-provisioned local model directory; never downloads")
     parser.add_argument("--dataset", type=Path, required=True, help="Versioned EvaluationDataset JSON")
@@ -578,7 +620,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True, help="Aggregate-only JSON result path")
     args = parser.parse_args()
     profile = {"minilm": MINILM_BASELINE, "e5-small": MULTILINGUAL_E5_SMALL,
-               "e5-base": MULTILINGUAL_E5_BASE}[args.profile]
+               "e5-base": MULTILINGUAL_E5_BASE, "bge-m3": BGE_M3_DENSE}[args.profile]
     result = _run(profile, args.model_path, args.dataset, args.documents, args.device)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")

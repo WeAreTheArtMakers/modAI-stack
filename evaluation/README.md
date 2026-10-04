@@ -148,3 +148,20 @@ DATABASE_URL=sqlite+aiosqlite:///:memory: RAG_TOP_K=3 \
 ```
 
 Kıyaslama generation, reranker, adaptive retrieval, BM25/hybrid veya query rewriting içermez. Sonuçlar yalnızca aggregate metrikleri yazar; soru, belge gövdesi ve yerel model yolu serialize edilmez. Model ağırlıkları ve aggregate çıktılarını Git’e eklemeyin. Ölçüm ve karar durumu [Compact Multilingual v2 raporunda](experiments/compact-multilingual-validation-v2.md) tutulur; deney üretim embedding ayarını değiştirmez.
+
+### BGE-M3 dense-only ölçümü (tamamlandı; evaluation-only)
+
+Sabit BGE-M3 snapshot’ı yalnızca açık operatör onayıyla indirilir; benchmark runner indirme yapmaz. `--profile bge-m3` yalnızca aşağıdaki sabit revision, beklenen dizin adı, gerekli dosyalar, safetensors boyutu/hash’i ve boş prefix sözleşmesiyle çalışır. Dört modelin MPS preflight’ını geçmesi halinde hepsini aynı cihazda, her biri ayrı yeni süreçte koşturun; MPS preflight’ı başarısız olursa performans kıyaslamasında tüm adaylar CPU’da yeniden çalıştırılmalıdır.
+
+```bash
+DATABASE_URL=sqlite+aiosqlite:///:memory: RAG_TOP_K=3 \
+  HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1 \
+  python -m app.tools.benchmark_embedding_profile \
+  --profile bge-m3 --device mps \
+  --model-path "$BGE_M3_MODEL_PATH" \
+  --dataset evaluation/corpora/compact-multilingual-v1/dataset.json \
+  --documents evaluation/corpora/compact-multilingual-v1/documents.json \
+  --output /private/tmp/bge-m3-aggregate.json
+```
+
+The matched four-model deep-rank and tokenizer audit is available via `python -m app.tools.diagnose_cross_language_retrieval --help`; it requires the four explicit local snapshot paths and unchanged canonical/mirror corpus inputs. BGE-M3 dense measurements and their category-B resource/quality decision are in [the v1 experiment report](experiments/compact-multilingual-bge-m3-v1.md). The candidate stays inactive; production MiniLM and `RAG_TOP_K=3` are unchanged.

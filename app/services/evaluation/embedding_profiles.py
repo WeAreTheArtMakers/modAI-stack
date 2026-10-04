@@ -23,6 +23,9 @@ E5_REVISION = "614241f622f53c4eeff9890bdc4f31cfecc418b3"
 E5_BASE_PROFILE_ID = "compact-multilingual-e5-base-candidate"
 E5_BASE_MODEL_ID = "intfloat/multilingual-e5-base"
 E5_BASE_REVISION = "d128750597153bb5987e10b1c3493a34e5a4502a"
+BGE_M3_PROFILE_ID = "balanced-multilingual-bge-m3-candidate"
+BGE_M3_MODEL_ID = "BAAI/bge-m3"
+BGE_M3_REVISION = "31e47391fcbda65be526abe98e646b3c6cd845a8"
 
 
 @dataclass(frozen=True)
@@ -108,6 +111,16 @@ MULTILINGUAL_E5_BASE = EmbeddingProfileSpec(
     language_scope="Multilingual (upstream model card)",
     query_prefix="query: ",
     passage_prefix="passage: ",
+)
+
+BGE_M3_DENSE = EmbeddingProfileSpec(
+    profile_id=BGE_M3_PROFILE_ID,
+    model_id=BGE_M3_MODEL_ID,
+    revision=BGE_M3_REVISION,
+    license="MIT",
+    dimensions=1024,
+    max_input_tokens=8192,
+    language_scope="Multilingual (upstream model card)",
 )
 
 

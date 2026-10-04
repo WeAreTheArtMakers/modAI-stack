@@ -79,7 +79,9 @@ def test_runner_uses_ephemeral_profile_isolated_qdrant_and_serializes_aggregates
         device = "cpu"
 
         def encode(self, values, **kwargs):
-            return np.zeros((len(values), MINILM_BASELINE.dimensions), dtype=np.float32)
+            vectors = np.zeros((len(values), MINILM_BASELINE.dimensions), dtype=np.float32)
+            vectors[:, 0] = 1.0
+            return vectors
 
     constructor_calls = []
 
