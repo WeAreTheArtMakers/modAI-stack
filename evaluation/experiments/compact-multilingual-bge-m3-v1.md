@@ -111,7 +111,7 @@ Times are milliseconds on the same Apple MPS host; retrieval median is Qdrant-on
 | E5-base | 4826.821 | 11.533 / 12.869 | 0.377 | 11.888 | 362.986 | 121.217 | 32.805 | 398.904 | 1059.1 | 1,112,201,288 | 135,168 | 373,271 |
 | **BGE-M3 dense** | **6129.638** | **28.264 / 37.348** | **0.414** | **28.709** | **628.097** | **70.053** | **39.464** | **672.423** | **1077.9** | **2,271,064,456** | **180,224** | **463,384** |
 
-There are 44 document vectors in this isolated index: the BGE-M3 raw float32 payload is 180,224 bytes (4× MiniLM/E5-small; 1.33× E5-base). The measured Qdrant directory is 2.05× MiniLM/E5-small and 1.24× E5-base. BGE-M3’s safetensors file is 25.0× MiniLM, 4.82× E5-small and 2.04× E5-base. Peak RSS is 1.53× MiniLM, 0.96× E5-small and 1.02× E5-base. Median total query retrieval is 4.85× MiniLM, 2.94× E5-small and 2.41× E5-base in this run. These small one-off timings and directory sizes are directional measurements, not deployment capacity guarantees.
+There are 44 document vectors in this isolated index: the BGE-M3 raw float32 payload is 180,224 bytes (2.67× MiniLM/E5-small; 1.33× E5-base). The measured Qdrant directory is 2.05× MiniLM/E5-small and 1.24× E5-base. BGE-M3’s safetensors file is 25.0× MiniLM, 4.82× E5-small and 2.04× E5-base. Peak RSS is 1.53× MiniLM, 0.96× E5-small and 1.02× E5-base. Median total query retrieval is 4.85× MiniLM, 2.94× E5-small and 2.41× E5-base in this run. These small one-off timings and directory sizes are directional measurements, not deployment capacity guarantees.
 
 ## Limitations and product gate
 
