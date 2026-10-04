@@ -4,6 +4,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app.core.config import get_settings
@@ -43,6 +44,24 @@ async def lifespan(app: FastAPI):
     configure_logging()
     await init_db(); yield
 app = FastAPI(title="Local AI Realtime RAG Platform", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_validation_error(_request: Request, error: RequestValidationError):
+    # FastAPI's default 422 body includes the rejected input. For password and
+    # token fields that would echo secrets back to the client (and browser logs).
+    details = []
+    for item in error.errors():
+        location = item.get("loc", ())
+        sensitive = any(str(part).lower() in {"password", "token", "jwt_secret"} for part in location)
+        details.append({
+            "loc": list(location),
+            "msg": "Invalid value" if sensitive else str(item.get("msg", "Invalid value")),
+            "type": str(item.get("type", "value_error")),
+        })
+    return JSONResponse(status_code=422, content={"detail": details})
+
+
 @app.middleware("http")
 async def request_metrics(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", "")

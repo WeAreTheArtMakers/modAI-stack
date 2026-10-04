@@ -1,8 +1,15 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
-class RegisterRequest(BaseModel): email: EmailStr; password: str = Field(min_length=8, max_length=128)
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
 class LoginRequest(RegisterRequest): pass
 class TokenResponse(BaseModel): access_token: str; token_type: str = "bearer"
 class OrganizationAccess(BaseModel):
@@ -162,6 +169,11 @@ class OrganizationAdminResponse(BaseModel):
     member_count: int = 0
 
 
+class OrganizationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    slug: str = Field(min_length=1, max_length=150, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
 class WorkspaceAdminResponse(BaseModel):
     id: int
     organization_id: int
@@ -228,6 +240,27 @@ class InvitationCreatedResponse(InvitationResponse):
 
 class InvitationAcceptRequest(BaseModel):
     token: str = Field(min_length=32, max_length=512)
+
+
+class InvitationSetupRequest(InvitationAcceptRequest):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class InvitationSetupInfo(BaseModel):
+    status: Literal["pending", "accepted", "expired"]
+    email: EmailStr
+    organization_name: str
+    workspace_name: str | None
+    role: TenantRole
+    expires_at: datetime
+    account_exists: bool
+
+
+class InvitationSetupResponse(BaseModel):
+    email: EmailStr
+    organization_name: str
+    workspace_name: str | None
+    role: TenantRole
 
 
 class PlatformStatusResponse(BaseModel):

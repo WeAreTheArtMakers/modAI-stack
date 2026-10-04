@@ -4,7 +4,6 @@ Platform administration is based on ``User.role``. Tenant administration is
 based exclusively on an administrator membership in the target organization;
 neither form of authority is silently converted into the other.
 """
-import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -29,6 +28,7 @@ from app.models.schemas import (
     MembershipResponse,
     MembershipUpdate,
     OrganizationAdminResponse,
+    OrganizationCreate,
     PlatformRoleUpdate,
     PlatformStatusResponse,
     WorkspaceAdminResponse,
@@ -36,6 +36,10 @@ from app.models.schemas import (
     WorkspaceUpdate,
 )
 from app.services.audit import record_audit_event
+from app.services.invitations import (
+    invitation_target, invitation_token_hash, locked_invitation_statement,
+    normalize_email, require_pending_invitation,
+)
 
 router = APIRouter(prefix="/admin", tags=["enterprise administration"])
 
@@ -51,12 +55,12 @@ async def _require_organization_admin(db: AsyncSession, user: dict, organization
 
 
 def _normalized_email(value: str) -> str:
-    return value.strip().lower()
+    return normalize_email(value)
 
 
 def _locked_invitation_statement(token_hash: str):
     """Return the dialect-aware row lock used for invitation consumption."""
-    return select(Invitation).where(Invitation.token_hash == token_hash).with_for_update()
+    return locked_invitation_statement(token_hash)
 
 
 async def _protect_last_organization_admin(
@@ -193,6 +197,25 @@ async def list_organizations(user=Depends(current_user), db: AsyncSession = Depe
         ).distinct()
         organizations = list((await db.scalars(select(Organization).where(Organization.id.in_(organization_ids)).order_by(Organization.id))).all())
     return [await _organization_response(db, organization) for organization in organizations]
+
+
+@router.post("/organizations", response_model=OrganizationAdminResponse, status_code=status.HTTP_201_CREATED)
+async def create_organization(payload: OrganizationCreate, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """Permit platform administration to seed a company when registration is closed."""
+    ensure_admin(user)
+    if await db.scalar(select(Organization.id).where(Organization.slug == payload.slug)) is not None:
+        raise HTTPException(409, "Organization slug already exists")
+    organization = Organization(name=payload.name.strip(), slug=payload.slug)
+    db.add(organization)
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(409, "Organization slug already exists") from exc
+    record_audit_event(db, action="organization_created", resource_type="organization", resource_id=organization.id,
+                       actor_user_id=int(user["sub"]), organization_id=organization.id)
+    await db.commit()
+    return await _organization_response(db, organization)
 
 
 @router.get("/organizations/{organization_id}", response_model=OrganizationAdminResponse)
@@ -350,7 +373,7 @@ async def create_invitation(payload: InvitationCreate, user=Depends(current_user
         organization_id=payload.organization_id,
         workspace_id=payload.workspace_id,
         role=payload.role,
-        token_hash=hashlib.sha256(delivery_token.encode()).hexdigest(),
+        token_hash=invitation_token_hash(delivery_token),
         expires_at=datetime.now(timezone.utc) + timedelta(hours=payload.expires_in_hours),
         created_by_user_id=int(user["sub"]),
     )
@@ -380,25 +403,14 @@ async def revoke_invitation(invitation_id: int, user=Depends(current_user), db: 
 
 @router.post("/invitations/accept", response_model=InvitationResponse)
 async def accept_invitation(payload: InvitationAcceptRequest, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
-    token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
+    token_hash = invitation_token_hash(payload.token)
     # PostgreSQL locks the invitation row until commit.  SQLite accepts the
     # clause as a no-op in unit tests, while production gets single-use safety.
-    invitation = await db.scalar(_locked_invitation_statement(token_hash))
-    if not invitation or invitation.accepted_at is not None:
-        raise HTTPException(404, "Invitation is invalid or has already been used")
-    expires_at = invitation.expires_at.replace(tzinfo=None) if invitation.expires_at.tzinfo else invitation.expires_at
-    if expires_at <= datetime.utcnow():
-        raise HTTPException(410, "Invitation has expired")
+    invitation = require_pending_invitation(await db.scalar(_locked_invitation_statement(token_hash)))
     account = await db.get(User, int(user["sub"]))
     if not account or _normalized_email(account.email) != _normalized_email(invitation.email):
         raise HTTPException(403, "Invitation is not addressed to this account")
-    organization = await db.get(Organization, invitation.organization_id)
-    if not organization:
-        raise HTTPException(409, "Invitation target is no longer available")
-    if invitation.workspace_id is not None:
-        workspace = await db.get(Workspace, invitation.workspace_id)
-        if not workspace or workspace.organization_id != invitation.organization_id:
-            raise HTTPException(409, "Invitation target is no longer available")
+    await invitation_target(db, invitation)
     statement = select(Membership).where(Membership.user_id == account.id, Membership.organization_id == invitation.organization_id)
     statement = statement.where(Membership.workspace_id == invitation.workspace_id) if invitation.workspace_id is not None else statement.where(Membership.workspace_id.is_(None))
     if not await db.scalar(statement):
@@ -408,8 +420,10 @@ async def accept_invitation(payload: InvitationAcceptRequest, user=Depends(curre
                 await db.flush()
         except IntegrityError:
             # A concurrent membership assignment wins without changing its role.
-            # The invitation can still be consumed safely and never escalates it.
-            pass
+            # Consume only if the winning membership really exists; do not
+            # silently turn unrelated database errors into accepted invites.
+            if not await db.scalar(statement):
+                raise HTTPException(409, "Membership could not be created") from None
     invitation.accepted_at = datetime.now(timezone.utc)
     record_audit_event(db, action="invitation_accepted", resource_type="invitation", resource_id=invitation.id, actor_user_id=account.id, organization_id=invitation.organization_id, workspace_id=invitation.workspace_id)
     await db.commit()
