@@ -143,22 +143,43 @@ class QdrantService:
 
         return models.Filter(must=conditions)
 
+    @staticmethod
+    def _retrieval_filter(
+        organization_id: int,
+        workspace_id: int,
+        knowledge_base_ids: list[int],
+    ) -> models.Filter:
+        """Search authorized tenant content, regardless of who uploaded it.
+
+        The caller must resolve KB authorization in PostgreSQL before reaching
+        Qdrant. Never allow an unscoped vector search as a fallback.
+        """
+        if organization_id <= 0 or workspace_id <= 0 or not knowledge_base_ids or any(
+            knowledge_base_id <= 0 for knowledge_base_id in knowledge_base_ids
+        ):
+            raise ValueError("RAG retrieval requires an organization, workspace, and knowledge base scope")
+        return models.Filter(must=[
+            models.FieldCondition(key="organization_id", match=models.MatchValue(value=organization_id)),
+            models.FieldCondition(key="workspace_id", match=models.MatchValue(value=workspace_id)),
+            models.FieldCondition(key="knowledge_base_id", match=models.MatchAny(any=knowledge_base_ids)),
+            models.FieldCondition(key="is_active", match=models.MatchValue(value=True)),
+        ])
+
     async def search(
         self,
         *,
-        user_id: int,
         vector: list[float],
         limit: int,
-        organization_id: int | None = None,
-        workspace_id: int | None = None,
-        knowledge_base_id: int | None = None,
-        knowledge_base_ids: list[int] | None = None,
+        organization_id: int,
+        workspace_id: int,
+        knowledge_base_ids: list[int],
     ):
+        query_filter = self._retrieval_filter(organization_id, workspace_id, knowledge_base_ids)
         return await self.client.search(
             collection_name=self.collection_name,
             query_vector=vector,
             limit=limit,
-            query_filter=self._user_filter(user_id, organization_id, workspace_id, knowledge_base_id, knowledge_base_ids),
+            query_filter=query_filter,
             with_payload=True,
         )
 

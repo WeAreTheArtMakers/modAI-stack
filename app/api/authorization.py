@@ -133,9 +133,9 @@ async def resolve_knowledge_base_scope(
     db: AsyncSession,
     user: dict,
     knowledge_base_ids: list[int],
-) -> tuple[list[int], tuple[KnowledgeBase, Workspace, Membership] | None]:
+) -> tuple[list[int], tuple[KnowledgeBase, Workspace, Membership]]:
     if not knowledge_base_ids:
-        return [], None
+        raise HTTPException(400, "Select at least one knowledge base")
     rows = [
         await require_knowledge_base_access(db, user, knowledge_base_id)
         for knowledge_base_id in dict.fromkeys(knowledge_base_ids)

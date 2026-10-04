@@ -14,8 +14,8 @@ import type { ModelSystemStatus, Source, UserContext } from "./types";
 import { pendingInvitation, savePendingInvitation } from "./invitations/transport";
 import { ApiError } from "./api/client";
 
-const mocks = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn(), listAdminUsers: vi.fn(), updatePlatformRole: vi.fn(), acceptInvitation: vi.fn(), inspectInvitation: vi.fn(), setupInvitedAccount: vi.fn(), listAdminOrganizations: vi.fn(), createAdminOrganization: vi.fn(), listAdminWorkspaces: vi.fn(), listInvitations: vi.fn(), createInvitation: vi.fn() }));
-vi.mock("./auth/AuthContext", () => ({ useAuth: () => ({ user: mocks.user, loading: false, error: null, login: mocks.login, logout: mocks.logout }) }));
+const mocks = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), refreshUser: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn(), listAdminUsers: vi.fn(), updatePlatformRole: vi.fn(), acceptInvitation: vi.fn(), inspectInvitation: vi.fn(), setupInvitedAccount: vi.fn(), listAdminOrganizations: vi.fn(), createAdminOrganization: vi.fn(), listAdminWorkspaces: vi.fn(), listInvitations: vi.fn(), createInvitation: vi.fn() }));
+vi.mock("./auth/AuthContext", () => ({ useAuth: () => ({ user: mocks.user, loading: false, error: null, login: mocks.login, logout: mocks.logout, refreshUser: mocks.refreshUser }) }));
 vi.mock("./api/documents", () => ({ uploadDocuments: mocks.uploadDocuments, reindexDocument: vi.fn(), deleteDocument: vi.fn() }));
 vi.mock("./api/auth", () => ({ inspectInvitation: mocks.inspectInvitation, setupInvitedAccount: mocks.setupInvitedAccount }));
 vi.mock("./api/models", () => ({ getModelStatus: mocks.getModelStatus, listManagedModels: mocks.listManagedModels, deleteManagedModel: mocks.deleteManagedModel }));
@@ -29,7 +29,7 @@ function renderModels() { const client = new QueryClient({ defaultOptions: { que
 function renderAdmin(section: "users" | "organizations" | "workspaces" | "memberships" | "invitations" | "audit" | "platform") { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><AdminPage section={section} /></QueryClientProvider>); }
 
 describe("Web Console critical UI", () => {
-  beforeEach(() => { vi.clearAllMocks(); mocks.user = null; sessionStorage.clear(); window.history.replaceState(null, "", "/"); });
+  beforeEach(() => { vi.clearAllMocks(); mocks.user = null; mocks.refreshUser.mockResolvedValue(undefined); sessionStorage.clear(); window.history.replaceState(null, "", "/"); });
 
   it("renders and submits the login form", async () => {
     mocks.login.mockResolvedValue(undefined);
@@ -183,6 +183,7 @@ describe("Web Console critical UI", () => {
     await user.click(await screen.findByRole("button", { name: "Daveti kabul et" }));
     await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith("single-use-token-that-is-long-enough"));
     expect(await screen.findByText(/Davet kabul edildi/)).toBeInTheDocument();
+    expect(mocks.refreshUser).toHaveBeenCalled();
   });
 
   it("lets a new invited employee choose and confirm a password without login", async () => {

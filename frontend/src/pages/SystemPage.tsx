@@ -9,7 +9,7 @@ import {
   Server,
   TriangleAlert,
 } from "lucide-react";
-import { getHealth } from "../api/health";
+import { getReadiness } from "../api/health";
 import { getModelStatus } from "../api/models";
 import { getRetrievalProfiles } from "../api/retrieval";
 import { PageHeader } from "../components/PageHeader";
@@ -57,7 +57,7 @@ function ProfileCard({ profile }: { profile: RetrievalProfile }) {
 }
 
 export function SystemPage() {
-  const health = useQuery({ queryKey: ["health"], queryFn: getHealth, refetchInterval: 30_000 });
+  const readiness = useQuery({ queryKey: ["readiness"], queryFn: getReadiness, refetchInterval: 30_000 });
   const models = useQuery({ queryKey: ["model-status"], queryFn: getModelStatus, refetchInterval: 30_000 });
   const profiles = useQuery({
     queryKey: ["retrieval-profiles"],
@@ -65,32 +65,32 @@ export function SystemPage() {
     refetchInterval: 60_000,
   });
 
-  if (health.isLoading || models.isLoading || profiles.isLoading) {
+  if (readiness.isLoading || models.isLoading || profiles.isLoading) {
     return <LoadingState label="Servis ve arama profili durumu okunuyor" />;
   }
-  if (health.error && models.error && profiles.error) {
-    return <ErrorState error={health.error} />;
+  if (readiness.error && models.error && profiles.error) {
+    return <ErrorState error={readiness.error} />;
   }
 
   const ollama = models.data?.providers.find((provider) => provider.provider === "ollama");
   const activeProfile = profiles.data?.profiles.find((profile) => profile.active);
   const services = [
-    { name: "API", detail: "FastAPI", ok: health.data?.status === "ok", icon: Server },
+    { name: "API", detail: "FastAPI", ok: readiness.data ? true : readiness.error ? false : undefined, icon: Server },
     {
       name: "Ollama",
       detail: models.data?.generation.configured_model ?? "Yerel model sağlayıcısı",
-      ok: ollama?.ready,
+      ok: readiness.data?.ollama.ready ?? ollama?.ready,
       icon: Gauge,
     },
     {
       name: "Embedding",
       detail: activeProfile?.display_name ?? "Profil eşlemesi bulunamadı",
-      ok: models.data?.embedding.ready,
+      ok: readiness.data?.embedding.ready ?? models.data?.embedding.ready,
       icon: Globe2,
     },
-    { name: "PostgreSQL", detail: "Kalıcı veri", ok: undefined, icon: Database },
-    { name: "Redis", detail: "İndeks kuyruğu", ok: undefined, icon: Network },
-    { name: "Qdrant", detail: "Vektör arama", ok: undefined, icon: Server },
+    { name: "PostgreSQL", detail: "Kalıcı veri", ok: readiness.data?.dependencies.postgres, icon: Database },
+    { name: "Redis", detail: "İndeks kuyruğu", ok: readiness.data?.dependencies.redis, icon: Network },
+    { name: "Qdrant", detail: "Vektör arama", ok: readiness.data?.dependencies.qdrant, icon: Server },
   ];
 
   return (
@@ -180,7 +180,7 @@ export function SystemPage() {
       <div className="panel mt-6 flex gap-4 p-5">
         <Gauge className="mt-0.5 shrink-0 text-cyan" size={19} />
         <p className="text-sm leading-6 text-slate-500">
-          Ollama ve embedding hazırlığı API sinyallerinden gelir. PostgreSQL, Redis ve Qdrant için ayrı sağlık endpoint'i yoktur; bu servisler Docker Compose tarafından yönetilir.
+          PostgreSQL, Redis, Qdrant, Ollama ve embedding hazırlığı sunucunun /ready yanıtından okunur. Servisler hazır değilse yöneticinize bildirin.
         </p>
       </div>
     </>

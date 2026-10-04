@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Building2, CheckCircle2, ClipboardList, KeyRound, ShieldAlert } from "lucide-react";
+import { Link } from "react-router";
 import { createAdminOrganization, createAdminWorkspace, createInvitation, createMembership, getPlatformStatus, listAdminOrganizations, listAdminUsers, listAdminWorkspaces, listAuditEvents, listInvitations, listMemberships, removeMembership, revokeInvitation, updateMembership, updatePlatformRole } from "../api/admin";
-import { getErrorMessage } from "../api/client";
+import { ApiError, getErrorMessage } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "../components/State";
 import { useAuth } from "../auth/AuthContext";
@@ -19,6 +20,17 @@ const labels: Record<AdminSection, { eyebrow: string; title: string; description
   audit: { eyebrow: "Platform yönetimi", title: "Denetim günlüğü", description: "Yönetim işlemleri için filtrelenebilir, hassas veri içermeyen kayıtlar." },
   platform: { eyebrow: "Platform yönetimi", title: "Platform", description: "Kayıt politikası, sağlayıcı yapılandırması ve hazır olma durumu." },
 };
+
+async function refreshTenantAccess(client: QueryClient, refreshUser: () => Promise<void>) {
+  await Promise.all([
+    client.invalidateQueries({ queryKey: ["admin-memberships"] }),
+    client.invalidateQueries({ queryKey: ["workspaces"] }),
+    client.invalidateQueries({ queryKey: ["knowledge-bases"] }),
+    client.invalidateQueries({ queryKey: ["documents"] }),
+    client.invalidateQueries({ queryKey: ["admin-organizations"] }),
+  ]);
+  await refreshUser();
+}
 
 function roleSelect(value: Role, onChange: (role: Role) => void, disabled = false) {
   return <select aria-label="Tenant rolü" className="field max-w-32 py-2" value={value} onChange={(event) => onChange(event.target.value as Role)} disabled={disabled}>{["user", "manager", "admin"].map((role) => <option value={role} key={role}>{role}</option>)}</select>;
@@ -73,21 +85,34 @@ function OrganizationsSection() {
 }
 
 function WorkspacesSection({ organizationId }: { organizationId: number }) {
+  const { refreshUser } = useAuth();
   const client = useQueryClient(); const [name, setName] = useState(""); const [slug, setSlug] = useState(""); const [formOpen, setFormOpen] = useState(false);
   const query = useQuery({ queryKey: ["admin-workspaces", organizationId], queryFn: () => listAdminWorkspaces(organizationId) });
-  const mutation = useMutation({ mutationFn: () => createAdminWorkspace({ organization_id: organizationId, name, slug }), onSuccess: () => { setName(""); setSlug(""); setFormOpen(false); void client.invalidateQueries({ queryKey: ["admin-workspaces", organizationId] }); } });
+  const mutation = useMutation({ mutationFn: () => createAdminWorkspace({ organization_id: organizationId, name, slug }), onSuccess: async () => { setName(""); setSlug(""); setFormOpen(false); await Promise.all([client.invalidateQueries({ queryKey: ["admin-workspaces"] }), client.invalidateQueries({ queryKey: ["workspaces"] }), client.invalidateQueries({ queryKey: ["admin-organizations"] })]); await refreshUser(); } });
   if (query.isLoading) return <LoadingState />; if (query.error) return <ErrorState error={query.error} />;
   return <><button className="button-primary mb-5" onClick={() => setFormOpen(!formOpen)}>Yeni Workspace</button>{formOpen && <form className="panel mb-5 grid gap-3 p-5 md:grid-cols-3" onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}><input className="field" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ad" required /><input className="field" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" required /><button className="button-primary" disabled={mutation.isPending}>Oluştur</button>{mutation.error && <p className="text-sm text-red-600 md:col-span-3">{getErrorMessage(mutation.error)}</p>}</form>}<div className="panel overflow-x-auto"><table className="w-full min-w-[460px] text-left text-sm"><thead className="bg-cloud text-xs uppercase text-slate-500"><tr><th className="p-4">Ad</th><th className="p-4">Slug</th><th className="p-4">ID</th></tr></thead><tbody>{query.data?.map((workspace) => <tr key={workspace.id} className="border-t border-slate-100"><td className="p-4 font-medium">{workspace.name}</td><td className="p-4 text-slate-500">/{workspace.slug}</td><td className="p-4 text-slate-500">{workspace.id}</td></tr>)}</tbody></table></div></>;
 }
 
 function MembershipsSection({ organizationId }: { organizationId: number }) {
+  const { user, refreshUser } = useAuth();
   const client = useQueryClient(); const [userEmail, setUserEmail] = useState(""); const [role, setRole] = useState<Role>("user"); const [creating, setCreating] = useState(false);
   const query = useQuery({ queryKey: ["admin-memberships", organizationId], queryFn: () => listMemberships(organizationId) });
-  const create = useMutation({ mutationFn: () => createMembership({ user_email: userEmail, organization_id: organizationId, role }), onSuccess: () => { setUserEmail(""); setCreating(false); void client.invalidateQueries({ queryKey: ["admin-memberships", organizationId] }); } });
-  const update = useMutation({ mutationFn: ({ id, nextRole }: { id: number; nextRole: Role }) => updateMembership(id, nextRole), onSuccess: () => void client.invalidateQueries({ queryKey: ["admin-memberships", organizationId] }) });
-  const remove = useMutation({ mutationFn: removeMembership, onSuccess: () => void client.invalidateQueries({ queryKey: ["admin-memberships", organizationId] }) });
+  const create = useMutation({ mutationFn: () => createMembership({ user_email: userEmail.trim(), organization_id: organizationId, role }), onSuccess: async () => { setUserEmail(""); setCreating(false); await refreshTenantAccess(client, refreshUser); } });
+  const update = useMutation({ mutationFn: ({ id, nextRole }: { id: number; nextRole: Role }) => updateMembership(id, nextRole), onSuccess: () => refreshTenantAccess(client, refreshUser) });
+  const remove = useMutation({ mutationFn: removeMembership, onSuccess: () => refreshTenantAccess(client, refreshUser) });
+  const ownMembership = query.data?.find((membership) => membership.organization_id === organizationId && membership.workspace_id === null && (membership.user_id === user?.id || membership.user_email.trim().toLowerCase() === user?.email.trim().toLowerCase()));
+  const selfAssign = useMutation({
+    mutationFn: () => ownMembership ? updateMembership(ownMembership.id, "admin") : createMembership({ user_email: user!.email.trim(), organization_id: organizationId, role: "admin" }),
+    onSuccess: () => refreshTenantAccess(client, refreshUser),
+  });
   if (query.isLoading) return <LoadingState />; if (query.error) return <ErrorState error={query.error} />;
-  return <><button className="button-primary mb-5" onClick={() => setCreating(!creating)}>Kayıtlı kullanıcıyı ekle</button>{creating && <form className="panel mb-5 flex flex-wrap gap-3 p-5" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}><input aria-label="Kullanıcı e-postası" type="email" className="field max-w-sm" value={userEmail} onChange={(event) => setUserEmail(event.target.value)} placeholder="person@example.com" required />{roleSelect(role, setRole)}<button className="button-primary" disabled={create.isPending}>Ekle</button>{create.error && <p className="w-full text-sm text-red-600">{getErrorMessage(create.error)}</p>}</form>}<div className="panel overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-cloud text-xs uppercase text-slate-500"><tr><th className="p-4">Kullanıcı</th><th className="p-4">Kapsam</th><th className="p-4">Tenant rolü</th><th className="p-4" /></tr></thead><tbody>{query.data?.map((membership) => <tr className="border-t border-slate-100" key={membership.id}><td className="p-4 font-medium">{membership.user_email}</td><td className="p-4 text-slate-500">{membership.workspace_id ? `Workspace #${membership.workspace_id}` : "Organization"}</td><td className="p-4">{roleSelect(membership.role, (nextRole) => update.mutate({ id: membership.id, nextRole }))}</td><td className="p-4"><button className="button-secondary py-2 text-red-700" onClick={() => { if (window.confirm("Bu üyelik kaldırılsın mı?")) remove.mutate(membership.id); }}>Kaldır</button></td></tr>)}</tbody></table></div>{(update.error || remove.error) && <p className="mt-3 text-sm text-red-600">{getErrorMessage(update.error ?? remove.error)}</p>}</>;
+  return <>
+    {user?.role === "admin" && <div className="panel mb-5 p-5"><h2 className="font-bold text-ink">Kendi tenant erişiminiz</h2><p className="mt-2 text-sm text-slate-600">Platform yöneticisi olmak belge erişimi vermez. Seçili Organization için üyeliğinizi açıkça oluşturun.</p>{ownMembership?.role === "admin" ? <p className="mt-3 font-semibold text-emerald-700">Organization Admin</p> : <button className="button-primary mt-4" disabled={selfAssign.isPending} onClick={() => selfAssign.mutate()}>Kendimi Organization Admin yap</button>}{selfAssign.error && <p role="alert" className="mt-3 text-sm text-red-700">{getErrorMessage(selfAssign.error)}</p>}</div>}
+    <div className="mb-5 flex flex-wrap gap-3"><button className="button-primary" onClick={() => setCreating(!creating)}>Mevcut hesabı ekle</button><Link className="button-secondary" to="/admin/invitations">Yeni çalışan davet et</Link></div>
+    <p className="mb-4 text-sm text-slate-600">Bu işlem yalnızca platformda zaten hesabı bulunan bir kullanıcıya üyelik verir. Yeni çalışanlar için Davetler bölümünü kullanın.</p>
+    {creating && <form className="panel mb-5 flex flex-wrap gap-3 p-5" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}><input aria-label="Kullanıcı e-postası" type="email" className="field max-w-sm" value={userEmail} onChange={(event) => setUserEmail(event.target.value)} placeholder="person@example.com" required />{roleSelect(role, setRole)}<button className="button-primary" disabled={create.isPending}>Ekle</button>{create.error && <div role="alert" className="w-full text-sm text-red-600">{create.error instanceof ApiError && create.error.status === 404 && create.error.message === "User not found" ? <>Bu e-posta ile kayıtlı bir hesap bulunamadı. Yeni bir çalışan eklemek için Davetler bölümünü kullanın. <Link className="font-semibold underline" to="/admin/invitations">Davet oluştur</Link></> : getErrorMessage(create.error)}</div>}</form>}
+    <div className="panel overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-cloud text-xs uppercase text-slate-500"><tr><th className="p-4">Kullanıcı</th><th className="p-4">Kapsam</th><th className="p-4">Tenant rolü</th><th className="p-4" /></tr></thead><tbody>{query.data?.map((membership) => <tr className="border-t border-slate-100" key={membership.id}><td className="p-4 font-medium">{membership.user_email}</td><td className="p-4 text-slate-500">{membership.workspace_id ? `Workspace #${membership.workspace_id}` : "Organization"}</td><td className="p-4">{roleSelect(membership.role, (nextRole) => update.mutate({ id: membership.id, nextRole }))}</td><td className="p-4"><button className="button-secondary py-2 text-red-700" onClick={() => { if (window.confirm("Bu üyelik kaldırılsın mı?")) remove.mutate(membership.id); }}>Kaldır</button></td></tr>)}</tbody></table></div>{(update.error || remove.error) && <p className="mt-3 text-sm text-red-600">{getErrorMessage(update.error ?? remove.error)}</p>}
+  </>;
 }
 
 function InvitationsSection({ organizationId }: { organizationId: number }) {

@@ -25,10 +25,9 @@ def build_rag_prompt(question: str, chunks: list[str]) -> str:
 async def retrieve_rag_context(
     question: str,
     *,
-    user_id: int,
-    organization_id: int | None = None,
-    workspace_id: int | None = None,
-    knowledge_base_ids: list[int] | None = None,
+    organization_id: int,
+    workspace_id: int,
+    knowledge_base_ids: list[int],
     limit: int | None = None,
 ) -> RetrievedRagContext:
     embedding_started = perf_counter()
@@ -36,7 +35,6 @@ async def retrieve_rag_context(
     embedding_latency_ms = (perf_counter() - embedding_started) * 1000
     retrieval_started = perf_counter()
     hits = await qdrant_service.search(
-        user_id=user_id,
         vector=query_vector,
         limit=limit if limit is not None else get_settings().rag_top_k,
         organization_id=organization_id,

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState, type FormEvent } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useLocation } from "react-router";
 import { CheckCircle2 } from "lucide-react";
 import { acceptInvitation } from "../api/admin";
@@ -15,13 +15,22 @@ export function InviteAcceptPage() {
     if (location.hash || new URLSearchParams(location.search).has("token")) return tokenFromFragment(location.hash) ?? "";
     return pendingInvitation() ?? "";
   });
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const info = useQuery({ queryKey: ["invitation-info", token], queryFn: () => inspectInvitation(token), enabled: token.length >= 32, retry: false });
   const setup = useMutation({ mutationFn: () => setupInvitedAccount(token, password), onSuccess: clearPendingInvitation });
-  const accept = useMutation({ mutationFn: () => acceptInvitation(token), onSuccess: clearPendingInvitation });
+  const accept = useMutation({ mutationFn: () => acceptInvitation(token), onSuccess: async () => {
+    clearPendingInvitation();
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] }),
+      queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] }),
+      queryClient.invalidateQueries({ queryKey: ["documents"] }),
+    ]);
+    await refreshUser();
+  } });
 
   useLayoutEffect(() => {
     const fragmentToken = tokenFromFragment(location.hash);
@@ -55,7 +64,7 @@ export function InviteAcceptPage() {
         <p>Bu e-posta için bir hesap zaten var. Şifrenizi değiştirmeden, o hesapla giriş yapıp daveti kabul edin.</p>
         {user?.email.toLowerCase() === info.data.email.toLowerCase() ? <>
           <button className="button-primary" onClick={() => accept.mutate()} disabled={accept.isPending || accept.isSuccess}>Daveti kabul et</button>
-          {accept.isSuccess && <p role="status" className="flex items-center gap-2 text-emerald-700"><CheckCircle2 size={18} /> Davet kabul edildi. Yeni üyeliğinizi görmek için sayfayı yenileyin.</p>}
+          {accept.isSuccess && <p role="status" className="flex items-center gap-2 text-emerald-700"><CheckCircle2 size={18} /> Davet kabul edildi. <Link to="/" className="underline">Workspace'inize gidin</Link></p>}
           {accept.error && <p role="alert" className="text-red-700">{getErrorMessage(accept.error)}</p>}
         </> : user ? <button className="button-secondary" onClick={logout}>Başka hesapla devam etmek için çıkış yap</button> : <Link className="button-primary inline-flex" to="/login" onClick={(event) => { if (!savePendingInvitation(token)) { event.preventDefault(); setFormError("Davet oturumu saklanamadı. Tarayıcı oturum depolamasını etkinleştirin."); } }}>Giriş yap</Link>}
       </> : user ? <div className="space-y-3"><p role="alert">Yeni hesabı oluşturmadan önce mevcut oturumdan çıkın.</p><button className="button-secondary" onClick={logout}>Mevcut hesaptan çık</button></div> : <form className="space-y-4" onSubmit={submitSetup}>

@@ -90,6 +90,14 @@ export interface HealthState {
   ollama?: boolean;
 }
 
+export interface ReadinessState {
+  status: string;
+  ready: boolean;
+  dependencies: { postgres: boolean; redis: boolean; qdrant: boolean };
+  ollama: { ready: boolean };
+  embedding: { ready: boolean };
+}
+
 export interface ModelProviderStatus {
   provider: string;
   endpoint: string;

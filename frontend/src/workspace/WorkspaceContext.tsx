@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listWorkspaces } from "../api/workspaces";
+import { useAuth } from "../auth/AuthContext";
 import type { Workspace } from "../types";
 
 interface WorkspaceContextValue {
@@ -12,7 +13,8 @@ interface WorkspaceContextValue {
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const query = useQuery({ queryKey: ["workspaces"], queryFn: listWorkspaces });
+  const { user } = useAuth();
+  const query = useQuery({ queryKey: ["workspaces", user?.id], queryFn: listWorkspaces, enabled: Boolean(user) });
   const [currentId, setCurrentId] = useState<number | null>(() => {
     const saved = localStorage.getItem("modai.workspace_id");
     return saved ? Number(saved) : null;
