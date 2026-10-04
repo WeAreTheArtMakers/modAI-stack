@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bot, ChevronDown, MessageSquare, Send, UserRound } from "lucide-react";
+import { Link, useSearchParams } from "react-router";
 import { listKnowledgeBases } from "../api/knowledgeBases";
 import { streamRag } from "../api/websocket";
 import { getErrorMessage } from "../api/client";
@@ -8,6 +9,8 @@ import type { Source } from "../types";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "../components/State";
 import { useWorkspace } from "../workspace/WorkspaceContext";
+import { useAuth } from "../auth/AuthContext";
+import { canManage } from "../lib";
 
 interface ChatMessage { id: string; role: "user" | "assistant"; content: string; sources?: Source[]; streaming?: boolean; }
 
@@ -17,11 +20,27 @@ export function SourceCard({ source }: { source: Source }) {
 }
 
 export function ChatPage() {
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const { current } = useWorkspace(); const kbs = useQuery({ queryKey: ["knowledge-bases"], queryFn: listKnowledgeBases }); const available = useMemo(() => kbs.data?.filter((kb) => kb.workspace_id === current?.id) ?? [], [kbs.data, current?.id]);
   const [selected, setSelected] = useState<number[]>([]); const [question, setQuestion] = useState(""); const [messages, setMessages] = useState<ChatMessage[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  useEffect(() => { setSelected((currentSelection) => currentSelection.filter((id) => available.some((kb) => kb.id === id))); }, [available]);
+  const requestedKb = searchParams.get("kb");
+  useEffect(() => {
+    const requestedId = requestedKb && /^\d+$/.test(requestedKb) ? Number(requestedKb) : null;
+    const authorizedRequest = requestedId !== null && Number.isSafeInteger(requestedId) && available.some((kb) => kb.id === requestedId);
+    setSelected((previous) => {
+      const next = authorizedRequest ? [requestedId] : previous.filter((id) => available.some((kb) => kb.id === id));
+      if (!next.length && available.length === 1) next.push(available[0].id);
+      return next.length === previous.length && next.every((id, index) => id === previous[index]) ? previous : next;
+    });
+  }, [available, requestedKb]);
   function toggle(id: number) { setSelected((currentSelection) => currentSelection.includes(id) ? currentSelection.filter((item) => item !== id) : [...currentSelection, id]); }
   async function ask(event: FormEvent) { event.preventDefault(); if (!question.trim() || !selected.length || busy) return; const content = question.trim(); const assistantId = crypto.randomUUID(); setQuestion(""); setError(null); setBusy(true); setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", content }, { id: assistantId, role: "assistant", content: "", sources: [], streaming: true }]); try { await streamRag(selected, content, (event) => { setMessages((items) => items.map((message) => message.id !== assistantId ? message : event.type === "sources" ? { ...message, sources: event.data } : event.type === "token" ? { ...message, content: message.content + event.data } : event.type === "complete" ? { ...message, streaming: false } : { ...message, streaming: false })); if (event.type === "error") setError(event.data); }); } catch (reason) { setMessages((items) => items.map((message) => message.id === assistantId ? { ...message, streaming: false } : message)); setError(getErrorMessage(reason)); } finally { setBusy(false); } }
   if (kbs.isLoading) return <LoadingState />; if (kbs.error) return <ErrorState error={kbs.error} />;
+  if (!current) {
+    const canSetup = user?.role === "admin" || user?.organizations.some((organization) => organization.organization_admin);
+    return <><PageHeader eyebrow="RAG Chat" title="Bilginizle konuşun" description="RAG için önce bir Workspace gerekir." /><EmptyState icon={<MessageSquare size={22} />} title="Workspace gerekli" description={canSetup ? "Organization erişiminizi ve Workspace'i hazırladıktan sonra Chat kullanabilirsiniz." : "Erişim için Organization yöneticinizle iletişime geçin."} action={canSetup && <Link className="button-primary" to={user?.role === "admin" ? "/admin/memberships" : "/admin/workspaces"}>Kuruluma git</Link>} /></>;
+  }
+  if (!available.length) return <><PageHeader eyebrow="RAG Chat" title="Bilginizle konuşun" description="Bu Workspace'te henüz RAG kaynağı yok." /><EmptyState icon={<MessageSquare size={22} />} title="Bu Workspace'te henüz RAG kaynağı yok" description={canManage(current.membership_role) ? "Bir Knowledge Base oluşturup belge yükleyerek başlayın." : "Bir manager veya admin Knowledge Base oluşturmalı ve belge yüklemelidir."} action={canManage(current.membership_role) && <Link className="button-primary" to="/knowledge-bases">Knowledge Base oluştur</Link>} /></>;
   return <><PageHeader eyebrow="RAG Chat" title="Bilginizle konuşun" description="Aynı workspace içindeki bir veya daha fazla Knowledge Base'i seçin; yerel model yanıtını kaynaklarıyla birlikte üretir." /><div className="grid gap-6 xl:grid-cols-[280px_1fr]"><aside className="panel h-fit p-5"><p className="eyebrow">Kaynak seçimi</p><h2 className="mt-2 text-base font-bold text-ink">Knowledge Base'ler</h2><div className="mt-4 space-y-2">{available.map((kb) => <label key={kb.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${selected.includes(kb.id) ? "border-cyan bg-cyan/5" : "border-slate-100 hover:bg-cloud"}`}><input type="checkbox" className="mt-1 accent-cyan" checked={selected.includes(kb.id)} onChange={() => toggle(kb.id)} /><span><span className="block text-sm font-semibold text-ink">{kb.name}</span><span className="mt-1 block text-xs text-slate-500">{kb.membership_role}</span></span></label>)}</div>{!available.length && <p className="mt-4 text-sm text-slate-500">Bu workspace'te Knowledge Base yok.</p>}<p className="mt-5 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-400">RAG isteği yalnızca seçtiğiniz ve yetkili olduğunuz kaynaklarda aranır.</p></aside><section className="panel flex min-h-[620px] flex-col overflow-hidden"><div className="border-b border-slate-100 px-6 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-white"><Bot size={17} /></span><div><h2 className="text-sm font-bold text-ink">Local RAG assistant</h2><p className="text-xs text-slate-500">{selected.length ? `${selected.length} kaynak seçildi` : "Kaynak seçimi bekleniyor"}</p></div></div></div><div className="flex-1 space-y-6 overflow-y-auto p-6">{!messages.length && <EmptyState icon={<MessageSquare size={22} />} title="Sorunuzu yazın" description="Seçtiğiniz belgelerden cevap almak için aşağıdaki alana bir soru yazın." />}{messages.map((message) => <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}><span className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${message.role === "user" ? "order-2 bg-cyan/10 text-cyan" : "bg-ink text-white"}`}>{message.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</span><div className={`max-w-3xl ${message.role === "user" ? "order-1" : ""}`}><div className={`rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-ink text-white" : "bg-cloud text-ink"}`}>{message.content || (message.streaming ? <span className="text-slate-400">Yanıt hazırlanıyor…</span> : "Yanıt alınamadı.")}{message.streaming && message.content && <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-cyan align-middle" />}</div>{message.sources && message.sources.length > 0 && <div className="mt-3 space-y-2"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kaynaklar</p>{message.sources.map((source, index) => <SourceCard key={`${source.document_id}-${source.chunk_index}-${index}`} source={source} />)}</div>}</div></div>)}</div>{error && <div role="alert" className="mx-6 mb-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}<form className="border-t border-slate-100 p-4" onSubmit={ask}><div className="flex items-end gap-3"><textarea className="field min-h-12 resize-none" rows={2} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={selected.length ? "Belgeleriniz hakkında bir soru sorun..." : "Önce bir Knowledge Base seçin"} disabled={!selected.length || busy} /><button className="button-primary h-12 shrink-0 px-4" disabled={!selected.length || !question.trim() || busy} title="Gönder"><Send size={17} /></button></div></form></section></div></>;
 }
