@@ -46,6 +46,7 @@ export function hasSession(): boolean {
 }
 
 export async function logout(): Promise<void> {
-  try { await request<void>("/auth/logout", { method: "POST" }, false); } catch { /* Local logout still clears access state. */ }
+  const revoke = request<void>("/auth/logout", { method: "POST" }, false);
   tokenStore.clear();
+  try { await revoke; } catch { /* Local logout still clears access state. */ }
 }
