@@ -131,9 +131,8 @@ Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-runtime.txt
+# Yalnızca ilk kurulumda; mevcut yerel .env dosyasını üzerine yazmayın.
 cp .env.example .env
-ollama pull modAIJet:latest
-uvicorn app.main:app --reload
 ```
 
 Bağımlılıklar kullanım amacına göre ayrılmıştır:
@@ -151,7 +150,24 @@ pip install -r requirements-training.txt
 
 `requirements.txt`, eski tam kurulum alışkanlığı için uyumluluk giriş noktasıdır; runtime, geliştirme ve eğitim bağımlılıklarını birlikte kurar. Production API/worker imajı yalnızca `requirements-runtime.txt` kullanır. SentenceTransformers için gereken `torch` ve `transformers` runtime'da kalır; `datasets`, `peft` ve `accelerate` ise LoRA eğitim ortamına bilinçli olarak ayrılmıştır.
 
-Docker için `cp .env.example .env` ve `docker compose up --build` komutlarını çalıştırın. API `http://localhost:8000`, Qdrant `http://localhost:6333`, host PostgreSQL bağlantısı `localhost:55432` adresindedir. Docker içindeki API, Mac üzerinde Ollama’ya `host.docker.internal:11434` adresinden bağlanır.
+### Yerel geliştirme / Uygulamayı çalıştırma
+
+**Tam sistem:** Depo kökünde `.env` içindeki `POSTGRES_DB`, `POSTGRES_USER` ve `POSTGRES_PASSWORD` değerlerini yerel veritabanınızla uyumlu biçimde ayarlayın; mevcut PostgreSQL volume'unun kimlik bilgilerini değiştirmeyin. Ardından:
+
+```bash
+docker compose up --build
+```
+
+Compose; `frontend`, `api`, `worker`, `postgres`, `redis` ve `qdrant` servislerini başlatır. Arayüz `http://localhost:5173`, API `http://localhost:8000`, Qdrant `http://localhost:6333`, host tarafından erişilen PostgreSQL ise `localhost:55432` adresindedir. Arayüzün `/api` ve `/ws` istekleri mevcut Nginx yapılandırmasıyla API'ye yönlendirilir. Docker içindeki API, Mac'teki Ollama'ya `host.docker.internal:11434` üzerinden bağlanır. `GET /health` yalnızca API'nin ayakta olduğunu; `GET /ready` ise bağımlılıkların durumunu gösterir. Tam RAG için Ollama generation modeli ve SentenceTransformer embedding modeli ayrıca hazır olmalıdır.
+
+**Host üzerinde backend geliştirme:** Depo kökünde çalışın; PostgreSQL, Redis ve Qdrant erişilebilir olmalıdır. Yerel `.env` içindeki `DATABASE_URL` **`postgresql+asyncpg://`** sürücüsünü kullanmalı ve Compose PostgreSQL'i için `localhost:55432` adresini göstermelidir (`.env.example` içindeki `5432` değeri host Compose portu değildir). API konteyneri zaten host `8000` portunu kullanıyorsa onu ve host Uvicorn'u aynı anda bu portta çalıştırmayın.
+
+```bash
+source .venv/bin/activate
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+`cd app && python main.py` veya `python app/main.py` kullanmayın: `app` bir Python paketidir ve uygulama depo kökünden Uvicorn'un `app.main:app` import yolu ile sunulur. Yanlış çağrıdaki `ModuleNotFoundError`, paket importlarını değiştirmeyi gerektirmez.
 
 ### Kayıt ve ilk platform yöneticisi
 
