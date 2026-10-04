@@ -3,13 +3,14 @@ import { Navigate, useLocation, useNavigate } from "react-router";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { Logo } from "../components/Logo";
 import { useAuth } from "../auth/AuthContext";
+import { pendingInvitation } from "../invitations/transport";
 
 export function LoginPage() {
   const { user, loading, login, error } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { returnTo?: unknown; notice?: unknown } | null;
-  const returnTo = typeof state?.returnTo === "string" && state.returnTo.startsWith("/invite/accept?token=") ? state.returnTo : "/";
+  const state = location.state as { notice?: unknown } | null;
+  const returnTo = pendingInvitation() ? "/invite/accept" : "/";
   const notice = typeof state?.notice === "string" ? state.notice : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

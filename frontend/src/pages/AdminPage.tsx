@@ -105,7 +105,7 @@ function InvitationsSection({ organizationId }: { organizationId: number }) {
     mutationFn: () => createInvitation({ email, organization_id: organizationId, workspace_id: workspaceId, role }),
     onSuccess: (result) => {
       const url = new URL("/invite/accept", window.location.origin);
-      url.searchParams.set("token", result.delivery_token);
+      url.hash = new URLSearchParams({ token: result.delivery_token }).toString();
       setLink(url.toString()); setCopyStatus(""); setEmail(""); setFormOpen(false);
       void client.invalidateQueries({ queryKey: ["admin-invitations", organizationId] });
     },
