@@ -29,7 +29,7 @@ This is the canonical reproducible benchmark. The former private 92-case robustn
 
 ### Current / next
 
-- Next milestone: conduct a controlled **Balanced Multilingual profile migration/index-activation design review** using the BGE-M3 quality/resource evidence. This milestone is design-only; it does not activate a profile or authorize reindexing. Do not automatically begin implementation.
+- The controlled **Balanced Multilingual profile migration/index-activation design review** is documented in [`balanced-multilingual-migration-v1.md`](../architecture/balanced-multilingual-migration-v1.md). It is design-only and does not activate a profile, authorize reindexing, or start implementation. Any implementation needs a separately reviewed milestone and explicit operator approval.
 - Keep BGE-M3, E5-small, and E5-base experimental, inactive, and non-selectable. Do not change production `EMBEDDING_MODEL` or `RAG_TOP_K=3` based on this benchmark.
 
 ### If a future candidate passes review
