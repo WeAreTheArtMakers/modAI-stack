@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, func
 from uuid import uuid4
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 class Base(DeclarativeBase): pass
@@ -105,10 +105,27 @@ class Document(Base):
     index_status: Mapped[str] = mapped_column(String(20), default="ready")
     index_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     active_version: Mapped[int] = mapped_column(Integer, default=1)
+    source_revision: Mapped[int] = mapped_column(
+        BigInteger,
+        default=1,
+        server_default="1",
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     user: Mapped[User] = relationship()
     versions: Mapped[list[DocumentVersion]] = relationship(back_populates="document", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_revision > 0",
+            name="ck_documents_source_revision",
+        ),
+    )
 
 class IndexJob(Base):
     __tablename__ = "index_jobs"
@@ -120,6 +137,308 @@ class IndexJob(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+class IndexGeneration(Base):
+    __tablename__ = "index_generations"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        index=True,
+    )
+    generation_number: Mapped[int] = mapped_column(Integer)
+    profile_id: Mapped[str] = mapped_column(String(100))
+    profile_version: Mapped[int] = mapped_column(Integer)
+
+    space_json: Mapped[dict] = mapped_column(JSON)
+    space_sha256: Mapped[str] = mapped_column(String(64))
+
+    materialization_json: Mapped[dict] = mapped_column(JSON)
+    materialization_sha256: Mapped[str] = mapped_column(String(64))
+
+    qdrant_collection: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(30), default="planned")
+
+    baseline_event_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+    )
+    validation_json: Mapped[dict] = mapped_column(
+        JSON,
+        default=dict,
+    )
+    retire_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "generation_number",
+            name="uq_index_generations_workspace_number",
+        ),
+        UniqueConstraint(
+            "workspace_id",
+            "id",
+            name="uq_index_generations_workspace_id",
+        ),
+        CheckConstraint(
+            "state IN ('planned','building','catching_up','validating',"
+            "'ready','failed','superseded','retired')",
+            name="ck_index_generations_state",
+        ),
+        CheckConstraint(
+            "generation_number > 0",
+            name="ck_index_generations_number_positive",
+        ),
+        CheckConstraint(
+            "profile_version > 0",
+            name="ck_index_generations_profile_version_positive",
+        ),
+        Index(
+            "ix_index_generations_workspace_state",
+            "workspace_id",
+            "state",
+        ),
+    )
+
+
+class WorkspaceRetrievalAssignment(Base):
+    __tablename__ = "workspace_retrieval_assignments"
+
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    serving_mode: Mapped[str] = mapped_column(
+        String(20),
+        default="legacy",
+    )
+    active_generation_id: Mapped[str | None] = mapped_column(
+        String(36),
+        nullable=True,
+    )
+    assignment_epoch: Mapped[int] = mapped_column(
+        BigInteger,
+        default=0,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    updated_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "active_generation_id"],
+            ["index_generations.workspace_id", "index_generations.id"],
+            name="fk_workspace_retrieval_assignment_generation",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "("
+            "serving_mode = 'legacy' AND active_generation_id IS NULL"
+            ") OR ("
+            "serving_mode = 'generation' AND active_generation_id IS NOT NULL"
+            ")",
+            name="ck_workspace_retrieval_assignment_mode",
+        ),
+        CheckConstraint(
+            "assignment_epoch >= 0",
+            name="ck_workspace_retrieval_assignment_epoch",
+        ),
+    )
+
+
+class DocumentIndexEvent(Base):
+    __tablename__ = "document_index_events"
+
+    event_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    organization_id: Mapped[int] = mapped_column(Integer)
+    workspace_id: Mapped[int] = mapped_column(Integer)
+    knowledge_base_id: Mapped[int] = mapped_column(Integer)
+
+    # Intentionally no FK to documents: tombstones must survive source deletion.
+    document_id: Mapped[int] = mapped_column(Integer)
+
+    source_revision: Mapped[int] = mapped_column(BigInteger)
+    operation: Mapped[str] = mapped_column(String(40))
+
+    document_version: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    content_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+    correlation_id: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "document_id",
+            "source_revision",
+            name="uq_document_index_events_source_revision",
+        ),
+        CheckConstraint(
+            "source_revision > 0",
+            name="ck_document_index_events_source_revision",
+        ),
+        Index(
+            "ix_document_index_events_workspace_event",
+            "workspace_id",
+            "event_id",
+        ),
+    )
+
+
+class IndexGenerationItem(Base):
+    __tablename__ = "index_generation_items"
+
+    generation_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("index_generations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    # Intentionally no FK to documents: migration state survives tombstones.
+    document_id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    source_revision: Mapped[int] = mapped_column(BigInteger)
+    document_version: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    content_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    expected_chunk_count: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    indexed_chunk_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
+
+    state: Mapped[str] = mapped_column(
+        String(30),
+        default="pending",
+        index=True,
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    error_code: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_revision > 0",
+            name="ck_index_generation_items_source_revision",
+        ),
+        CheckConstraint(
+            "indexed_chunk_count >= 0",
+            name="ck_index_generation_items_indexed_count",
+        ),
+        CheckConstraint(
+            "expected_chunk_count IS NULL OR expected_chunk_count >= 0",
+            name="ck_index_generation_items_expected_count",
+        ),
+        CheckConstraint(
+            "attempts >= 0",
+            name="ck_index_generation_items_attempts",
+        ),
+    )
+
+
+class IndexGenerationEventReceipt(Base):
+    __tablename__ = "index_generation_event_receipts"
+
+    generation_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("index_generations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    event_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "document_index_events.event_id",
+            ondelete="RESTRICT",
+        ),
+        primary_key=True,
+    )
+
+    applied_source_revision: Mapped[int] = mapped_column(BigInteger)
+    result: Mapped[str] = mapped_column(String(30))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_index_generation_event_receipts_event",
+            "event_id",
+        ),
+    )
+
+
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
     id: Mapped[int] = mapped_column(primary_key=True)
