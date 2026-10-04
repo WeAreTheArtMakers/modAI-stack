@@ -1,17 +1,22 @@
 import hashlib
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.authorization import ROLE_ORDER, authorized_workspaces
 from app.api.deps import current_user, ensure_admin
 from app.core.config import get_settings
 from app.core.security import create_token, decode_token, hash_password, verify_password
 from app.db.session import get_db
-from app.models.database import KnowledgeBase, Membership, Organization, User, Workspace
+from app.models.database import Invitation, KnowledgeBase, Membership, Organization, User, Workspace
 from app.models.schemas import (
     CurrentUserResponse,
+    InvitationAcceptRequest,
+    InvitationSetupInfo,
+    InvitationSetupRequest,
+    InvitationSetupResponse,
     LoginRequest,
     OrganizationAccess,
     RegisterRequest,
@@ -22,6 +27,10 @@ from app.models.schemas import (
 )
 from app.services.security import RefreshSessionService, RedisRateLimiter, WebSocketTicketService
 from app.services.audit import record_audit_event
+from app.services.invitations import (
+    invitation_expired, invitation_target, invitation_token_hash,
+    locked_invitation_statement, normalize_email, require_pending_invitation,
+)
 router = APIRouter(prefix="/auth", tags=["auth"])
 def tokens(user: User):
     s = get_settings()
@@ -95,7 +104,7 @@ async def register(req: RegisterRequest, request: Request, response: Response, d
     if not get_settings().allow_registration:
         raise HTTPException(403, "Registration is disabled")
     await _limit(request, "register", request.client.host if request.client else "unknown", get_settings().rate_limit_auth_per_minute, 60)
-    if await db.scalar(select(User).where(User.email == req.email)): raise HTTPException(409, "Email already registered")
+    if await db.scalar(select(User).where(func.lower(User.email) == req.email)): raise HTTPException(409, "Email already registered")
     # Platform administration and tenant membership are deliberately independent.
     user = User(email=req.email, password_hash=hash_password(req.password), role="user")
     email_suffix = hashlib.sha256(req.email.encode()).hexdigest()[:10]
@@ -112,7 +121,7 @@ async def register(req: RegisterRequest, request: Request, response: Response, d
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     await _limit(request, "login", request.client.host if request.client else "unknown", get_settings().rate_limit_auth_per_minute, 60)
-    user = await db.scalar(select(User).where(User.email == req.email))
+    user = await db.scalar(select(User).where(func.lower(User.email) == req.email))
     if not user or not verify_password(req.password, user.password_hash):
         record_audit_event(db, action="login", resource_type="session", success=False, metadata={"reason": "invalid_credentials"}, request=request)
         await db.commit()
@@ -120,6 +129,60 @@ async def login(req: LoginRequest, request: Request, response: Response, db: Asy
     record_audit_event(db, action="login", resource_type="session", actor_user_id=user.id, success=True, request=request)
     await db.commit()
     _set_refresh_cookie(response, await _issue_refresh_token(user)); return tokens(user)
+
+
+@router.post("/invitations/info", response_model=InvitationSetupInfo)
+async def invitation_info(payload: InvitationAcceptRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Reveal only the scope carried by a valid invitation token."""
+    await _limit(request, "invitation-info", request.client.host if request.client else "unknown", get_settings().rate_limit_auth_per_minute, 60)
+    invitation = await db.scalar(select(Invitation).where(Invitation.token_hash == invitation_token_hash(payload.token)))
+    if invitation is None:
+        raise HTTPException(404, "Invitation is invalid")
+    organization, workspace = await invitation_target(db, invitation)
+    email = normalize_email(invitation.email)
+    account_exists = await db.scalar(select(User.id).where(func.lower(User.email) == email)) is not None
+    state = "accepted" if invitation.accepted_at is not None else "expired" if invitation_expired(invitation) else "pending"
+    return InvitationSetupInfo(
+        status=state, email=email, organization_name=organization.name,
+        workspace_name=workspace.name if workspace else None, role=invitation.role,
+        expires_at=invitation.expires_at, account_exists=account_exists,
+    )
+
+
+@router.post("/invitations/setup", response_model=InvitationSetupResponse, status_code=201)
+async def setup_invited_account(payload: InvitationSetupRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Create only the account and tenant membership authorized by this token."""
+    await _limit(request, "invitation-setup", request.client.host if request.client else "unknown", get_settings().rate_limit_auth_per_minute, 60)
+    invitation = require_pending_invitation(
+        await db.scalar(locked_invitation_statement(invitation_token_hash(payload.token)))
+    )
+    organization, workspace = await invitation_target(db, invitation)
+    email = normalize_email(invitation.email)
+    if await db.scalar(select(User.id).where(func.lower(User.email) == email)) is not None:
+        raise HTTPException(409, "Account already exists; sign in to accept the invitation")
+    account = User(email=email, password_hash=hash_password(payload.password), role="user")
+    try:
+        db.add(account)
+        await db.flush()
+        db.add(Membership(
+            user_id=account.id, organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id, role=invitation.role,
+        ))
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(409, "Invitation account could not be created") from exc
+    invitation.accepted_at = datetime.now(timezone.utc)
+    record_audit_event(db, action="invite_account_created", resource_type="user", resource_id=account.id,
+                       organization_id=invitation.organization_id, workspace_id=invitation.workspace_id, request=request)
+    record_audit_event(db, action="invitation_accepted", resource_type="invitation", resource_id=invitation.id,
+                       actor_user_id=account.id, organization_id=invitation.organization_id,
+                       workspace_id=invitation.workspace_id, request=request)
+    await db.commit()
+    return InvitationSetupResponse(
+        email=email, organization_name=organization.name,
+        workspace_name=workspace.name if workspace else None, role=invitation.role,
+    )
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(request: Request, response: Response, refresh_token: str | None = Cookie(default=None), db: AsyncSession = Depends(get_db)):

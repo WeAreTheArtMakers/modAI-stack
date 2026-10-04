@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError
@@ -14,13 +14,16 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 # Keep this deterministic even when an operator exports a local PostgreSQL URL.
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
-from app.api.routes import admin
+from app.api.routes import admin, auth
+from app.core.security import verify_password
 from app.models.database import AuditEvent, Base, Invitation, KnowledgeBase, Membership, Organization, User, Workspace
 from app.models.schemas import (
     InvitationAcceptRequest,
     InvitationCreate,
+    InvitationSetupRequest,
     MembershipCreate,
     MembershipUpdate,
+    OrganizationCreate,
     PlatformRoleUpdate,
     WorkspaceCreate,
 )
@@ -101,6 +104,18 @@ async def test_tenant_admin_is_limited_to_its_organization_and_manager_cannot_ad
         )
     with pytest.raises(HTTPException, match="Organization administrator access denied"):
         await admin.list_memberships(organization_id=ids["org_a"], user=ids["tenant_manager"], db=db)
+
+
+@pytest.mark.asyncio
+async def test_only_platform_admin_can_seed_first_company_organization(enterprise_session):
+    db, ids = enterprise_session
+    with pytest.raises(HTTPException, match="Admin role required"):
+        await admin.create_organization(OrganizationCreate(name="New Company", slug="new-company"), user=ids["tenant_admin"], db=db)
+    created = await admin.create_organization(OrganizationCreate(name="New Company", slug="new-company"), user=ids["platform"], db=db)
+    assert created.name == "New Company" and created.member_count == 0
+    with pytest.raises(HTTPException, match="slug already exists"):
+        await admin.create_organization(OrganizationCreate(name="Duplicate", slug="new-company"), user=ids["platform"], db=db)
+    assert await db.scalar(select(AuditEvent).where(AuditEvent.action == "organization_created"))
 
 
 @pytest.mark.asyncio
@@ -293,3 +308,143 @@ async def test_database_partial_index_rejects_duplicate_organization_memberships
     with pytest.raises(IntegrityError):
         await db.flush()
     await db.rollback()
+
+
+def _invitation_request() -> Request:
+    return Request({"type": "http", "method": "POST", "path": "/auth/invitations/setup",
+                    "headers": [], "client": ("127.0.0.1", 1)})
+
+
+@pytest.mark.asyncio
+async def test_tenant_invitation_authorization_and_workspace_scope(enterprise_session):
+    db, ids = enterprise_session
+    own = await admin.create_invitation(
+        InvitationCreate(email="new@example.com", organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="manager"),
+        user=ids["tenant_admin"], db=db,
+    )
+    assert own.workspace_id == ids["workspace_a"] and own.role == "manager"
+    with pytest.raises(HTTPException, match="Organization administrator access denied"):
+        await admin.create_invitation(InvitationCreate(email="new@example.com", organization_id=ids["org_b"]), user=ids["tenant_admin"], db=db)
+    with pytest.raises(HTTPException, match="Workspace does not belong"):
+        await admin.create_invitation(InvitationCreate(email="new@example.com", organization_id=ids["org_a"], workspace_id=ids["workspace_b"]), user=ids["tenant_admin"], db=db)
+    with pytest.raises(HTTPException, match="Organization administrator access denied"):
+        await admin.create_invitation(InvitationCreate(email="new@example.com", organization_id=ids["org_a"]), user=ids["tenant_manager"], db=db)
+
+
+@pytest.mark.asyncio
+async def test_new_invitee_creates_only_company_account_and_membership_when_public_registration_is_disabled(enterprise_session, monkeypatch):
+    from types import SimpleNamespace
+
+    db, ids = enterprise_session
+    async def no_limit(*_args, **_kwargs): return None
+    monkeypatch.setattr(auth, "_limit", no_limit)
+    monkeypatch.setattr(auth, "get_settings", lambda: SimpleNamespace(allow_registration=False, rate_limit_auth_per_minute=10))
+    created = await admin.create_invitation(
+        InvitationCreate(email="NEW.PERSON@EXAMPLE.COM", organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="manager"),
+        user=ids["tenant_admin"], db=db,
+    )
+    request = _invitation_request()
+    info = await auth.invitation_info(InvitationAcceptRequest(token=created.delivery_token), request=request, db=db)
+    assert info.status == "pending" and info.email == "new.person@example.com"
+    assert info.account_exists is False and info.organization_name == "Organization A" and info.workspace_name == "Engineering"
+    result = await auth.setup_invited_account(InvitationSetupRequest(token=created.delivery_token, password="company-chosen-password"), request=request, db=db)
+    assert result.email == "new.person@example.com" and result.role == "manager"
+    account = await db.scalar(select(User).where(User.email == result.email))
+    assert account is not None and account.role == "user" and verify_password("company-chosen-password", account.password_hash)
+    assert account.password_hash != "company-chosen-password"
+    memberships = list((await db.scalars(select(Membership).where(Membership.user_id == account.id))).all())
+    assert len(memberships) == 1
+    assert (memberships[0].organization_id, memberships[0].workspace_id, memberships[0].role) == (ids["org_a"], ids["workspace_a"], "manager")
+    assert (await db.scalar(select(Organization).where(Organization.name.contains("new.person")))) is None
+    assert len(list((await db.scalars(select(Organization))).all())) == 2
+    assert len(list((await db.scalars(select(Workspace))).all())) == 2
+    assert len(list((await db.scalars(select(KnowledgeBase))).all())) == 1
+    assert (await auth.invitation_info(InvitationAcceptRequest(token=created.delivery_token), request=request, db=db)).status == "accepted"
+    with pytest.raises(HTTPException, match="already been used"):
+        await auth.setup_invited_account(InvitationSetupRequest(token=created.delivery_token, password="another-password"), request=request, db=db)
+    actions = set((await db.scalars(select(AuditEvent.action))).all())
+    assert {"invitation_created", "invite_account_created", "invitation_accepted"}.issubset(actions)
+
+
+@pytest.mark.asyncio
+async def test_new_invitee_can_receive_organization_wide_membership_without_personal_tenant(enterprise_session, monkeypatch):
+    db, ids = enterprise_session
+    async def no_limit(*_args, **_kwargs): return None
+    monkeypatch.setattr(auth, "_limit", no_limit)
+    created = await admin.create_invitation(InvitationCreate(email="org-member@example.com", organization_id=ids["org_a"], role="user"), user=ids["tenant_admin"], db=db)
+    await auth.setup_invited_account(InvitationSetupRequest(token=created.delivery_token, password="employee-password"), request=_invitation_request(), db=db)
+    account = await db.scalar(select(User).where(User.email == "org-member@example.com"))
+    memberships = list((await db.scalars(select(Membership).where(Membership.user_id == account.id))).all())
+    assert len(memberships) == 1 and memberships[0].workspace_id is None
+    assert memberships[0].organization_id == ids["org_a"] and memberships[0].role == "user"
+    assert len(list((await db.scalars(select(Organization))).all())) == 2
+
+
+@pytest.mark.asyncio
+async def test_existing_account_cannot_be_reset_by_invite_token_and_membership_role_is_preserved(enterprise_session, monkeypatch):
+    db, ids = enterprise_session
+    async def no_limit(*_args, **_kwargs): return None
+    monkeypatch.setattr(auth, "_limit", no_limit)
+    account = await db.get(User, ids["invitee_id"])
+    old_hash = account.password_hash
+    first = await admin.create_invitation(InvitationCreate(email="invitee@example.com", organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="user"), user=ids["tenant_admin"], db=db)
+    info = await auth.invitation_info(InvitationAcceptRequest(token=first.delivery_token), request=_invitation_request(), db=db)
+    assert info.account_exists is True
+    with pytest.raises(HTTPException, match="Account already exists"):
+        await auth.setup_invited_account(InvitationSetupRequest(token=first.delivery_token, password="attacker-password"), request=_invitation_request(), db=db)
+    assert (await db.get(User, account.id)).password_hash == old_hash
+    await admin.accept_invitation(InvitationAcceptRequest(token=first.delivery_token), user=ids["invitee"], db=db)
+    second = await admin.create_invitation(InvitationCreate(email="invitee@example.com", organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="admin"), user=ids["tenant_admin"], db=db)
+    await admin.accept_invitation(InvitationAcceptRequest(token=second.delivery_token), user=ids["invitee"], db=db)
+    memberships = list((await db.scalars(select(Membership).where(Membership.user_id == account.id, Membership.organization_id == ids["org_a"]))).all())
+    assert len(memberships) == 1 and memberships[0].role == "user"
+    assert (await db.get(User, account.id)).role == "user" and account.password_hash == old_hash
+
+
+@pytest.mark.asyncio
+async def test_invite_setup_invalid_revoked_and_expired_tokens(enterprise_session, monkeypatch):
+    db, ids = enterprise_session
+    async def no_limit(*_args, **_kwargs): return None
+    monkeypatch.setattr(auth, "_limit", no_limit)
+    request = _invitation_request()
+    with pytest.raises(HTTPException, match="invalid"):
+        await auth.setup_invited_account(InvitationSetupRequest(token="x" * 40, password="valid-password"), request=request, db=db)
+    expired = await admin.create_invitation(InvitationCreate(email="later@example.com", organization_id=ids["org_a"]), user=ids["tenant_admin"], db=db)
+    row = await db.get(Invitation, expired.id)
+    row.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    await db.commit()
+    assert (await auth.invitation_info(InvitationAcceptRequest(token=expired.delivery_token), request=request, db=db)).status == "expired"
+    with pytest.raises(HTTPException, match="expired"):
+        await auth.setup_invited_account(InvitationSetupRequest(token=expired.delivery_token, password="valid-password"), request=request, db=db)
+    revoked = await admin.create_invitation(InvitationCreate(email="revoked@example.com", organization_id=ids["org_a"]), user=ids["tenant_admin"], db=db)
+    await admin.revoke_invitation(revoked.id, user=ids["tenant_admin"], db=db)
+    with pytest.raises(HTTPException, match="invalid"):
+        await auth.invitation_info(InvitationAcceptRequest(token=revoked.delivery_token), request=request, db=db)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_membership_winner_cannot_be_duplicated_or_role_escalated(enterprise_session, monkeypatch):
+    db, ids = enterprise_session
+    account = await db.get(User, ids["invitee_id"])
+    winner = Membership(user_id=account.id, organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="user")
+    db.add(winner)
+    await db.commit()
+    created = await admin.create_invitation(InvitationCreate(email=account.email, organization_id=ids["org_a"], workspace_id=ids["workspace_a"], role="admin"), user=ids["tenant_admin"], db=db)
+    original_scalar = db.scalar
+    original_flush = db.flush
+    membership_checks = 0
+    async def racing_scalar(statement, *args, **kwargs):
+        nonlocal membership_checks
+        if "FROM memberships" in str(statement) and membership_checks == 0:
+            membership_checks += 1
+            return None  # The other transaction commits between check and insert.
+        return await original_scalar(statement, *args, **kwargs)
+    async def duplicate_flush(*_args, **_kwargs):
+        raise IntegrityError("INSERT memberships", {}, Exception("duplicate"))
+    monkeypatch.setattr(db, "scalar", racing_scalar)
+    monkeypatch.setattr(db, "flush", duplicate_flush)
+    await admin.accept_invitation(InvitationAcceptRequest(token=created.delivery_token), user=ids["invitee"], db=db)
+    monkeypatch.setattr(db, "scalar", original_scalar)
+    monkeypatch.setattr(db, "flush", original_flush)
+    memberships = list((await db.scalars(select(Membership).where(Membership.user_id == account.id, Membership.organization_id == ids["org_a"]))).all())
+    assert len(memberships) == 1 and memberships[0].role == "user"

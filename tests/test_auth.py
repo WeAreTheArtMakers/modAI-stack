@@ -6,12 +6,14 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from starlette.requests import Request
 from starlette.responses import Response
 from app.core.security import create_token, decode_token
 from app.api.routes import auth
 from app.models.database import Membership, User
 from app.models.schemas import LoginRequest, RegisterRequest, WebSocketTicketRequest
+from app.main import app
 
 
 def request_for(path="/auth", headers=None):
@@ -43,6 +45,17 @@ def install_refresh_sessions(monkeypatch):
 def test_token_round_trip():
     token = create_token("1", "user", "access", timedelta(minutes=1))
     assert decode_token(token)["sub"] == "1"
+
+
+def test_validation_errors_never_echo_password_or_invitation_token():
+    client = TestClient(app)
+    secret_password = "s3cr3t"
+    secret_token = "sensitive-invitation-token-not-for-response"
+    response = client.post("/auth/invitations/setup", json={"token": secret_token, "password": secret_password})
+    assert response.status_code == 422
+    assert secret_password not in response.text and secret_token not in response.text
+    assert isinstance(response.json()["detail"], list)
+    assert response.json()["detail"][0]["msg"] == "Invalid value"
 
 @pytest.mark.asyncio
 async def test_refresh_endpoint_accepts_only_refresh_tokens(monkeypatch):

@@ -173,7 +173,17 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 Geliştirme varsayılanında `ALLOW_REGISTRATION=true` ile kullanıcılar `POST /auth/register` üzerinden kaydolabilir. Yeni kullanıcıların **platform rolü `user`** olur; kendi oluşturdukları Organization için `workspace_id=NULL` olan Organization-geneli Membership rolü `admin` atanır. Bu üyelik mevcut Workspace’e erişim verir, ancak platform rolünü yükseltmez.
 
-Kurumsal üretimde `ALLOW_REGISTRATION=false` ayarlanmalıdır. Bu durumda kayıt endpoint’i `403` döndürür, mevcut kullanıcıların girişi çalışmaya devam eder. İlk platform yöneticisini public bir HTTP endpoint’i kullanmadan, uygulamanın erişebildiği güvenli terminalde oluşturun veya yükseltin:
+Kurumsal üretimde `ALLOW_REGISTRATION=false` ayarlanmalıdır. Bu durumda genel kayıt endpoint’i `403` döndürür; yönetici tarafından verilmiş geçerli davetle hesap oluşturma yine çalışır. Yönetici çalışanların kalıcı şifrelerini görmez veya belirlemez. Şifre sıfırlama bu sürümde sunulmaz; güvensiz bir yönetici sıfırlama yolu eklenmemiştir.
+
+#### İlk yerel/şirket kurulumu
+
+1. Depo kökünde `.env` dosyasını hazırlayın; mevcut dosyayı otomatik olarak üzerine yazmayın. `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` ve güçlü `JWT_SECRET` ayarlayın. Mevcut PostgreSQL volume'u varsa aynı veritabanı kimlik bilgilerini kullanın. `python -m app.tools.check_compose_env` yalnızca `SET`/`MISSING` durumlarını gösterir, değerleri yazdırmaz.
+2. `docker compose up --build -d` ile servisleri başlatın; `docker compose exec api alembic upgrade head` ile şemayı yükseltin.
+3. `docker compose exec api python -m app.tools.bootstrap_admin` komutunu etkileşimli terminalde çalıştırın. E-posta istenir; şifre `getpass` ile iki kez, ekranda gösterilmeden alınır. İlk platform admin zaten varsa komut reddeder. Komut satırına şifre yazmayın.
+4. `http://localhost:5173` adresinden giriş yapın. Platform yöneticisi Admin → Organization'lar ekranından ilk şirketi, ardından Workspaceler ekranından çalışma alanını oluşturabilir.
+5. Admin → Davetler ekranında çalışan e-postası, tenant rolü ve isteğe bağlı workspace seçerek tek kullanımlık davet bağlantısı oluşturun; bağlantıyı güvenli bir kanaldan iletin. Bağlantı `/invite/accept#token=...` biçimindedir: fragment HTTP istek URL'sine gönderilmez ve sayfa açılınca adres çubuğundan kaldırılır. Var olan hesap sahibi girişe geçerse token en fazla 15 dakika boyunca yalnızca sekmenin `sessionStorage` alanında tutulur; tamamlanma/geçersizlikte silinir. Yeni çalışan şifresini kendisi belirler ve yalnızca davet edilen Organization/Workspace üyeliğini alır. Var olan hesap sahibi önce kendi hesabıyla giriş yaparak daveti kabul eder. Ham davet bağlantısı yeniden gösterilmez.
+
+İlk kurulum için yukarıdaki komutu kullanın. Aşağıdaki eski, açıkça belirtilen yönetim araçları var olan hesapları elle yükseltmek gibi ayrı idari işlemler içindir; ilk-admin bootstrap korumasının yerine geçmez:
 
 ```bash
 # Var olan kullanıcıyı platform admin yapar.

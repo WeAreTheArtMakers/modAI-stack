@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router";
+import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginPage } from "./pages/LoginPage";
 import { SourceCard } from "./pages/ChatPage";
@@ -11,12 +11,15 @@ import { ModelsPage } from "./pages/ModelsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { InviteAcceptPage } from "./pages/InviteAcceptPage";
 import type { ModelSystemStatus, Source, UserContext } from "./types";
+import { pendingInvitation, savePendingInvitation } from "./invitations/transport";
+import { ApiError } from "./api/client";
 
-const mocks = vi.hoisted(() => ({ login: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn(), listAdminUsers: vi.fn(), updatePlatformRole: vi.fn(), acceptInvitation: vi.fn() }));
-vi.mock("./auth/AuthContext", () => ({ useAuth: () => ({ user: mocks.user, loading: false, error: null, login: mocks.login, logout: vi.fn() }) }));
+const mocks = vi.hoisted(() => ({ login: vi.fn(), logout: vi.fn(), uploadDocuments: vi.fn(), user: null as UserContext | null, getModelStatus: vi.fn(), listManagedModels: vi.fn(), deleteManagedModel: vi.fn(), streamModelPull: vi.fn(), listAdminUsers: vi.fn(), updatePlatformRole: vi.fn(), acceptInvitation: vi.fn(), inspectInvitation: vi.fn(), setupInvitedAccount: vi.fn(), listAdminOrganizations: vi.fn(), createAdminOrganization: vi.fn(), listAdminWorkspaces: vi.fn(), listInvitations: vi.fn(), createInvitation: vi.fn() }));
+vi.mock("./auth/AuthContext", () => ({ useAuth: () => ({ user: mocks.user, loading: false, error: null, login: mocks.login, logout: mocks.logout }) }));
 vi.mock("./api/documents", () => ({ uploadDocuments: mocks.uploadDocuments, reindexDocument: vi.fn(), deleteDocument: vi.fn() }));
+vi.mock("./api/auth", () => ({ inspectInvitation: mocks.inspectInvitation, setupInvitedAccount: mocks.setupInvitedAccount }));
 vi.mock("./api/models", () => ({ getModelStatus: mocks.getModelStatus, listManagedModels: mocks.listManagedModels, deleteManagedModel: mocks.deleteManagedModel }));
-vi.mock("./api/admin", () => ({ listAdminUsers: mocks.listAdminUsers, updatePlatformRole: mocks.updatePlatformRole, listAdminOrganizations: vi.fn(), listAdminWorkspaces: vi.fn(), createAdminWorkspace: vi.fn(), listMemberships: vi.fn(), createMembership: vi.fn(), updateMembership: vi.fn(), removeMembership: vi.fn(), listInvitations: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), acceptInvitation: mocks.acceptInvitation, listAuditEvents: vi.fn(), getPlatformStatus: vi.fn() }));
+vi.mock("./api/admin", () => ({ listAdminUsers: mocks.listAdminUsers, updatePlatformRole: mocks.updatePlatformRole, listAdminOrganizations: mocks.listAdminOrganizations, createAdminOrganization: mocks.createAdminOrganization, listAdminWorkspaces: mocks.listAdminWorkspaces, createAdminWorkspace: vi.fn(), listMemberships: vi.fn(), createMembership: vi.fn(), updateMembership: vi.fn(), removeMembership: vi.fn(), listInvitations: mocks.listInvitations, createInvitation: mocks.createInvitation, revokeInvitation: vi.fn(), acceptInvitation: mocks.acceptInvitation, listAuditEvents: vi.fn(), getPlatformStatus: vi.fn() }));
 vi.mock("./api/websocket", async (importOriginal) => ({ ...(await importOriginal<typeof import("./api/websocket")>()), streamModelPull: mocks.streamModelPull }));
 
 const modelStatus: ModelSystemStatus = { providers: [{ provider: "ollama", endpoint: "http://localhost:11434", ready: true }], generation: { provider: "ollama", configured_model: "llama3.2:3b", ready: true, running: true }, embedding: { configured_model: "sentence-transformers/all-MiniLM-L6-v2", source: "huggingface_cache", download_allowed: false, cache_available: false, ready: false, status: "unavailable" } };
@@ -26,7 +29,7 @@ function renderModels() { const client = new QueryClient({ defaultOptions: { que
 function renderAdmin(section: "users" | "organizations" | "workspaces" | "memberships" | "invitations" | "audit" | "platform") { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><AdminPage section={section} /></QueryClientProvider>); }
 
 describe("Web Console critical UI", () => {
-  beforeEach(() => { vi.clearAllMocks(); mocks.user = null; });
+  beforeEach(() => { vi.clearAllMocks(); mocks.user = null; sessionStorage.clear(); window.history.replaceState(null, "", "/"); });
 
   it("renders and submits the login form", async () => {
     mocks.login.mockResolvedValue(undefined);
@@ -155,13 +158,128 @@ describe("Web Console critical UI", () => {
     await waitFor(() => expect(mocks.updatePlatformRole).toHaveBeenCalledWith(8, "admin"));
   });
 
-  it("accepts an invitation only through the authenticated acceptance view", async () => {
+  it("lets only a platform admin seed the first organization", async () => {
+    mocks.user = admin;
+    mocks.listAdminOrganizations.mockResolvedValue([]);
+    mocks.createAdminOrganization.mockResolvedValue({ id: 1, name: "Company", slug: "company", workspace_count: 0, member_count: 0, knowledge_base_count: 0, document_count: 0 });
+    const user = userEvent.setup();
+    renderAdmin("organizations");
+    await user.click(await screen.findByRole("button", { name: "Yeni organization" }));
+    await user.type(screen.getByLabelText("Organization adı"), "Company");
+    await user.type(screen.getByLabelText("Organization slug"), "company");
+    await user.click(screen.getByRole("button", { name: "Oluştur" }));
+    await waitFor(() => expect(mocks.createAdminOrganization).toHaveBeenCalledWith({ name: "Company", slug: "company" }));
+  });
+
+  it("shows an existing-account invitation and accepts only through the signed-in matching account", async () => {
     mocks.user = member;
+    mocks.inspectInvitation.mockResolvedValue({ status: "pending", email: "member@example.com", organization_name: "Tenant", workspace_name: "Workspace", role: "user", expires_at: "2030-01-01T00:00:00Z", account_exists: true });
     mocks.acceptInvitation.mockResolvedValue({ id: 1, email: "member@example.com" });
     const user = userEvent.setup();
-    render(<MemoryRouter initialEntries={["/invite/accept?token=single-use-token-that-is-long-enough"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
-    await user.click(screen.getByRole("button", { name: "Daveti kabul et" }));
+    window.history.replaceState(null, "", "/invite/accept#token=single-use-token-that-is-long-enough");
+    render(<BrowserRouter><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></BrowserRouter>);
+    expect(window.location.hash).toBe("");
+    expect(window.location.search).toBe("");
+    await user.click(await screen.findByRole("button", { name: "Daveti kabul et" }));
     await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith("single-use-token-that-is-long-enough"));
-    expect(await screen.findByText("Davet kabul edildi")).toBeInTheDocument();
+    expect(await screen.findByText(/Davet kabul edildi/)).toBeInTheDocument();
+  });
+
+  it("lets a new invited employee choose and confirm a password without login", async () => {
+    mocks.inspectInvitation.mockResolvedValue({ status: "pending", email: "new@example.com", organization_name: "Company", workspace_name: "Engineering", role: "manager", expires_at: "2030-01-01T00:00:00Z", account_exists: false });
+    mocks.setupInvitedAccount.mockResolvedValue({ email: "new@example.com" });
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={["/invite/accept#token=single-use-token-that-is-long-enough"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
+    expect(await screen.findByText("Company")).toBeInTheDocument();
+    expect(screen.getByText("Engineering")).toBeInTheDocument();
+    savePendingInvitation("single-use-token-that-is-long-enough");
+    await user.type(screen.getByLabelText("Yeni şifre"), "employee-chosen-password");
+    await user.type(screen.getByLabelText("Şifreyi doğrula"), "employee-chosen-password");
+    await user.click(screen.getByRole("button", { name: "Hesap oluştur ve katıl" }));
+    await waitFor(() => expect(mocks.setupInvitedAccount).toHaveBeenCalledWith("single-use-token-that-is-long-enough", "employee-chosen-password"));
+    await waitFor(() => expect(pendingInvitation()).toBeNull());
+  });
+
+  it("keeps an existing-account invite only in sessionStorage during login and clears it after acceptance", async () => {
+    const token = "single-use-token-that-is-long-enough";
+    mocks.inspectInvitation.mockResolvedValue({ status: "pending", email: "member@example.com", organization_name: "Tenant", workspace_name: null, role: "user", expires_at: "2030-01-01T00:00:00Z", account_exists: true });
+    mocks.login.mockImplementation(async () => { mocks.user = member; });
+    mocks.acceptInvitation.mockResolvedValue({ id: 1, email: "member@example.com" });
+    window.history.replaceState(null, "", `/invite/accept#token=${token}`);
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={[`/invite/accept#token=${token}`]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Routes><Route path="/invite/accept" element={<InviteAcceptPage />} /><Route path="/login" element={<LoginPage />} /></Routes></QueryClientProvider></MemoryRouter>);
+    await user.click(await screen.findByRole("link", { name: "Giriş yap" }));
+    expect(pendingInvitation()).toBe(token);
+    expect(window.location.hash).toBe("");
+    expect(window.location.search).toBe("");
+    const localValues = Array.from({ length: localStorage.length }, (_, index) => localStorage.getItem(localStorage.key(index) ?? ""));
+    expect(localValues.join("")).not.toContain(token);
+    await user.type(screen.getByLabelText("E-posta"), "member@example.com");
+    await user.type(screen.getByLabelText("Şifre"), "account-password");
+    await user.click(screen.getByRole("button", { name: /console'a gir/i }));
+    await user.click(await screen.findByRole("button", { name: "Daveti kabul et" }));
+    await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith(token));
+    await waitFor(() => expect(pendingInvitation()).toBeNull());
+  });
+
+  it("clears an invalid or revoked pending invitation without replaying its token", async () => {
+    const token = "single-use-token-that-is-long-enough";
+    savePendingInvitation(token);
+    mocks.inspectInvitation.mockRejectedValue(new ApiError(404, "Invitation is invalid"));
+    render(<MemoryRouter initialEntries={["/invite/accept"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
+    expect(await screen.findByText(/Davet geçersiz veya iptal edilmiş/)).toBeInTheDocument();
+    await waitFor(() => expect(pendingInvitation()).toBeNull());
+  });
+
+  it("does not accept legacy query-string invitation credentials", () => {
+    const token = "single-use-token-that-is-long-enough";
+    window.history.replaceState(null, "", `/invite/accept?token=${token}`);
+    render(<MemoryRouter initialEntries={[`/invite/accept?token=${token}`]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
+    expect(screen.getByText("Geçerli bir davet bağlantısı gerekli.")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+    expect(mocks.inspectInvitation).not.toHaveBeenCalled();
+  });
+
+  it("requires an existing session to sign out before creating a different invited account", async () => {
+    mocks.user = member;
+    mocks.inspectInvitation.mockResolvedValue({ status: "pending", email: "new@example.com", organization_name: "Company", workspace_name: null, role: "user", expires_at: "2030-01-01T00:00:00Z", account_exists: false });
+    const user = userEvent.setup();
+    render(<MemoryRouter initialEntries={["/invite/accept#token=single-use-token-that-is-long-enough"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
+    await screen.findByText("Company");
+    expect(screen.queryByLabelText("Yeni şifre")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Mevcut hesaptan çık" }));
+    expect(mocks.logout).toHaveBeenCalledOnce();
+    expect(mocks.setupInvitedAccount).not.toHaveBeenCalled();
+  });
+
+  it.each(["expired", "accepted"] as const)("shows the %s invitation state without a password form", async (status) => {
+    mocks.inspectInvitation.mockResolvedValue({ status, email: "new@example.com", organization_name: "Company", workspace_name: null, role: "user", expires_at: "2020-01-01T00:00:00Z", account_exists: false });
+    savePendingInvitation("single-use-token-that-is-long-enough");
+    render(<MemoryRouter initialEntries={["/invite/accept"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><InviteAcceptPage /></QueryClientProvider></MemoryRouter>);
+    expect(await screen.findByText(status === "expired" ? /süresi dolmuş/ : /daha önce kabul edilmiş/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Yeni şifre")).not.toBeInTheDocument();
+    await waitFor(() => expect(pendingInvitation()).toBeNull());
+  });
+
+  it("constructs and copies a scoped one-time invitation link on the admin screen", async () => {
+    mocks.user = member;
+    mocks.listAdminOrganizations.mockResolvedValue([{ id: 1, name: "Tenant", slug: "tenant", workspace_count: 1, member_count: 1, knowledge_base_count: 0, document_count: 0 }]);
+    mocks.listAdminWorkspaces.mockResolvedValue([{ id: 7, organization_id: 1, name: "Engineering", slug: "engineering" }]);
+    mocks.listInvitations.mockResolvedValue([]);
+    mocks.createInvitation.mockResolvedValue({ id: 9, email: "new@example.com", organization_id: 1, workspace_id: 7, role: "manager", expires_at: "2030-01-01T00:00:00Z", accepted_at: null, created_by_user_id: 2, created_at: null, delivery_token: "only-shown-once" });
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    renderAdmin("invitations");
+    await user.click(await screen.findByRole("button", { name: "Yeni kullanıcı davet et" }));
+    await user.type(screen.getByLabelText("Davet e-postası"), "new@example.com");
+    await user.selectOptions(screen.getByLabelText("Tenant rolü"), "manager");
+    await user.selectOptions(screen.getByLabelText("Davet workspace kapsamı"), "7");
+    await user.click(screen.getByRole("button", { name: "Davet bağlantısı oluştur" }));
+    await waitFor(() => expect(mocks.createInvitation).toHaveBeenCalledWith({ email: "new@example.com", organization_id: 1, workspace_id: 7, role: "manager" }));
+    await user.click(await screen.findByRole("button", { name: "Davet bağlantısını kopyala" }));
+    const link = `${window.location.origin}/invite/accept#token=only-shown-once`;
+    expect(writeText).toHaveBeenCalledWith(link);
+    expect(link).not.toContain("?token=");
   });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { onAuthFailure, request, tokenStore } from "./client";
+import { normalizeErrorDetail, onAuthFailure, request, tokenStore } from "./client";
 
 describe("API session refresh", () => {
   beforeEach(() => {
@@ -32,5 +32,13 @@ describe("API session refresh", () => {
     expect(tokenStore.refresh).toBeNull();
     expect(onFailure).toHaveBeenCalledTimes(1);
     unsubscribe();
+  });
+
+  it("renders FastAPI validation arrays as readable messages, never object coercion", async () => {
+    const detail = [{ loc: ["body", "password"], msg: "Şifre en az 8 karakter olmalı", type: "string_too_short" }];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ detail }), { status: 422 }));
+    await expect(request("/auth/invitations/setup", { method: "POST", body: "{}" }, false)).rejects.toThrow("Şifre en az 8 karakter olmalı");
+    expect(normalizeErrorDetail({ unexpected: "object" })).toBeUndefined();
+    expect(normalizeErrorDetail(detail)).not.toContain("[object Object]");
   });
 });

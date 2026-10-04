@@ -10,6 +10,7 @@ export function updatePlatformRole(id: number, role: "admin" | "user"): Promise<
 }
 
 export function listAdminOrganizations(): Promise<AdminOrganization[]> { return request<AdminOrganization[]>("/admin/organizations"); }
+export function createAdminOrganization(payload: { name: string; slug: string }): Promise<AdminOrganization> { return request<AdminOrganization>("/admin/organizations", { method: "POST", body: JSON.stringify(payload) }); }
 export function listAdminWorkspaces(organizationId?: number): Promise<AdminWorkspace[]> { return request<AdminWorkspace[]>(`/admin/workspaces${organizationId ? `?organization_id=${organizationId}` : ""}`); }
 export function createAdminWorkspace(payload: { organization_id: number; name: string; slug: string }): Promise<AdminWorkspace> { return request<AdminWorkspace>("/admin/workspaces", { method: "POST", body: JSON.stringify(payload) }); }
 export function updateAdminWorkspace(id: number, payload: { name?: string; slug?: string }): Promise<AdminWorkspace> { return request<AdminWorkspace>(`/admin/workspaces/${id}`, { method: "PATCH", body: JSON.stringify(payload) }); }

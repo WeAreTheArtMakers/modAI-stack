@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, CheckCircle2, ClipboardList, KeyRound, ShieldAlert } from "lucide-react";
-import { createAdminWorkspace, createInvitation, createMembership, getPlatformStatus, listAdminOrganizations, listAdminUsers, listAdminWorkspaces, listAuditEvents, listInvitations, listMemberships, removeMembership, revokeInvitation, updateMembership, updatePlatformRole } from "../api/admin";
+import { createAdminOrganization, createAdminWorkspace, createInvitation, createMembership, getPlatformStatus, listAdminOrganizations, listAdminUsers, listAdminWorkspaces, listAuditEvents, listInvitations, listMemberships, removeMembership, revokeInvitation, updateMembership, updatePlatformRole } from "../api/admin";
 import { getErrorMessage } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "../components/State";
@@ -26,6 +26,7 @@ function roleSelect(value: Role, onChange: (role: Role) => void, disabled = fals
 
 function TenantPicker({ value, onChange }: { value: number | undefined; onChange: (id: number) => void }) {
   const organizations = useQuery({ queryKey: ["admin-organizations"], queryFn: listAdminOrganizations });
+  useEffect(() => { if (value === undefined && organizations.data?.length) onChange(organizations.data[0].id); }, [value, organizations.data, onChange]);
   if (organizations.isLoading) return <LoadingState label="Organization'lar yükleniyor" />;
   if (organizations.error) return <ErrorState error={organizations.error} />;
   if (!organizations.data?.length) return <EmptyState icon={<Building2 size={22} />} title="Yönetilebilir organization yok" description="Bu alan yalnızca platform yöneticileri ve ilgili tenant yöneticileri içindir." />;
@@ -57,9 +58,18 @@ function UsersSection() {
 }
 
 function OrganizationsSection() {
+  const { user } = useAuth();
+  const client = useQueryClient();
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
   const query = useQuery({ queryKey: ["admin-organizations"], queryFn: listAdminOrganizations });
+  const create = useMutation({ mutationFn: () => createAdminOrganization({ name, slug }), onSuccess: () => { setName(""); setSlug(""); setFormOpen(false); void client.invalidateQueries({ queryKey: ["admin-organizations"] }); } });
   if (query.isLoading) return <LoadingState />; if (query.error) return <ErrorState error={query.error} />;
-  return query.data?.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{query.data.map((organization) => <article className="panel p-5" key={organization.id}><div className="flex items-center gap-3"><span className="rounded-xl bg-cyan/10 p-2.5 text-cyan"><Building2 size={19} /></span><div><h2 className="font-bold">{organization.name}</h2><p className="text-xs text-slate-500">/{organization.slug}</p></div></div><dl className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500">Workspace</dt><dd className="mt-1 font-bold">{organization.workspace_count}</dd></div><div><dt className="text-slate-500">Üye</dt><dd className="mt-1 font-bold">{organization.member_count}</dd></div><div><dt className="text-slate-500">Knowledge Base</dt><dd className="mt-1 font-bold">{organization.knowledge_base_count}</dd></div><div><dt className="text-slate-500">Belge</dt><dd className="mt-1 font-bold">{organization.document_count}</dd></div></dl></article>)}</div> : <EmptyState icon={<Building2 size={22} />} title="Organization bulunamadı" description="Erişebildiğiniz organization'lar burada görünür." />;
+  return <>
+    {user?.role === "admin" && <><button className="button-primary mb-5" onClick={() => setFormOpen(!formOpen)}>Yeni organization</button>{formOpen && <form className="panel mb-5 flex flex-wrap gap-3 p-5" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}><input aria-label="Organization adı" className="field max-w-sm" value={name} onChange={(event) => setName(event.target.value)} required placeholder="Şirket adı" /><input aria-label="Organization slug" className="field max-w-sm" value={slug} onChange={(event) => setSlug(event.target.value)} required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="sirket-slug" /><button className="button-primary" disabled={create.isPending}>Oluştur</button>{create.error && <p className="w-full text-sm text-red-700">{getErrorMessage(create.error)}</p>}</form>}</>}
+    {query.data?.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{query.data.map((organization) => <article className="panel p-5" key={organization.id}><div className="flex items-center gap-3"><span className="rounded-xl bg-cyan/10 p-2.5 text-cyan"><Building2 size={19} /></span><div><h2 className="font-bold">{organization.name}</h2><p className="text-xs text-slate-500">/{organization.slug}</p></div></div><dl className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500">Workspace</dt><dd className="mt-1 font-bold">{organization.workspace_count}</dd></div><div><dt className="text-slate-500">Üye</dt><dd className="mt-1 font-bold">{organization.member_count}</dd></div><div><dt className="text-slate-500">Knowledge Base</dt><dd className="mt-1 font-bold">{organization.knowledge_base_count}</dd></div><div><dt className="text-slate-500">Belge</dt><dd className="mt-1 font-bold">{organization.document_count}</dd></div></dl></article>)}</div> : <EmptyState icon={<Building2 size={22} />} title="Organization bulunamadı" description="Erişebildiğiniz organization'lar burada görünür." />}
+  </>;
 }
 
 function WorkspacesSection({ organizationId }: { organizationId: number }) {
@@ -81,12 +91,41 @@ function MembershipsSection({ organizationId }: { organizationId: number }) {
 }
 
 function InvitationsSection({ organizationId }: { organizationId: number }) {
-  const client = useQueryClient(); const [email, setEmail] = useState(""); const [role, setRole] = useState<Role>("user"); const [token, setToken] = useState<string | null>(null); const [formOpen, setFormOpen] = useState(false);
+  const client = useQueryClient();
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<Role>("user");
+  const [workspaceId, setWorkspaceId] = useState<number | undefined>();
+  const [link, setLink] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  useEffect(() => { setWorkspaceId(undefined); setLink(null); }, [organizationId]);
   const query = useQuery({ queryKey: ["admin-invitations", organizationId], queryFn: () => listInvitations(organizationId) });
-  const create = useMutation({ mutationFn: () => createInvitation({ email, organization_id: organizationId, role }), onSuccess: (result) => { setToken(result.delivery_token); setEmail(""); setFormOpen(false); void client.invalidateQueries({ queryKey: ["admin-invitations", organizationId] }); } });
+  const workspaces = useQuery({ queryKey: ["admin-workspaces", organizationId], queryFn: () => listAdminWorkspaces(organizationId) });
+  const create = useMutation({
+    mutationFn: () => createInvitation({ email, organization_id: organizationId, workspace_id: workspaceId, role }),
+    onSuccess: (result) => {
+      const url = new URL("/invite/accept", window.location.origin);
+      url.hash = new URLSearchParams({ token: result.delivery_token }).toString();
+      setLink(url.toString()); setCopyStatus(""); setEmail(""); setFormOpen(false);
+      void client.invalidateQueries({ queryKey: ["admin-invitations", organizationId] });
+    },
+  });
   const revoke = useMutation({ mutationFn: revokeInvitation, onSuccess: () => void client.invalidateQueries({ queryKey: ["admin-invitations", organizationId] }) });
-  if (query.isLoading) return <LoadingState />; if (query.error) return <ErrorState error={query.error} />;
-  return <><button className="button-primary mb-5" onClick={() => setFormOpen(!formOpen)}>Davet oluştur</button>{formOpen && <form className="panel mb-5 flex flex-wrap gap-3 p-5" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}><input aria-label="Davet e-postası" type="email" className="field max-w-sm" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="person@example.com" required />{roleSelect(role, setRole)}<button className="button-primary" disabled={create.isPending}>Bağlantı oluştur</button>{create.error && <p className="w-full text-sm text-red-600">{getErrorMessage(create.error)}</p>}</form>}{token && <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950"><div className="flex gap-3"><KeyRound className="shrink-0" size={18} /><div><p className="font-bold">Davet anahtarını şimdi iletin</p><p className="mt-1 text-amber-800">Bu değer yeniden gösterilmez ve sunucuda ham haliyle saklanmaz.</p><code className="mt-3 block break-all rounded-lg bg-white p-3 text-xs">{token}</code></div></div></div>}<div className="panel overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-cloud text-xs uppercase text-slate-500"><tr><th className="p-4">E-posta</th><th className="p-4">Rol</th><th className="p-4">Bitiş</th><th className="p-4">Durum</th><th className="p-4" /></tr></thead><tbody>{query.data?.map((invitation) => <tr key={invitation.id} className="border-t border-slate-100"><td className="p-4 font-medium">{invitation.email}</td><td className="p-4">{invitation.role}</td><td className="p-4 text-slate-500">{new Date(invitation.expires_at).toLocaleString("tr-TR")}</td><td className="p-4">{invitation.accepted_at ? <span className="text-emerald-700">Kabul edildi</span> : <span className="text-amber-700">Bekliyor</span>}</td><td className="p-4">{!invitation.accepted_at && <button className="button-secondary py-2 text-red-700" onClick={() => { if (window.confirm("Davet iptal edilsin mi?")) revoke.mutate(invitation.id); }}>İptal</button>}</td></tr>)}</tbody></table></div>{revoke.error && <p className="mt-3 text-sm text-red-600">{getErrorMessage(revoke.error)}</p>}</>;
+  if (query.isLoading || workspaces.isLoading) return <LoadingState />;
+  if (query.error || workspaces.error) return <ErrorState error={query.error ?? workspaces.error} />;
+  return <>
+    <button className="button-primary mb-5" onClick={() => setFormOpen(!formOpen)}>Yeni kullanıcı davet et</button>
+    {formOpen && <form className="panel mb-5 flex flex-wrap gap-3 p-5" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
+      <input aria-label="Davet e-postası" type="email" className="field max-w-sm" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="person@example.com" required />
+      {roleSelect(role, setRole)}
+      <select aria-label="Davet workspace kapsamı" className="field max-w-xs" value={workspaceId ?? ""} onChange={(event) => setWorkspaceId(event.target.value ? Number(event.target.value) : undefined)}><option value="">Tüm organization</option>{workspaces.data?.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>
+      <button className="button-primary" disabled={create.isPending}>Davet bağlantısı oluştur</button>
+      {create.error && <p className="w-full text-sm text-red-600">{getErrorMessage(create.error)}</p>}
+    </form>}
+    {link && <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950"><div className="flex gap-3"><KeyRound className="shrink-0" size={18} /><div className="min-w-0"><p className="font-bold">Davet bağlantısını güvenle iletin</p><p className="mt-1 text-amber-800">Bağlantı yalnızca şimdi gösterilir; sunucu ham token saklamaz.</p><code className="mt-3 block break-all rounded-lg bg-white p-3 text-xs">{link}</code><button className="button-secondary mt-3" onClick={() => { if (!navigator.clipboard?.writeText) { setCopyStatus("Kopyalama kullanılamıyor; bağlantıyı elle kopyalayın."); return; } void navigator.clipboard.writeText(link).then(() => setCopyStatus("Bağlantı kopyalandı.")).catch(() => setCopyStatus("Kopyalama kullanılamıyor; bağlantıyı elle kopyalayın.")); }}>Davet bağlantısını kopyala</button>{copyStatus && <p role="status" className="mt-2">{copyStatus}</p>}</div></div></div>}
+    <div className="panel overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-cloud text-xs uppercase text-slate-500"><tr><th className="p-4">E-posta</th><th className="p-4">Rol / kapsam</th><th className="p-4">Bitiş</th><th className="p-4">Durum</th><th className="p-4" /></tr></thead><tbody>{query.data?.map((invitation) => <tr key={invitation.id} className="border-t border-slate-100"><td className="p-4 font-medium">{invitation.email}</td><td className="p-4">{invitation.role} · {invitation.workspace_id ? `Workspace #${invitation.workspace_id}` : "Organization"}</td><td className="p-4 text-slate-500">{new Date(invitation.expires_at).toLocaleString("tr-TR")}</td><td className="p-4">{invitation.accepted_at ? <span className="text-emerald-700">Kabul edildi</span> : new Date(invitation.expires_at).getTime() <= Date.now() ? <span className="text-amber-700">Süresi doldu</span> : <span className="text-amber-700">Bekliyor</span>}</td><td className="p-4">{!invitation.accepted_at && <button className="button-secondary py-2 text-red-700" onClick={() => { if (window.confirm("Davet iptal edilsin mi?")) revoke.mutate(invitation.id); }}>İptal</button>}</td></tr>)}</tbody></table></div>
+    {revoke.error && <p className="mt-3 text-sm text-red-600">{getErrorMessage(revoke.error)}</p>}
+  </>;
 }
 
 function AuditSection() {

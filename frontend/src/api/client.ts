@@ -52,6 +52,16 @@ function readableError(status: number, detail?: string): string {
   return messages[status] ?? "İstek tamamlanamadı.";
 }
 
+export function normalizeErrorDetail(detail: unknown): string | undefined {
+  if (typeof detail === "string") return detail.trim().slice(0, 500) || undefined;
+  if (!Array.isArray(detail)) return undefined;
+  const messages = detail.slice(0, 5).flatMap((item: unknown) => {
+    if (typeof item !== "object" || item === null || !("msg" in item) || typeof item.msg !== "string") return [];
+    return [item.msg.trim().slice(0, 200)];
+  }).filter(Boolean);
+  return messages.length ? messages.join("; ") : undefined;
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   const response = await fetch(`${API_PREFIX}/auth/refresh`, {
     method: "POST",
@@ -85,8 +95,9 @@ export async function request<T>(
   if (!response.ok) {
     let detail: string | undefined;
     try {
-      const body = (await response.json()) as { detail?: string };
-      detail = body.detail;
+      const body: unknown = await response.json();
+      detail = body && typeof body === "object" && "detail" in body
+        ? normalizeErrorDetail(body.detail) : undefined;
     } catch {
       // The response may not contain JSON.
     }

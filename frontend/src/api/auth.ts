@@ -1,9 +1,31 @@
-import type { UserContext } from "../types";
+import type { Role, UserContext } from "../types";
 import { request, tokenStore } from "./client";
 
 export interface LoginResponse {
   access_token: string;
   token_type: string;
+}
+
+export interface InvitationSetupInfo {
+  status: "pending" | "accepted" | "expired";
+  email: string;
+  organization_name: string;
+  workspace_name: string | null;
+  role: Role;
+  expires_at: string;
+  account_exists: boolean;
+}
+
+export function inspectInvitation(token: string): Promise<InvitationSetupInfo> {
+  return request<InvitationSetupInfo>("/auth/invitations/info", {
+    method: "POST", body: JSON.stringify({ token }),
+  }, false);
+}
+
+export function setupInvitedAccount(token: string, password: string): Promise<{ email: string }> {
+  return request<{ email: string }>("/auth/invitations/setup", {
+    method: "POST", body: JSON.stringify({ token, password }),
+  }, false);
 }
 
 export async function login(email: string, password: string): Promise<UserContext> {
