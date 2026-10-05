@@ -1,90 +1,140 @@
-Business Source License 1.1
+WATAM SOURCE-AVAILABLE LICENSE
+Version 1.0
 
-Parameters
+Copyright © 2026 We Are The Art Makers.
+All rights reserved.
 
-Licensor: We Are The Art Makers
+This license governs modAI-stack and the source code, documentation,
+configuration, and related materials distributed with it ("Software").
 
-Licensed Work: modAI-stack
+1. OWNERSHIP
 
-Copyright: © 2026 We Are The Art Makers. All rights reserved.
+The Software is proprietary intellectual property of We Are The Art Makers
+("WATAM").
 
-Additional Use Grant: None
+All right, title, and interest in the Software, including source code,
+architecture, documentation, designs, trademarks, and derivative works
+created by WATAM, remain with WATAM.
 
-Change Date: Four years from the date each specific version of the Licensed Work
-is first publicly distributed under this License.
+Public availability of the source code does not transfer ownership and does
+not place the Software in the public domain.
 
-Change License: Apache License, Version 2.0
+No rights are granted except those expressly stated in this License.
 
----
+2. LIMITED EVALUATION RIGHTS
 
-Business Source License 1.1
+Subject to this License, you may:
 
-License text copyright © 2017 MariaDB Corporation Ab, All Rights Reserved.
-"Business Source License" is a trademark of MariaDB Corporation Ab.
+- View and inspect the publicly available source code.
+- Clone or download the Software solely for internal technical, security,
+  compatibility, or purchase evaluation.
+- Run the Software in a non-production environment solely for evaluation.
+- Make private modifications solely for evaluation or for preparing a
+  contribution to the official modAI-stack project.
+- Create a GitHub fork solely for evaluation or contribution purposes,
+  provided that this License and all copyright notices remain intact.
 
-Terms
+These rights do not include production or commercial use.
 
-The Licensor hereby grants you the right to copy, modify, create derivative
-works, redistribute, and make non-production use of the Licensed Work. The
-Licensor may make an Additional Use Grant, above, permitting limited
-production use.
+3. PROHIBITED USE WITHOUT A COMMERCIAL LICENSE
 
-Effective on the Change Date, or the fourth anniversary of the first publicly
-available distribution of a specific version of the Licensed Work under this
-License, whichever comes first, the Licensor hereby grants you rights under
-the terms of the Change License, and the rights granted in the paragraph
-above terminate.
+Unless WATAM has granted you a separate written commercial license, you may not:
 
-If your use of the Licensed Work does not comply with the requirements
-currently in effect as described in this License, you must purchase a
-commercial license from the Licensor, its affiliated entities, or authorized
-resellers, or you must refrain from using the Licensed Work.
+- Use the Software in production.
+- Use the Software for normal business operations beyond evaluation.
+- Use the Software to provide services to customers or third parties.
+- Offer the Software as SaaS, hosted software, managed service, or service bureau.
+- Sell, rent, lease, sublicense, or commercially exploit the Software.
+- Redistribute the Software or a modified version as another product.
+- Publish or distribute derivative products based substantially on the Software.
+- Remove or alter copyright, ownership, licensing, or attribution notices.
+- Grant third parties access to the Software as part of a commercial offering.
+- Use proprietary WATAM Enterprise modules except under a separate written agreement.
 
-All copies of the original and modified Licensed Work, and derivative works
-of the Licensed Work, are subject to this License. This License applies
-separately for each version of the Licensed Work and the Change Date may vary
-for each version of the Licensed Work released by Licensor.
+4. COMMERCIAL AND PRODUCTION USE
 
-You must conspicuously display this License on each original or modified copy
-of the Licensed Work. If you receive the Licensed Work in original or
-modified form from a third party, the terms and conditions set forth in this
-License apply to your use of that work.
+Production use and commercial use require a separate written commercial
+license agreement issued or approved by WATAM.
 
-Any use of the Licensed Work in violation of this License will automatically
-terminate your rights under this License for the current and all other
-versions of the Licensed Work.
+Commercial licenses may define, among other things:
 
-This License does not grant you any right in any trademark or logo of
-Licensor or its affiliates (provided that you may use a trademark or logo of
-Licensor as expressly required by this License).
+- Customer organization
+- Subscription term
+- Permitted environments
+- Number of users
+- Deployment scope
+- Pilot, Business, or Enterprise rights
+- Support level
+- Enterprise modules
+- Integrations
+- Fees
+- Renewal terms
+- Additional customer-specific rights or restrictions
 
-TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON
-AN “AS IS” BASIS. LICENSOR HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS,
-EXPRESS OR IMPLIED, INCLUDING (WITHOUT LIMITATION) WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND
-TITLE.
+Payment of a fee alone does not transfer ownership of the Software.
 
-MariaDB hereby grants you permission to use this License’s text to license
-your works, and to refer to it using the trademark “Business Source License”,
-as long as you comply with the Covenants of Licensor below.
+A commercial customer receives only the rights expressly granted in the
+applicable written commercial agreement.
 
-Covenants of Licensor
+5. NO TRANSFER OF INTELLECTUAL PROPERTY
 
-In consideration of the right to use this License’s text and the “Business
-Source License” name and trademark, Licensor covenants to MariaDB, and to all
-other recipients of the licensed work to be provided by Licensor:
+No license, subscription, pilot, installation, deployment, or commercial
+agreement transfers ownership of modAI-stack unless WATAM expressly agrees
+to such a transfer in a separate written instrument.
 
-1. To specify as the Change License the GPL Version 2.0 or any later version,
-   or a license that is compatible with GPL Version 2.0 or a later version,
-   where “compatible” means that software provided under the Change License can
-   be included in a program with software provided under GPL Version 2.0 or a
-   later version. Licensor may specify additional Change Licenses without
-   limitation.
+Customer data and customer-provided documents remain subject to the rights
+agreed with the customer and are not made WATAM property merely by use of
+the Software.
 
-2. To either: (a) specify an additional grant of rights to use that does not
-   impose any additional restriction on the right granted in this License, as
-   the Additional Use Grant; or (b) insert the text “None”.
+6. THIRD-PARTY SOFTWARE
 
-3. To specify a Change Date.
+Third-party libraries, models, tools, and other components remain subject to
+their respective licenses and terms.
 
-4. Not to modify this License in any other way.
+This License applies only to intellectual property for which WATAM has the
+right to grant these terms.
+
+7. TRADEMARKS
+
+This License does not grant permission to use the names, logos, trademarks,
+or branding of We Are The Art Makers or modAI-stack except as necessary to
+identify the Software.
+
+8. TERMINATION
+
+Any rights granted under this License automatically terminate if you violate
+its terms.
+
+Upon termination, you must stop all use not independently authorized by an
+applicable written commercial agreement.
+
+9. NO WARRANTY
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SOFTWARE IS PROVIDED "AS IS"
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EXPRESS OR IMPLIED.
+
+WATAM DISCLAIMS, TO THE MAXIMUM EXTENT PERMITTED BY LAW, WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NON-INFRINGEMENT.
+
+10. COMMERCIAL AGREEMENTS
+
+If WATAM and a customer enter into a separately executed commercial software
+license agreement, order form, pilot agreement, or enterprise agreement,
+that agreement governs the customer's licensed commercial use.
+
+Where such an agreement conflicts with this public License, the separately
+executed agreement controls for that customer and that licensed use.
+
+11. NO AUTOMATIC OPEN-SOURCE CONVERSION
+
+The Software does not automatically convert to an open-source license after
+any period of time.
+
+Any future change to the licensing of a new Software version must be expressly
+published by WATAM.
+
+Commercial licensing:
+https://wearetheartmakers.github.io/modAI-stack/
+
+© 2026 We Are The Art Makers. All rights reserved.

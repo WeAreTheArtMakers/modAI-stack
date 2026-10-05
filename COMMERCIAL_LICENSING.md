@@ -6,11 +6,12 @@
 > applicable written commercial agreement with We Are The Art Makers.
 
 
-modAI-stack is publicly available under the Business Source License 1.1.
+modAI-stack is proprietary source-available software distributed under the WATAM Source-Available License.
 
-The public source license permits the uses described in the LICENSE file.
-Production use that is not permitted by the Business Source License requires
-a separate commercial license from We Are The Art Makers.
+Public source-code visibility does not grant production or commercial
+usage rights. Production use, commercial deployment, hosted services,
+redistribution, resale, and other commercial exploitation require a separate
+written commercial license from We Are The Art Makers.
 
 Commercial licensing is available for:
 

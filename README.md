@@ -367,18 +367,31 @@ Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolam
 
 ## License
 
-modAI-stack is source-available under the **Business Source License 1.1
-(BUSL-1.1)**.
+**© 2026 We Are The Art Makers. All rights reserved.**
 
-The source code may be viewed, copied, modified, redistributed, and used
-according to the terms in [LICENSE](LICENSE). Production use outside those
-terms requires a separate commercial license from We Are The Art Makers.
+modAI-stack is proprietary **source-available software** distributed under the
+[WATAM Source-Available License](LICENSE).
+
+The source code is publicly visible for inspection, technical evaluation,
+security review, and permitted contribution purposes. Public availability of
+the source code does **not** grant unrestricted rights to use, redistribute,
+sell, sublicense, host, or deploy the Software.
+
+**Production and commercial use require a separate written commercial license
+from We Are The Art Makers.**
+
+This includes business production deployments, SaaS or hosted offerings,
+customer-facing services, redistribution as another product, and other
+commercial exploitation unless expressly authorized in writing.
 
 Commercial licensing and pricing:
+
 https://wearetheartmakers.github.io/modAI-stack/
 
-See [COMMERCIAL_LICENSING.md](COMMERCIAL_LICENSING.md) and
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for additional information.
+See [COMMERCIAL_LICENSING.md](COMMERCIAL_LICENSING.md) for current commercial
+packages and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for information
+about third-party components.
 
-The BUSL-licensed version converts to the Change License specified in LICENSE
-on the applicable Change Date.
+The ownership of modAI-stack and its proprietary intellectual property remains
+with We Are The Art Makers. Purchasing a Pilot, Business, or Enterprise license
+grants usage rights only; it does not transfer ownership of the Software.
