@@ -370,3 +370,21 @@ Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolam
 Bu proje WATAM lisansı ile sunulmaktadır.
 
 <a href="https://wearetheartmakers.com" target="_blank" rel="noopener noreferrer">We Are The Art Makers</a>
+
+## License
+
+modAI-stack is source-available under the **Business Source License 1.1
+(BUSL-1.1)**.
+
+The source code may be viewed, copied, modified, redistributed, and used
+according to the terms in [LICENSE](LICENSE). Production use outside those
+terms requires a separate commercial license from We Are The Art Makers.
+
+Commercial licensing and pricing:
+https://wearetheartmakers.github.io/modAI-stack/
+
+See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for additional information.
+
+The BUSL-licensed version converts to the Change License specified in LICENSE
+on the applicable Change Date.
