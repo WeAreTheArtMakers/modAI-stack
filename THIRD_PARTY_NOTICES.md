@@ -25,3 +25,14 @@ release and reviewed before redistribution.
 Model weights are not automatically licensed under the modAI-stack license.
 Each model remains subject to the license or terms provided by its respective
 publisher.
+
+## Release notice requirement
+
+This document summarizes the major third-party license families currently
+observed in the project. It is not intended to replace an exact release-time
+dependency inventory.
+
+Before redistributing a production release, the dependency inventory must be
+regenerated and any copyright notices, license texts, attribution requirements,
+or other obligations required by redistributed third-party components must be
+included with that release.

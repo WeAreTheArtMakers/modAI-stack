@@ -365,12 +365,6 @@ Geri yükleme sırası: önce aynı sürümde PostgreSQL’i geri yükleyin, son
 
 Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Gerçek canlı RAG kabulü tamamlandı; TXT/PDF/DOCX retrieval ile reindex, replace ve delete/vectors cleanup yaşam döngüsü doğrulandı. Üretim dağıtımında merkezi secret vault entegrasyonu, TLS işletimi, nesne depolama, yedekleme/restore tatbikatı ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
 
-## Lisans
-
-Bu proje WATAM lisansı ile sunulmaktadır.
-
-<a href="https://wearetheartmakers.com" target="_blank" rel="noopener noreferrer">We Are The Art Makers</a>
-
 ## License
 
 modAI-stack is source-available under the **Business Source License 1.1
@@ -383,7 +377,7 @@ terms requires a separate commercial license from We Are The Art Makers.
 Commercial licensing and pricing:
 https://wearetheartmakers.github.io/modAI-stack/
 
-See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) and
+See [COMMERCIAL_LICENSING.md](COMMERCIAL_LICENSING.md) and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for additional information.
 
 The BUSL-licensed version converts to the Change License specified in LICENSE

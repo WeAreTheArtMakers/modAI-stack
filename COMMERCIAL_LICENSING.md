@@ -1,5 +1,11 @@
 # modAI-stack Commercial Licensing
 
+> **Commercial information only:** This document describes current commercial
+> packaging and pricing. It is not a software license agreement, order form,
+> SLA, or customer contract. Production rights are granted only under an
+> applicable written commercial agreement with We Are The Art Makers.
+
+
 modAI-stack is publicly available under the Business Source License 1.1.
 
 The public source license permits the uses described in the LICENSE file.
