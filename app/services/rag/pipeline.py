@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from time import perf_counter
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import get_settings
+from app.models.database import Document
 from app.models.schemas import Source
 from app.services.qdrant import qdrant_service
 from app.services.rag.embeddings import get_embedding_service
@@ -25,6 +29,7 @@ def build_rag_prompt(question: str, chunks: list[str]) -> str:
 async def retrieve_rag_context(
     question: str,
     *,
+    db: AsyncSession,
     organization_id: int,
     workspace_id: int,
     knowledge_base_ids: list[int],
@@ -42,6 +47,41 @@ async def retrieve_rag_context(
         knowledge_base_ids=knowledge_base_ids,
     )
     retrieval_latency_ms = (perf_counter() - retrieval_started) * 1000
+
+    # Qdrant may temporarily retain vectors after a logical delete.
+    # PostgreSQL is authoritative for source liveness.
+    candidate_document_ids = {
+        hit.payload.get("document_id")
+        for hit in hits
+        if hit.payload
+        and isinstance(hit.payload.get("document_id"), int)
+    }
+
+    if candidate_document_ids:
+        live_document_ids = set(
+            (
+                await db.scalars(
+                    select(Document.id).where(
+                        Document.id.in_(candidate_document_ids),
+                        Document.organization_id == organization_id,
+                        Document.workspace_id == workspace_id,
+                        Document.knowledge_base_id.in_(knowledge_base_ids),
+                        Document.deleted_at.is_(None),
+                    )
+                )
+            ).all()
+        )
+
+        hits = [
+            hit
+            for hit in hits
+            if hit.payload
+            and hit.payload.get("document_id")
+            in live_document_ids
+        ]
+    else:
+        hits = []
+
     chunks = [hit.payload["text"] for hit in hits if hit.payload and hit.payload.get("text")]
     sources = [
         Source(

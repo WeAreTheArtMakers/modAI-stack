@@ -6,6 +6,7 @@ from app.models.database import Document, DocumentIndexEvent
 
 SOURCE_STAGED = "source_staged"
 ACTIVE_VERSION_PUBLISHED = "active_version_published"
+DOCUMENT_DELETED = "document_deleted"
 
 
 def _require_event_scope(document: Document) -> tuple[int, int, int]:
