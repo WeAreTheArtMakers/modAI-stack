@@ -10,6 +10,22 @@ Organization, Workspace ve Knowledge Base sınırları rol tabanlı erişimle ko
 
 [GitHub deposu](https://github.com/WeAreTheArtMakers/modAI-stack)
 
+
+## Commercial deployments
+
+modAI-stack is publicly developed as the core of a private enterprise
+knowledge AI platform.
+
+Commercial pilots, supported self-hosted deployments, enterprise
+implementation, and customer-specific integrations are available separately.
+
+**Pricing & commercial deployments:**  
+https://wearetheartmakers.github.io/modAI-stack/
+
+Future enterprise-only capabilities may be developed in separate proprietary
+modules and are not necessarily distributed through this public repository.
+
+
 ## Ürün arayüzü
 
 <p align="center"><img src="docs/screenshots/login-console.png" alt="modAI Console giriş ekranı: şirket belgelerine yerel altyapıdan erişim" width="100%"></p>
