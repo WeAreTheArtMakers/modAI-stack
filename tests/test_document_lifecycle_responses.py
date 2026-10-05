@@ -33,6 +33,7 @@ class DeferredUpdatedDocument:
         self.index_status = "ready"
         self.index_error = None
         self.active_version = 1
+        self.source_revision = 1
         self.created_at = datetime.now(timezone.utc)
         self.refreshed = False
 
@@ -65,6 +66,9 @@ class FakeDb:
     async def commit(self):
         pass
 
+    async def rollback(self):
+        pass
+
     async def refresh(self, document):
         document.refreshed = True
         self.refreshed.append(document)
@@ -86,6 +90,15 @@ def install_route_fakes(monkeypatch):
     monkeypatch.setattr(documents, "require_document_access", document_access)
     monkeypatch.setattr(documents, "RedisIndexQueue", FakeQueue)
     monkeypatch.setattr(documents, "record_audit_event", lambda *_args, **_kwargs: None)
+
+    async def lock_document_source(_db, _document_id):
+        return _db.document
+
+    monkeypatch.setattr(
+        documents,
+        "lock_document_source",
+        lock_document_source,
+    )
 
 
 @pytest.mark.asyncio

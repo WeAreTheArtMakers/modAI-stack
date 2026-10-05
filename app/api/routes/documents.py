@@ -11,6 +11,12 @@ from app.db.session import get_db
 from app.models.database import Document, DocumentVersion, IndexJob
 from app.models.schemas import DocumentListResponse, DocumentResponse
 from app.services.documents.parser import extract_text
+from app.services.document_source_events import (
+    SOURCE_STAGED,
+    add_document_source_event,
+    advance_document_source_revision,
+    lock_document_source,
+)
 from app.services.jobs.redis_queue import RedisIndexQueue
 from app.services.qdrant import qdrant_service
 from app.services.storage import storage
@@ -20,38 +26,146 @@ logger = logging.getLogger(__name__)
 @router.post("/upload", response_model=DocumentResponse, status_code=201)
 async def upload(request: Request, file: UploadFile = File(...), knowledge_base_id: int | None = Form(default=None), user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     data = await file.read()
-    if len(data) > get_settings().max_upload_bytes: raise HTTPException(413, "File too large")
-    try: extract_text(file.filename or "", data)
-    except Exception as exc: raise HTTPException(400, "Unsupported or invalid document") from exc
+    if len(data) > get_settings().max_upload_bytes:
+        raise HTTPException(413, "File too large")
+
+    try:
+        extract_text(file.filename or "", data)
+    except Exception as exc:
+        raise HTTPException(
+            400,
+            "Unsupported or invalid document",
+        ) from exc
+
     filename = (file.filename or "document")[:255]
     user_id = int(user["sub"])
-    if knowledge_base_id is None: raise HTTPException(400, "knowledge_base_id is required")
-    kb, workspace, membership = await require_knowledge_base_access(db, user, knowledge_base_id, "manager")
+
+    if knowledge_base_id is None:
+        raise HTTPException(
+            400,
+            "knowledge_base_id is required",
+        )
+
+    kb, workspace, _ = await require_knowledge_base_access(
+        db,
+        user,
+        knowledge_base_id,
+        "manager",
+    )
+
     digest = hashlib.sha256(data).hexdigest()
-    duplicate = await db.scalar(select(Document).where(Document.knowledge_base_id == kb.id, Document.content_hash == digest))
-    if duplicate: raise HTTPException(409, "This document already exists in the knowledge base")
-    stored_path = await storage.save(data, Path(filename).suffix)
-    doc = Document(user_id=user_id, organization_id=workspace.organization_id, workspace_id=workspace.id, knowledge_base_id=kb.id, filename=filename, content="", content_hash=digest, file_size=len(data), index_status="queued")
-    db.add(doc)
-    await db.flush()
-    record_audit_event(db, action="document_upload", resource_type="document", actor_user_id=user_id, organization_id=workspace.organization_id, workspace_id=workspace.id, resource_id=doc.id, metadata={"file_size": len(data)}, request=request)
-    await db.commit()
-    await db.refresh(doc)
+
+    duplicate = await db.scalar(
+        select(Document).where(
+            Document.knowledge_base_id == kb.id,
+            Document.content_hash == digest,
+        )
+    )
+    if duplicate:
+        raise HTTPException(
+            409,
+            "This document already exists in the knowledge base",
+        )
+
+    stored_path = await storage.save(
+        data,
+        Path(filename).suffix,
+    )
+
     try:
-        version = DocumentVersion(document_id=doc.id, version=1, content_hash=digest, file_size=len(data), status="queued", stored_path=stored_path)
-        job = IndexJob(document_id=doc.id, version=1, status="queued")
+        # Initial source revision is revision 1. Document, immutable
+        # version, indexing job and source event commit atomically.
+        doc = Document(
+            user_id=user_id,
+            organization_id=workspace.organization_id,
+            workspace_id=workspace.id,
+            knowledge_base_id=kb.id,
+            filename=filename,
+            content="",
+            content_hash=digest,
+            file_size=len(data),
+            index_status="queued",
+            source_revision=1,
+        )
+        db.add(doc)
+        await db.flush()
+
+        version = DocumentVersion(
+            document_id=doc.id,
+            version=1,
+            content_hash=digest,
+            file_size=len(data),
+            status="queued",
+            stored_path=stored_path,
+        )
+        job = IndexJob(
+            document_id=doc.id,
+            version=1,
+            status="queued",
+        )
         db.add_all([version, job])
+
+        add_document_source_event(
+            db,
+            document=doc,
+            operation=SOURCE_STAGED,
+            document_version=1,
+            content_hash=digest,
+            correlation_id=getattr(
+                request.state,
+                "request_id",
+                None,
+            ),
+        )
+
+        record_audit_event(
+            db,
+            action="document_upload",
+            resource_type="document",
+            actor_user_id=user_id,
+            organization_id=workspace.organization_id,
+            workspace_id=workspace.id,
+            resource_id=doc.id,
+            metadata={"file_size": len(data)},
+            request=request,
+        )
+
         await db.commit()
-        queue = RedisIndexQueue()
-        try: await queue.enqueue(job.id)
-        finally: await queue.close()
+        await db.refresh(doc)
+
     except Exception as exc:
-        logger.exception("Document indexing job could not be queued", extra={"document_id": doc.id})
+        await db.rollback()
         await storage.delete(stored_path)
-        await db.delete(doc)
-        await db.commit()
-        raise HTTPException(503, "Document indexing job could not be queued") from exc
+
+        logger.exception(
+            "Document source transaction failed",
+            extra={"knowledge_base_id": kb.id},
+        )
+
+        raise HTTPException(
+            503,
+            "Document could not be saved",
+        ) from exc
+
+    # PostgreSQL is now authoritative. Redis is only the wake-up path.
+    # A queue failure must never delete the committed source/event.
+    queue = RedisIndexQueue()
+    try:
+        await queue.enqueue(job.id)
+    except Exception as exc:
+        logger.exception(
+            "Document indexing wake-up failed after source commit",
+            extra={"document_id": doc.id},
+        )
+        raise HTTPException(
+            503,
+            "Document was saved but indexing could not be queued",
+        ) from exc
+    finally:
+        await queue.close()
+
     return doc
+
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
     knowledge_base_id: int | None = Query(default=None),
@@ -105,24 +219,145 @@ async def reindex_document(request: Request, document_id: int, user=Depends(curr
     return doc
 @router.post("/{document_id}/replace", response_model=DocumentResponse)
 async def replace_document(request: Request, document_id: int, file: UploadFile = File(...), user=Depends(current_user), db: AsyncSession = Depends(get_db)):
-    doc, _ = await require_document_access(db, user, document_id, "manager")
+    doc, _ = await require_document_access(
+        db,
+        user,
+        document_id,
+        "manager",
+    )
+
     data = await file.read()
-    if len(data) > get_settings().max_upload_bytes: raise HTTPException(413, "File too large")
-    try: extract_text(file.filename or doc.filename, data)
-    except Exception as exc: raise HTTPException(400, "Unsupported or invalid document") from exc
+    if len(data) > get_settings().max_upload_bytes:
+        raise HTTPException(413, "File too large")
+
+    try:
+        extract_text(file.filename or doc.filename, data)
+    except Exception as exc:
+        raise HTTPException(
+            400,
+            "Unsupported or invalid document",
+        ) from exc
+
     digest = hashlib.sha256(data).hexdigest()
-    if digest == doc.content_hash: raise HTTPException(409, "Replacement has identical content")
-    versions = await db.scalars(select(DocumentVersion.version).where(DocumentVersion.document_id == doc.id))
-    next_version = max(list(versions), default=doc.active_version) + 1
-    path = await storage.save(data, Path(file.filename or doc.filename).suffix)
-    version = DocumentVersion(document_id=doc.id, version=next_version, content_hash=digest, file_size=len(data), status="queued", stored_path=path)
-    job = IndexJob(document_id=doc.id, version=next_version, status="queued")
-    doc.filename = (file.filename or doc.filename)[:255]; doc.index_status = "queued"; doc.index_error = None
-    db.add_all([version, job]); record_audit_event(db, action="document_replace", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, metadata={"version": next_version}, request=request); await db.commit(); await db.refresh(doc)
+
+    path = await storage.save(
+        data,
+        Path(file.filename or doc.filename).suffix,
+    )
+
+    try:
+        # Serialize staged source changes for this document.
+        locked_doc = await lock_document_source(
+            db,
+            doc.id,
+        )
+
+        if digest == locked_doc.content_hash:
+            raise HTTPException(
+                409,
+                "Replacement has identical content",
+            )
+
+        versions = await db.scalars(
+            select(DocumentVersion.version).where(
+                DocumentVersion.document_id == locked_doc.id
+            )
+        )
+        next_version = max(
+            list(versions),
+            default=locked_doc.active_version,
+        ) + 1
+
+        advance_document_source_revision(
+            locked_doc
+        )
+
+        version = DocumentVersion(
+            document_id=locked_doc.id,
+            version=next_version,
+            content_hash=digest,
+            file_size=len(data),
+            status="queued",
+            stored_path=path,
+        )
+        job = IndexJob(
+            document_id=locked_doc.id,
+            version=next_version,
+            status="queued",
+        )
+
+        locked_doc.filename = (
+            file.filename or locked_doc.filename
+        )[:255]
+        locked_doc.index_status = "queued"
+        locked_doc.index_error = None
+
+        db.add_all([version, job])
+
+        add_document_source_event(
+            db,
+            document=locked_doc,
+            operation=SOURCE_STAGED,
+            document_version=next_version,
+            content_hash=digest,
+            correlation_id=getattr(
+                request.state,
+                "request_id",
+                None,
+            ),
+        )
+
+        record_audit_event(
+            db,
+            action="document_replace",
+            resource_type="document",
+            actor_user_id=int(user["sub"]),
+            organization_id=locked_doc.organization_id,
+            workspace_id=locked_doc.workspace_id,
+            resource_id=locked_doc.id,
+            metadata={"version": next_version},
+            request=request,
+        )
+
+        await db.commit()
+        await db.refresh(locked_doc)
+
+    except HTTPException:
+        await db.rollback()
+        await storage.delete(path)
+        raise
+
+    except Exception as exc:
+        await db.rollback()
+        await storage.delete(path)
+
+        logger.exception(
+            "Document replacement source transaction failed",
+            extra={"document_id": doc.id},
+        )
+
+        raise HTTPException(
+            503,
+            "Document replacement could not be saved",
+        ) from exc
+
     queue = RedisIndexQueue()
-    try: await queue.enqueue(job.id)
-    finally: await queue.close()
-    return doc
+    try:
+        await queue.enqueue(job.id)
+    except Exception as exc:
+        logger.exception(
+            "Replacement indexing wake-up failed after source commit",
+            extra={"document_id": locked_doc.id},
+        )
+        raise HTTPException(
+            503,
+            "Replacement was saved but indexing could not be queued",
+        ) from exc
+    finally:
+        await queue.close()
+
+    return locked_doc
+
 @router.post("/upload-batch", response_model=list[DocumentResponse], status_code=201)
 async def upload_batch(request: Request, files: list[UploadFile] = File(...), knowledge_base_id: int | None = Form(default=None), user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     results = []
