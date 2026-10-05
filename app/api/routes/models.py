@@ -54,7 +54,13 @@ async def model_status(user=Depends(current_user)):
             provider_status = ModelProviderStatus(provider="ollama", endpoint=provider_status.endpoint, ready=False)
     configured_model = get_settings().ollama_model
     return ModelSystemStatus(
-        providers=[provider_status],
+        providers=[
+            ModelProviderResponse(
+                provider=provider_status.provider,
+                endpoint=provider_status.endpoint,
+                ready=provider_status.ready,
+            )
+        ],
         generation=GenerationModelStatus(
             provider="ollama",
             configured_model=configured_model,
