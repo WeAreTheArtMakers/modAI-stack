@@ -250,6 +250,30 @@ class ResolvedRetrievalIndex:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedGenerationWriteIndex:
+    """Immutable trusted identity for one generation-scoped write target.
+
+    Construction is intended for a future privileged migration resolver.
+    The collection name remains bound to the exact embedding-space hash.
+    """
+
+    scope: GenerationWriteScope
+    space: EmbeddingSpaceContract
+    materialization: MaterializationContract
+    collection_name: str
+
+    def __post_init__(self) -> None:
+        expected_collection = collection_name_for_space(
+            self.space.space_sha256
+        )
+
+        if self.collection_name != expected_collection:
+            raise RetrievalCompatibilityError(
+                "collection does not match the resolved embedding space"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class LegacyUnverifiedRetrieval:
     """Explicit representation of the current unversioned legacy index.
 
