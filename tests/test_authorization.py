@@ -118,3 +118,28 @@ async def test_employee_retrieves_colleague_vector_but_not_foreign_or_inactive_v
         assert [hit.payload["document_id"] for hit in hits] == [ids["doc_a"]]
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_tombstoned_document_is_no_longer_accessible(session):
+    from datetime import datetime, timezone
+
+    db, ids = session
+
+    document, _ = await require_document_access(
+        db,
+        ids["a"],
+        ids["doc_a"],
+    )
+
+    document.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    with pytest.raises(HTTPException) as error:
+        await require_document_access(
+            db,
+            ids["a"],
+            ids["doc_a"],
+        )
+
+    assert error.value.status_code == 403

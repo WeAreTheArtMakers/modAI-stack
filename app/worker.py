@@ -47,6 +47,12 @@ async def process_job(job_id: str) -> None:
                     "document version not found"
                 )
 
+            if document.deleted_at is not None:
+                job.status = "cancelled"
+                job.error = None
+                await db.commit()
+                return
+
             # A ready version means this job is a reindex/repair of an
             # already-published source. It must not create a new source
             # revision or publication event.
@@ -119,6 +125,12 @@ async def process_job(job_id: str) -> None:
                 job.document_id,
             )
             document = locked_document
+
+            if locked_document.deleted_at is not None:
+                job.status = "cancelled"
+                job.error = None
+                await db.commit()
+                return
 
             active_version_before = (
                 locked_document.active_version
@@ -278,9 +290,18 @@ async def process_job(job_id: str) -> None:
             job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
             job.error = embedding_model_unavailable_detail()
             document = await db.get(Document, job.document_id)
-            if document: document.index_status = job.status; document.index_error = job.error
+            if document and document.deleted_at is not None:
+                job.status = "cancelled"
+                job.error = None
+            elif document:
+                document.index_status = job.status
+                document.index_error = job.error
             await db.commit()
-            if document and document.workspace_id is not None:
+            if (
+                document
+                and document.deleted_at is None
+                and document.workspace_id is not None
+            ):
                 await queue.publish_progress(
                     {
                         "type": "index_progress",
@@ -302,9 +323,18 @@ async def process_job(job_id: str) -> None:
             job.status = "failed" if job.attempts >= get_settings().indexing_max_retries else "queued"
             job.error = "Document indexing failed"
             document = await db.get(Document, job.document_id)
-            if document: document.index_status = job.status; document.index_error = job.error
+            if document and document.deleted_at is not None:
+                job.status = "cancelled"
+                job.error = None
+            elif document:
+                document.index_status = job.status
+                document.index_error = job.error
             await db.commit()
-            if document and document.workspace_id is not None:
+            if (
+                document
+                and document.deleted_at is None
+                and document.workspace_id is not None
+            ):
                 await queue.publish_progress(
                     {
                         "type": "index_progress",

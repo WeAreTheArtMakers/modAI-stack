@@ -61,7 +61,11 @@ async def test_rag_pipeline_uses_configured_top_k_when_no_limit_is_supplied(monk
     monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
 
     context = await pipeline.retrieve_rag_context(
-        "question", organization_id=1, workspace_id=2, knowledge_base_ids=[3]
+        "question",
+        db=SimpleNamespace(),
+        organization_id=1,
+        workspace_id=2,
+        knowledge_base_ids=[3],
     )
 
     assert observed["limit"] == 3
@@ -69,3 +73,175 @@ async def test_rag_pipeline_uses_configured_top_k_when_no_limit_is_supplied(monk
     assert observed["workspace_id"] == 2
     assert observed["knowledge_base_ids"] == [3]
     assert context.sources == []
+
+
+@pytest.mark.asyncio
+async def test_rag_pipeline_filters_tombstoned_qdrant_hits_using_postgres(
+    monkeypatch,
+):
+    class FakeEmbeddingService:
+        async def embed_text(self, _text: str):
+            return [0.1]
+
+    class Hit:
+        def __init__(self, document_id, text, score):
+            self.payload = {
+                "document_id": document_id,
+                "filename": f"{document_id}.txt",
+                "chunk_index": 0,
+                "text": text,
+            }
+            self.score = score
+
+    class FakeQdrantService:
+        async def search(self, **_kwargs):
+            return [
+                Hit(1, "live source", 0.9),
+                Hit(2, "deleted secret", 0.8),
+            ]
+
+    class ScalarResult:
+        def all(self):
+            # PostgreSQL says only document 1 remains live.
+            return [1]
+
+    class FakeDb:
+        async def scalars(self, _statement):
+            return ScalarResult()
+
+    monkeypatch.setattr(
+        pipeline,
+        "get_embedding_service",
+        lambda: FakeEmbeddingService(),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "qdrant_service",
+        FakeQdrantService(),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "get_settings",
+        lambda: SimpleNamespace(rag_top_k=3),
+    )
+
+    context = await pipeline.retrieve_rag_context(
+        "question",
+        db=FakeDb(),
+        organization_id=10,
+        workspace_id=20,
+        knowledge_base_ids=[30],
+    )
+
+    assert [source.document_id for source in context.sources] == [1]
+    assert "live source" in context.prompt
+    assert "deleted secret" not in context.prompt
+
+
+@pytest.mark.asyncio
+async def test_websocket_rag_passes_postgres_session_to_retrieval(
+    monkeypatch,
+):
+    import app.api.websocket.rag as websocket_rag_module
+    from starlette.websockets import WebSocketDisconnect
+
+    observed = {}
+    db = object()
+
+    class SessionContext:
+        async def __aenter__(self):
+            return db
+
+        async def __aexit__(self, *_args):
+            pass
+
+    class FakeWebSocket:
+        def __init__(self):
+            self.receive_count = 0
+            self.messages = []
+
+        async def accept(self):
+            pass
+
+        async def receive_json(self):
+            self.receive_count += 1
+            if self.receive_count == 1:
+                return {
+                    "question": "question",
+                    "knowledge_base_ids": [4],
+                }
+            raise WebSocketDisconnect()
+
+        async def send_json(self, value):
+            self.messages.append(value)
+
+        async def close(self, code=None):
+            pass
+
+    async def fake_user(_ws, scope):
+        assert scope == "rag"
+        return {"sub": "7"}
+
+    async def resolve_scope(_db, _user, knowledge_base_ids):
+        assert _db is db
+        return (
+            [4],
+            (
+                SimpleNamespace(id=4),
+                SimpleNamespace(
+                    id=3,
+                    organization_id=2,
+                ),
+                SimpleNamespace(role="user"),
+            ),
+        )
+
+    async def retrieve(question, **kwargs):
+        observed["question"] = question
+        observed.update(kwargs)
+        return SimpleNamespace(
+            sources=[],
+            prompt="prompt",
+        )
+
+    class FakeProvider:
+        async def stream(self, prompt):
+            assert prompt == "prompt"
+            yield "token"
+
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "websocket_user",
+        fake_user,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "SessionLocal",
+        lambda: SessionContext(),
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "resolve_knowledge_base_scope",
+        resolve_scope,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "retrieve_rag_context",
+        retrieve,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "provider",
+        FakeProvider(),
+    )
+
+    ws = FakeWebSocket()
+    await websocket_rag_module.websocket_rag(ws)
+
+    assert observed["db"] is db
+    assert observed["organization_id"] == 2
+    assert observed["workspace_id"] == 3
+    assert observed["knowledge_base_ids"] == [4]
+
+    assert {"type": "token", "data": "token"} in ws.messages
+    assert {"type": "complete"} in ws.messages

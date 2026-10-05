@@ -497,3 +497,64 @@ def test_evaluation_cli_runs_adaptive_fixture_without_persisting_source_text(tmp
     assert "private fact text" not in serialized
     assert "private extra text" not in serialized
     assert "private third text" not in serialized
+
+
+@pytest.mark.asyncio
+async def test_authorized_retriever_passes_postgres_session_to_rag_context(
+    monkeypatch,
+):
+    observed = {}
+    db = object()
+
+    async def resolve_scope(_db, _user, knowledge_base_ids):
+        assert _db is db
+        assert knowledge_base_ids == [4]
+        return (
+            [4],
+            (
+                SimpleNamespace(id=4),
+                SimpleNamespace(
+                    id=3,
+                    organization_id=2,
+                ),
+                SimpleNamespace(role="user"),
+            ),
+        )
+
+    async def retrieve(question, **kwargs):
+        observed["question"] = question
+        observed.update(kwargs)
+        return SimpleNamespace(
+            sources=[],
+            prompt="prompt",
+            embedding_latency_ms=1.0,
+            retrieval_latency_ms=2.0,
+        )
+
+    monkeypatch.setattr(
+        "app.services.evaluation.runner.resolve_knowledge_base_scope",
+        resolve_scope,
+    )
+    monkeypatch.setattr(
+        "app.services.evaluation.runner.retrieve_rag_context",
+        retrieve,
+    )
+
+    case = EvaluationCase(
+        id="postgres-session",
+        category="technical",
+        question="question",
+        knowledge_base_ids=[4],
+        top_k=3,
+    )
+
+    result = await AuthorizedRagRetriever(
+        db,
+        {"sub": "7"},
+    )(case)
+
+    assert observed["db"] is db
+    assert observed["organization_id"] == 2
+    assert observed["workspace_id"] == 3
+    assert observed["knowledge_base_ids"] == [4]
+    assert result.evidence == []

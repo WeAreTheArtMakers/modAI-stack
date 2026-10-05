@@ -104,6 +104,7 @@ async def require_document_access(db: AsyncSession, user: dict, document_id: int
         .join(Membership, _workspace_membership_clause())
         .where(
             Document.id == document_id,
+            Document.deleted_at.is_(None),
             Membership.user_id == int(user["sub"]),
             Document.organization_id == Membership.organization_id,
         )

@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import func, select
@@ -13,6 +14,7 @@ from app.models.schemas import DocumentListResponse, DocumentResponse
 from app.services.documents.parser import extract_text
 from app.services.document_source_events import (
     SOURCE_STAGED,
+    DOCUMENT_DELETED,
     add_document_source_event,
     advance_document_source_revision,
     lock_document_source,
@@ -59,6 +61,7 @@ async def upload(request: Request, file: UploadFile = File(...), knowledge_base_
         select(Document).where(
             Document.knowledge_base_id == kb.id,
             Document.content_hash == digest,
+            Document.deleted_at.is_(None),
         )
     )
     if duplicate:
@@ -187,6 +190,7 @@ async def list_documents(
             return DocumentListResponse(items=[], total=0, limit=limit, offset=offset)
         filters = [Document.workspace_id.in_(workspace_ids)]
 
+    filters.append(Document.deleted_at.is_(None))
     base_query = select(Document).where(*filters)
     total = await db.scalar(select(func.count()).select_from(base_query.subquery()))
     documents = list((await db.scalars(
@@ -367,16 +371,90 @@ async def upload_batch(request: Request, files: list[UploadFile] = File(...), kn
     if not results: raise HTTPException(400, "No files were accepted")
     return results
 @router.delete("/{document_id}", status_code=204)
-async def delete_document(request: Request, document_id: int, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
-    doc, _ = await require_document_access(db, user, document_id, "manager")
+async def delete_document(
+    request: Request,
+    document_id: int,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    doc, _ = await require_document_access(
+        db,
+        user,
+        document_id,
+        "manager",
+    )
+
     try:
-        await qdrant_service.delete_document_vectors(user_id=doc.user_id, document_id=doc.id)
+        locked_doc = await lock_document_source(
+            db,
+            doc.id,
+        )
+
+        if locked_doc.deleted_at is not None:
+            return
+
+        advance_document_source_revision(
+            locked_doc
+        )
+
+        locked_doc.deleted_at = datetime.now(
+            timezone.utc
+        )
+        locked_doc.index_status = "deleted"
+        locked_doc.index_error = None
+
+        jobs = list(
+            (
+                await db.scalars(
+                    select(IndexJob).where(
+                        IndexJob.document_id == locked_doc.id,
+                        IndexJob.status.in_(
+                            ["queued", "processing"]
+                        ),
+                    )
+                )
+            ).all()
+        )
+
+        for job in jobs:
+            job.status = "cancelled"
+            job.error = None
+
+        add_document_source_event(
+            db,
+            document=locked_doc,
+            operation=DOCUMENT_DELETED,
+            document_version=locked_doc.active_version,
+            content_hash=locked_doc.content_hash,
+            correlation_id=getattr(
+                request.state,
+                "request_id",
+                None,
+            ),
+        )
+
+        record_audit_event(
+            db,
+            action="document_delete",
+            resource_type="document",
+            actor_user_id=int(user["sub"]),
+            organization_id=locked_doc.organization_id,
+            workspace_id=locked_doc.workspace_id,
+            resource_id=locked_doc.id,
+            request=request,
+        )
+
+        await db.commit()
+
     except Exception as exc:
-        logger.exception("Document vector deletion failed", extra={"document_id": doc.id})
-        raise HTTPException(503, "Document vector deletion failed") from exc
-    versions = list((await db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == doc.id))).all())
-    jobs = list((await db.scalars(select(IndexJob).where(IndexJob.document_id == doc.id, IndexJob.status.in_(["queued", "processing"])))).all())
-    for job in jobs: job.status = "cancelled"
-    for version in versions: await storage.delete(version.stored_path)
-    record_audit_event(db, action="document_delete", resource_type="document", actor_user_id=int(user["sub"]), organization_id=doc.organization_id, workspace_id=doc.workspace_id, resource_id=doc.id, request=request)
-    await db.delete(doc); await db.commit()
+        await db.rollback()
+
+        logger.exception(
+            "Document tombstone transaction failed",
+            extra={"document_id": document_id},
+        )
+
+        raise HTTPException(
+            503,
+            "Document could not be deleted",
+        ) from exc

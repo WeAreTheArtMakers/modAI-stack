@@ -71,6 +71,7 @@ class AuthorizedRagRetriever:
         )
         context = await retrieve_rag_context(
             case.question,
+            db=self.db,
             organization_id=kb_scope[1].organization_id,
             workspace_id=kb_scope[1].id,
             knowledge_base_ids=knowledge_base_ids,

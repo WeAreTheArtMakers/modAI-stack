@@ -482,3 +482,36 @@ async def test_newer_replacement_publishes_and_deactivates_old_version(
             "document_version": 1,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_tombstoned_document_job_never_publishes_vectors(
+    monkeypatch,
+):
+    from datetime import datetime, timezone
+
+    document = make_document(
+        active_version=2,
+        source_revision=5,
+        index_status="deleted",
+    )
+    document.deleted_at = datetime.now(timezone.utc)
+
+    job = make_job(2)
+    version = make_version(2)
+
+    db, _queue, qdrant = await run_worker(
+        monkeypatch,
+        job=job,
+        version=version,
+        document=document,
+    )
+
+    assert job.status == "cancelled"
+    assert job.error is None
+    assert document.source_revision == 5
+
+    assert source_events(db) == []
+    assert qdrant.upserts == []
+    assert qdrant.activations == []
+    assert qdrant.deletions == []

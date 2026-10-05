@@ -34,6 +34,7 @@ async def websocket_rag(ws: WebSocket):
                     )
                     context = await retrieve_rag_context(
                         req.question,
+                        db=db,
                         organization_id=kb_scope[1].organization_id,
                         workspace_id=kb_scope[1].id,
                         knowledge_base_ids=authorized_kb_ids,
