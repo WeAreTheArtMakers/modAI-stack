@@ -33,6 +33,7 @@ class DeferredUpdatedDocument:
         self.index_status = "ready"
         self.index_error = None
         self.active_version = 1
+        self.source_revision = 1
         self.created_at = datetime.now(timezone.utc)
         self.refreshed = False
 
@@ -65,6 +66,9 @@ class FakeDb:
     async def commit(self):
         pass
 
+    async def rollback(self):
+        pass
+
     async def refresh(self, document):
         document.refreshed = True
         self.refreshed.append(document)
@@ -86,6 +90,15 @@ def install_route_fakes(monkeypatch):
     monkeypatch.setattr(documents, "require_document_access", document_access)
     monkeypatch.setattr(documents, "RedisIndexQueue", FakeQueue)
     monkeypatch.setattr(documents, "record_audit_event", lambda *_args, **_kwargs: None)
+
+    async def lock_document_source(_db, _document_id):
+        return _db.document
+
+    monkeypatch.setattr(
+        documents,
+        "lock_document_source",
+        lock_document_source,
+    )
 
 
 @pytest.mark.asyncio
@@ -157,6 +170,8 @@ async def test_worker_releases_its_document_version_lock_after_indexing(monkeypa
         knowledge_base_id=4,
         filename="source.txt",
         active_version=1,
+        source_revision=1,
+        deleted_at=None,
         content="",
         content_hash="old",
         file_size=0,
@@ -170,6 +185,9 @@ async def test_worker_releases_its_document_version_lock_after_indexing(monkeypa
 
         async def scalar(self, _statement):
             return version
+
+        def add(self, _item):
+            pass
 
         async def commit(self):
             pass
@@ -221,6 +239,15 @@ async def test_worker_releases_its_document_version_lock_after_indexing(monkeypa
 
     monkeypatch.setattr(worker, "SessionLocal", SessionContext)
     monkeypatch.setattr(worker, "RedisIndexQueue", lambda: queue)
+
+    async def lock_document_source(_db, _document_id):
+        return document
+
+    monkeypatch.setattr(
+        worker,
+        "lock_document_source",
+        lock_document_source,
+    )
     monkeypatch.setattr(worker, "get_settings", lambda: SimpleNamespace(indexing_job_timeout_seconds=60, chunk_size=10, chunk_overlap=1))
     monkeypatch.setattr(worker, "storage", SimpleNamespace(read=read))
     monkeypatch.setattr(worker, "extract_text", lambda *_args: "indexed")
