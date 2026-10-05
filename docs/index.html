@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="modAI-stack — private, self-hosted enterprise knowledge AI with role-aware access and source-backed answers." />
+  <title>modAI-stack — Private Enterprise Knowledge AI</title>
+  <style>
+    :root{
+      --bg:#090b10;--panel:#11141c;--text:#f5f7fb;--muted:#a8b0c0;--line:#252b38;
+      --accent:#8ba7ff;--accent2:#b6c4ff;--good:#9ce7c1;--shadow:0 18px 60px rgba(0,0,0,.30);
+      --radius:22px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;background:radial-gradient(circle at 20% 0%,rgba(85,110,210,.20),transparent 28rem),radial-gradient(circle at 90% 20%,rgba(120,90,200,.13),transparent 24rem),var(--bg);color:var(--text);line-height:1.55}
+    a{color:inherit;text-decoration:none}.wrap{width:min(1180px,calc(100% - 36px));margin:auto}
+    header{position:sticky;top:0;z-index:20;background:rgba(9,11,16,.76);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.06)}
+    nav{display:flex;align-items:center;justify-content:space-between;height:72px}.brand{font-weight:800;letter-spacing:-.03em}.brand span{color:var(--accent2)}
+    .navlinks{display:flex;gap:24px;align-items:center;color:var(--muted);font-size:14px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-weight:700;font-size:14px;transition:.2s ease}
+    .btn:hover{transform:translateY(-1px);border-color:#3a4355}.btn.primary{background:linear-gradient(135deg,#eef2ff,#b6c4ff);color:#0a0d14;border-color:transparent}
+    .hero{padding:110px 0 70px;text-align:center}.eyebrow{display:inline-flex;gap:8px;align-items:center;border:1px solid #2a3140;background:rgba(255,255,255,.035);color:#cdd5e5;border-radius:999px;padding:7px 12px;font-size:13px}
+    h1{max-width:900px;margin:24px auto 18px;font-size:clamp(42px,7vw,82px);line-height:.98;letter-spacing:-.055em}
+    .hero p{max-width:760px;margin:0 auto;color:var(--muted);font-size:clamp(17px,2vw,21px)}.hero-actions{display:flex;gap:12px;justify-content:center;margin-top:32px;flex-wrap:wrap}
+    .proof{margin:54px auto 0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:980px}.proof div{padding:18px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025);color:#cdd5e5;font-size:14px}
+    section{padding:78px 0}.section-head{max-width:760px;margin-bottom:34px}.section-head h2{font-size:clamp(31px,4vw,48px);letter-spacing:-.04em;margin:0 0 12px}.section-head p{color:var(--muted);margin:0;font-size:17px}
+    .fit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));box-shadow:var(--shadow)}
+    .fit{padding:24px}.fit h3{margin:12px 0 8px;font-size:19px}.fit p{margin:0;color:var(--muted)}.icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#171e2d;border:1px solid #2b3549;color:var(--accent2);font-weight:800}
+    .pricing{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}.price-card{padding:28px;position:relative;display:flex;flex-direction:column}.price-card.featured{border-color:#687fce;background:linear-gradient(180deg,rgba(106,132,222,.15),rgba(255,255,255,.025))}
+    .badge{position:absolute;top:18px;right:18px;color:#dce4ff;background:#26345e;border:1px solid #445996;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:999px}
+    .plan{color:#d8deeb;font-weight:800;font-size:16px}.price{font-size:46px;font-weight:850;letter-spacing:-.05em;margin:14px 0 0}.price small{font-size:14px;color:var(--muted);font-weight:600;letter-spacing:0}.desc{color:var(--muted);min-height:52px}
+    ul{padding:0;margin:22px 0 28px;list-style:none}li{margin:10px 0;color:#d4dae6;padding-left:24px;position:relative}li:before{content:"✓";position:absolute;left:0;color:var(--good);font-weight:900}.price-card .btn{margin-top:auto}
+    .note{margin-top:18px;color:#8f98a9;font-size:13px;border-top:1px solid var(--line);padding-top:16px}.compare{overflow:auto;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.02)}
+    table{border-collapse:collapse;width:100%;min-width:760px}th,td{padding:16px 18px;border-bottom:1px solid var(--line);text-align:left}th{font-size:13px;color:#cbd3e2;background:#11151e}td{color:#b8c0d0}td:first-child{color:#eef2f8;font-weight:700}tr:last-child td{border-bottom:0}
+    .why{display:grid;grid-template-columns:1fr 1fr;gap:22px}.why .card{padding:28px}.why h3{margin-top:0}.why p{color:var(--muted)}.callout{padding:28px;border-radius:20px;border:1px solid #334061;background:linear-gradient(135deg,rgba(95,118,198,.17),rgba(255,255,255,.025))}
+    .faq details{border-bottom:1px solid var(--line);padding:18px 0}summary{cursor:pointer;font-weight:750}details p{color:var(--muted);max-width:820px}
+    .cta{margin:50px 0 80px;padding:42px;border-radius:28px;text-align:center;border:1px solid #344365;background:linear-gradient(135deg,rgba(93,120,216,.17),rgba(255,255,255,.03))}.cta h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.04em;margin:0 0 12px}.cta p{color:var(--muted);max-width:700px;margin:0 auto 24px}
+    footer{border-top:1px solid var(--line);padding:28px 0 40px;color:#7f899a;font-size:13px}.footer-flex{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+    @media (max-width:900px){.proof,.fit-grid,.pricing,.why{grid-template-columns:1fr}.proof{max-width:620px}.navlinks a:not(.btn){display:none}.desc{min-height:auto}}
+  </style>
+</head>
+<body>
+<header><div class="wrap"><nav>
+  <a class="brand" href="#">modAI-<span>stack</span></a>
+  <div class="navlinks">
+    <a href="#fit">Why modAI-stack</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
+    <a class="btn" href="https://github.com/WeAreTheArtMakers/modAI-stack">GitHub</a>
+  </div>
+</nav></div></header>
+
+<main>
+<section class="hero"><div class="wrap">
+  <div class="eyebrow">Private Enterprise Knowledge AI · Self-hosted</div>
+  <h1>Your company knowledge.<br>Your infrastructure. Your AI.</h1>
+  <p>A self-hosted enterprise knowledge layer with role-aware access, local AI support, and source-backed answers — designed for organizations that want control over where knowledge lives and how it is retrieved.</p>
+  <div class="hero-actions">
+    <a class="btn primary" href="mailto:admin@wearetheartmakers.com?subject=modAI-stack%20Private%20Pilot">Request a private pilot</a>
+    <a class="btn" href="#pricing">View pricing</a>
+  </div>
+  <div class="proof"><div>Self-hosted deployment</div><div>Role-aware workspaces</div><div>Source-backed RAG</div><div>Local model support</div></div>
+</div></section>
+
+<section id="fit"><div class="wrap">
+  <div class="section-head"><h2>Not another general chatbot.</h2>
+    <p>ChatGPT and Claude are excellent general AI products. modAI-stack is for a different requirement: a customer-controlled knowledge plane that can run on your infrastructure and enforce knowledge scope before retrieval.</p>
+  </div>
+  <div class="fit-grid">
+    <div class="card fit"><div class="icon">01</div><h3>Control the deployment</h3><p>Run the application and knowledge layer on infrastructure controlled by your organization.</p></div>
+    <div class="card fit"><div class="icon">02</div><h3>Control the knowledge boundary</h3><p>Organize company knowledge by workspace and knowledge base, with role-aware access before retrieval.</p></div>
+    <div class="card fit"><div class="icon">03</div><h3>Control the AI layer</h3><p>Use local model infrastructure and evolve model choices without tying the knowledge layer to one SaaS model vendor.</p></div>
+  </div>
+</div></section>
+
+<section id="pricing"><div class="wrap">
+  <div class="section-head"><h2>Simple commercial packages.</h2><p>Start with a narrow, measurable pilot. Expand only when the system proves useful on real company knowledge.</p></div>
+  <div class="pricing">
+    <article class="card price-card">
+      <div class="plan">Pilot</div><div class="price">€2,900 <small>one-time</small></div>
+      <p class="desc">A focused 2–4 week validation using selected company documents and a limited user group.</p>
+      <ul><li>Private self-hosted pilot deployment</li><li>1–2 knowledge bases</li><li>Selected company documents</li><li>Role-aware pilot access</li><li>Local AI configuration</li><li>Source-backed RAG validation</li><li>Final findings & rollout recommendation</li></ul>
+      <a class="btn" href="mailto:admin@wearetheartmakers.com?subject=modAI-stack%20Pilot">Start a pilot</a>
+    </article>
+    <article class="card price-card featured">
+      <div class="badge">Recommended</div><div class="plan">Business</div><div class="price">€9,900 <small>/ year</small></div>
+      <p class="desc">For a team or business unit that wants a supported private knowledge AI deployment.</p>
+      <ul><li>Annual commercial deployment license</li><li>Self-hosted production deployment</li><li>Multiple workspaces & knowledge bases</li><li>Role-aware user access</li><li>Source-backed enterprise RAG</li><li>Local model configuration</li><li>Standard onboarding & update guidance</li><li>Business support channel</li></ul>
+      <a class="btn primary" href="mailto:admin@wearetheartmakers.com?subject=modAI-stack%20Business">Discuss Business</a>
+    </article>
+    <article class="card price-card">
+      <div class="plan">Enterprise</div><div class="price">€19,900+ <small>/ year</small></div>
+      <p class="desc">For broader deployments that require custom scope, integration work, or deployment assistance.</p>
+      <ul><li>Everything in Business</li><li>Multi-team deployment scope</li><li>Custom infrastructure planning</li><li>Custom workflow / integration work</li><li>Model & retrieval configuration support</li><li>Priority implementation support</li><li>Custom SLA and commercial terms available</li></ul>
+      <a class="btn" href="mailto:admin@wearetheartmakers.com?subject=modAI-stack%20Enterprise">Contact for Enterprise</a>
+    </article>
+  </div>
+  <div class="note">Prices exclude applicable taxes, dedicated hardware, and third-party model/API fees. Custom integrations, SSO/SCIM, high-availability architecture, certifications, or customer-specific compliance work are not represented as included unless explicitly scoped in a commercial agreement.</div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head"><h2>What you are buying.</h2><p>The value is not “a cheaper ChatGPT.” The value is control over the enterprise knowledge workflow.</p></div>
+  <div class="compare"><table>
+    <thead><tr><th>Requirement</th><th>modAI-stack approach</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td>Deployment</td><td>Customer-controlled / self-hosted</td><td>Infrastructure and operational boundaries stay under your control.</td></tr>
+      <tr><td>Knowledge access</td><td>Workspace-scoped and role-aware</td><td>Users retrieve only from knowledge areas they are authorized to access.</td></tr>
+      <tr><td>Evidence</td><td>Source-backed answers</td><td>Responses include the company documents and chunks that support the answer.</td></tr>
+      <tr><td>Model strategy</td><td>Local-model capable</td><td>The knowledge platform is not structurally tied to a single hosted model provider.</td></tr>
+      <tr><td>Customization</td><td>Purpose-built deployment</td><td>Workflows can be adapted to the customer's internal knowledge process.</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section><div class="wrap why">
+  <div class="card"><h3>When ChatGPT or Claude is the better choice</h3><p>If your priority is immediate access to the strongest general-purpose hosted models, broad SaaS features, mature enterprise identity integrations, and you are comfortable with a hosted service, a major AI provider may be the better fit.</p></div>
+  <div class="callout"><h3>When modAI-stack is the better fit</h3><p>When the requirement is a private knowledge system you can deploy and shape around your own infrastructure, access boundaries, document workflows, local model strategy, and source-verifiable answers.</p></div>
+</div></section>
+
+<section id="faq" class="faq"><div class="wrap">
+  <div class="section-head"><h2>FAQ</h2></div>
+  <details open><summary>Is this a replacement for ChatGPT or Claude?</summary><p>No. It targets a different layer: private enterprise knowledge retrieval, access boundaries, deployment control, and source-backed answers. A customer can also choose to integrate other model providers in a separately scoped deployment.</p></details>
+  <details><summary>Does the price include hardware?</summary><p>No. Dedicated servers, GPUs, storage, cloud infrastructure, and third-party model or API charges are excluded unless explicitly included in a project scope.</p></details>
+  <details><summary>Do you claim certifications, SSO/SCIM, or high availability?</summary><p>No. These are not presented as included capabilities unless explicitly implemented and scoped. Enterprise controls and integrations can be evaluated as separate project work.</p></details>
+  <details><summary>Why start with a paid pilot?</summary><p>A pilot validates retrieval quality, usefulness, access design, and deployment fit against real company documents before a larger rollout.</p></details>
+</div></section>
+
+<div class="wrap"><div class="cta">
+  <h2>Start with one real knowledge workflow.</h2>
+  <p>Choose a focused document set, a small pilot group, and a measurable internal use case. Validate value before expanding across the organization.</p>
+  <a class="btn primary" href="mailto:admin@wearetheartmakers.com?subject=modAI-stack%20Private%20Pilot">Request a private pilot</a>
+</div></div>
+</main>
+
+<footer><div class="wrap footer-flex"><div>© 2026 We Are The Art Makers · modAI-stack</div><div>Private Enterprise Knowledge AI</div></div></footer>
+</body>
+</html>
