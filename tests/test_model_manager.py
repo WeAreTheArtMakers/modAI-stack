@@ -68,6 +68,57 @@ def test_model_identifier_rejects_paths_and_command_like_values(model):
         validate_model_identifier(model)
 
 
+def test_model_status_converts_provider_status_to_api_schema(monkeypatch):
+    class FakeProvider:
+        async def health(self):
+            from app.services.models.base import ModelProviderStatus
+            return ModelProviderStatus(
+                provider="ollama",
+                endpoint="http://ollama:11434",
+                ready=True,
+            )
+
+        async def get_running_models(self):
+            return ["modAIJet:latest"]
+
+    monkeypatch.setattr(
+        model_routes,
+        "get_model_provider",
+        lambda _name: FakeProvider(),
+    )
+    monkeypatch.setattr(
+        model_routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            ollama_model="modAIJet:latest"
+        ),
+    )
+    monkeypatch.setattr(
+        model_routes,
+        "embedding_model_status",
+        lambda: {
+            "configured_model": "sentence-transformers/all-MiniLM-L6-v2",
+            "source": "huggingface_cache",
+            "download_allowed": False,
+            "cache_available": True,
+            "ready": True,
+            "status": "available",
+        },
+    )
+
+    status = run(
+        model_routes.model_status(
+            user={"sub": "1"}
+        )
+    )
+
+    assert status.providers[0].provider == "ollama"
+    assert status.providers[0].endpoint == "http://ollama:11434"
+    assert status.providers[0].ready is True
+    assert status.generation.configured_model == "modAIJet:latest"
+    assert status.generation.running is True
+
+
 def test_model_manager_routes_turn_unavailable_provider_into_safe_error(monkeypatch):
     class OfflineProvider:
         async def list_models(self):
