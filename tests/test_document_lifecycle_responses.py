@@ -170,6 +170,8 @@ async def test_worker_releases_its_document_version_lock_after_indexing(monkeypa
         knowledge_base_id=4,
         filename="source.txt",
         active_version=1,
+        source_revision=1,
+        deleted_at=None,
         content="",
         content_hash="old",
         file_size=0,
@@ -183,6 +185,9 @@ async def test_worker_releases_its_document_version_lock_after_indexing(monkeypa
 
         async def scalar(self, _statement):
             return version
+
+        def add(self, _item):
+            pass
 
         async def commit(self):
             pass
@@ -234,6 +239,15 @@ async def test_worker_releases_its_document_version_lock_after_indexing(monkeypa
 
     monkeypatch.setattr(worker, "SessionLocal", SessionContext)
     monkeypatch.setattr(worker, "RedisIndexQueue", lambda: queue)
+
+    async def lock_document_source(_db, _document_id):
+        return document
+
+    monkeypatch.setattr(
+        worker,
+        "lock_document_source",
+        lock_document_source,
+    )
     monkeypatch.setattr(worker, "get_settings", lambda: SimpleNamespace(indexing_job_timeout_seconds=60, chunk_size=10, chunk_overlap=1))
     monkeypatch.setattr(worker, "storage", SimpleNamespace(read=read))
     monkeypatch.setattr(worker, "extract_text", lambda *_args: "indexed")
