@@ -44,39 +44,128 @@ export function streamRag(
   knowledgeBaseIds: number[],
   question: string,
   onEvent: (event: RagEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     let socket: WebSocket | null = null;
     let finished = false;
     let terminalEvent = false;
+
+    const abortError = () => {
+      const error = new Error("RAG isteği iptal edildi.");
+      error.name = "AbortError";
+      return error;
+    };
+
+    const onAbort = () => {
+      if (terminalEvent || finished) return;
+      fail(abortError());
+    };
+
+    const cleanupAbort = () => {
+      signal?.removeEventListener("abort", onAbort);
+    };
+
     const fail = (reason: Error) => {
       if (finished) return;
       finished = true;
+      cleanupAbort();
       reject(reason);
       socket?.close();
     };
+
+    if (signal?.aborted) {
+      fail(abortError());
+      return;
+    }
+
+    signal?.addEventListener(
+      "abort",
+      onAbort,
+      { once: true },
+    );
+
     const attach = (nextSocket: WebSocket) => {
+      if (finished) {
+        nextSocket.close();
+        return;
+      }
+
       socket = nextSocket;
-      nextSocket.onopen = () => nextSocket.send(JSON.stringify({ question, knowledge_base_ids: knowledgeBaseIds }));
-      nextSocket.onmessage = (message) => {
-      try {
-        const event = JSON.parse(message.data as string) as RagEvent;
-        onEvent(event);
-        if (event.type === "complete" || event.type === "error") {
-          terminalEvent = true;
-          socket?.close();
-        }
-      } catch { fail(new Error("RAG yanıtı okunamadı.")); }
+
+      nextSocket.onopen = () => {
+        nextSocket.send(JSON.stringify({
+          question,
+          knowledge_base_ids: knowledgeBaseIds,
+        }));
       };
-      nextSocket.onerror = () => fail(new Error("RAG bağlantısı kurulamadı."));
+
+      nextSocket.onmessage = (message) => {
+        try {
+          const event =
+            JSON.parse(message.data as string) as RagEvent;
+
+          onEvent(event);
+
+          if (
+            event.type === "complete"
+            || event.type === "error"
+          ) {
+            terminalEvent = true;
+            socket?.close();
+          }
+        } catch {
+          fail(
+            new Error("RAG yanıtı okunamadı."),
+          );
+        }
+      };
+
+      nextSocket.onerror = () => {
+        fail(
+          new Error(
+            "RAG bağlantısı kurulamadı.",
+          ),
+        );
+      };
+
       nextSocket.onclose = () => {
-      if (finished) return;
-      finished = true;
-      if (terminalEvent) resolve();
-      else reject(new Error("RAG bağlantısı beklenmedik şekilde kapandı."));
+        if (finished) return;
+
+        finished = true;
+        cleanupAbort();
+
+        if (terminalEvent) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              "RAG bağlantısı beklenmedik şekilde kapandı.",
+            ),
+          );
+        }
       };
     };
-    void websocketTicket("rag").then((ticket) => attach(new WebSocket(websocketUrl(`/ws/rag?ticket=${encodeURIComponent(ticket)}`)))).catch(() => fail(new Error("RAG bağlantısı kurulamadı.")));
+
+    void websocketTicket("rag")
+      .then((ticket) => {
+        if (finished) return;
+
+        attach(
+          new WebSocket(
+            websocketUrl(
+              `/ws/rag?ticket=${encodeURIComponent(ticket)}`,
+            ),
+          ),
+        );
+      })
+      .catch(() => {
+        fail(
+          new Error(
+            "RAG bağlantısı kurulamadı.",
+          ),
+        );
+      });
   });
 }
 

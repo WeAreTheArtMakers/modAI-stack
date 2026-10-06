@@ -107,6 +107,78 @@ describe("Web Console critical UI", () => {
     vi.unstubAllGlobals();
   });
 
+  it("aborts an in-flight RAG WebSocket and rejects with AbortError", async () => {
+    class RagWebSocket {
+      static instances: RagWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      closed = false;
+
+      constructor() {
+        RagWebSocket.instances.push(this);
+      }
+
+      send() {}
+
+      close() {
+        this.closed = true;
+        this.onclose?.();
+      }
+    }
+
+    vi.stubGlobal("WebSocket", RagWebSocket);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ticket: "short-lived-ticket",
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    try {
+      const controller = new AbortController();
+
+      const promise = streamRag(
+        [4],
+        "test",
+        vi.fn(),
+        controller.signal,
+      );
+
+      await waitFor(() =>
+        expect(
+          RagWebSocket.instances,
+        ).toHaveLength(1),
+      );
+
+      const socket =
+        RagWebSocket.instances[0];
+
+      socket.onopen?.();
+
+      const rejection = expect(
+        promise,
+      ).rejects.toMatchObject({
+        name: "AbortError",
+        message: "RAG isteği iptal edildi.",
+      });
+
+      controller.abort();
+
+      await rejection;
+
+      expect(socket.closed).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("shows provider-offline and embedding-unavailable states to regular users", async () => {
     mocks.user = member;
     mocks.getModelStatus.mockResolvedValue({ ...modelStatus, providers: [{ ...modelStatus.providers[0], ready: false }], generation: { ...modelStatus.generation, ready: false, running: false } });
