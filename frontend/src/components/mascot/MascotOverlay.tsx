@@ -66,7 +66,11 @@ export function clampMascotPosition(
   };
 }
 
-export function MascotOverlay() {
+export function MascotOverlay({
+  workspaceId = null,
+}: {
+  workspaceId?: number | null;
+}) {
   const [state, setState] = useState<MascotState>(
     () => loadMascotState(),
   );
@@ -326,6 +330,7 @@ export function MascotOverlay() {
               ].join(" ")}
             >
               <MascotChatPanel
+                workspaceId={workspaceId}
                 onClose={() => {
                   setState((current) => ({
                     ...current,
