@@ -12,12 +12,14 @@ from app.api.routes import assistant_conversations
 from app.models.database import (
     Base,
     ChatSession,
+    Message,
     Membership,
     Organization,
     User,
     Workspace,
 )
-from app.models.schemas import AssistantConversationCreate
+from app.models.schemas import AssistantConversationCreate, Source
+from app.services.assistant_conversations import persist_completed_turn
 
 
 @pytest_asyncio.fixture
@@ -355,3 +357,156 @@ async def test_legacy_null_workspace_session_is_not_exposed(
         ).all()
     )
     assert legacy in rows
+
+
+
+@pytest.mark.asyncio
+async def test_completed_turn_persists_user_and_assistant_with_compact_sources(
+    conversation_session,
+):
+    db, ids = conversation_session
+
+    conversation = await assistant_conversations.create_assistant_conversation(
+        AssistantConversationCreate(
+            workspace_id=ids["workspace_a"],
+            title="Persistent turn",
+        ),
+        user=ids["owner"],
+        db=db,
+    )
+
+    await persist_completed_turn(
+        db,
+        ids["owner"],
+        conversation_id=conversation.id,
+        workspace_id=ids["workspace_a"],
+        question="Aurora nedir?",
+        answer="Aurora bir örnek yanıttır.",
+        sources=[
+            Source(
+                document="guide.pdf",
+                document_id=11,
+                chunk_index=2,
+                score=0.91,
+                text="This chunk must not be copied into conversation storage.",
+            )
+        ],
+    )
+
+    messages = list(
+        (
+            await db.scalars(
+                select(Message)
+                .where(
+                    Message.session_id == conversation.id
+                )
+                .order_by(Message.id)
+            )
+        ).all()
+    )
+
+    assert [message.role for message in messages] == [
+        "user",
+        "assistant",
+    ]
+    assert messages[0].content == "Aurora nedir?"
+    assert messages[0].sources_json == []
+
+    assert messages[1].content == (
+        "Aurora bir örnek yanıttır."
+    )
+    assert messages[1].sources_json == [
+        {
+            "document": "guide.pdf",
+            "document_id": 11,
+            "chunk_index": 2,
+            "score": 0.91,
+        }
+    ]
+    assert "text" not in messages[1].sources_json[0]
+
+
+@pytest.mark.asyncio
+async def test_completed_turn_rejects_workspace_mismatch_without_messages(
+    conversation_session,
+):
+    db, ids = conversation_session
+
+    conversation = await assistant_conversations.create_assistant_conversation(
+        AssistantConversationCreate(
+            workspace_id=ids["workspace_a"],
+            title="Workspace boundary",
+        ),
+        user=ids["owner"],
+        db=db,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await persist_completed_turn(
+            db,
+            ids["owner"],
+            conversation_id=conversation.id,
+            workspace_id=ids["workspace_b"],
+            question="Question",
+            answer="Answer",
+            sources=[],
+        )
+
+    assert error.value.status_code == 400
+
+    messages = list(
+        (
+            await db.scalars(
+                select(Message).where(
+                    Message.session_id == conversation.id
+                )
+            )
+        ).all()
+    )
+    assert messages == []
+
+
+@pytest.mark.asyncio
+async def test_completed_turn_rejects_archived_conversation_without_messages(
+    conversation_session,
+):
+    db, ids = conversation_session
+
+    conversation = await assistant_conversations.create_assistant_conversation(
+        AssistantConversationCreate(
+            workspace_id=ids["workspace_a"],
+            title="Archived",
+        ),
+        user=ids["owner"],
+        db=db,
+    )
+
+    await assistant_conversations.archive_assistant_conversation(
+        conversation.id,
+        user=ids["owner"],
+        db=db,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await persist_completed_turn(
+            db,
+            ids["owner"],
+            conversation_id=conversation.id,
+            workspace_id=ids["workspace_a"],
+            question="Question",
+            answer="Answer",
+            sources=[],
+        )
+
+    assert error.value.status_code == 409
+
+    messages = list(
+        (
+            await db.scalars(
+                select(Message).where(
+                    Message.session_id == conversation.id
+                )
+            )
+        ).all()
+    )
+    assert messages == []

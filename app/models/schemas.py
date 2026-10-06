@@ -69,6 +69,7 @@ class RagResponse(BaseModel): answer: str; sources: list[Source]
 class RagRequest(BaseModel):
     question: str = Field(min_length=1, max_length=12000)
     knowledge_base_ids: list[int] = Field(default_factory=list, max_length=20)
+    conversation_id: int | None = Field(default=None, gt=0)
 class DocumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
