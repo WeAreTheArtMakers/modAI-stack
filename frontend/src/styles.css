@@ -25,3 +25,203 @@ button { cursor: pointer; }
 
 @keyframes pulse-soft { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
 .pulse-soft { animation: pulse-soft 1.8s ease-in-out infinite; }
+
+/* modAI mascot */
+.modai-mascot-face {
+  position: relative;
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  animation: modai-mascot-float 3.4s ease-in-out infinite;
+}
+
+.modai-mascot-head {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 39px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0.04)
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 6px 14px rgba(0, 0, 0, 0.18);
+}
+
+.modai-mascot-screen {
+  position: relative;
+  display: flex;
+  width: 29px;
+  height: 23px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(22, 211, 238, 0.15),
+      rgba(34, 211, 238, 0.05)
+    );
+  box-shadow:
+    inset 0 0 12px rgba(34, 211, 238, 0.09);
+}
+
+.modai-mascot-eyes {
+  position: absolute;
+  top: 7px;
+  display: flex;
+  gap: 7px;
+}
+
+.modai-mascot-eye {
+  width: 4px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgb(103 232 249);
+  box-shadow:
+    0 0 5px rgba(103, 232, 249, 0.75);
+  transform-origin: center;
+  animation: modai-mascot-blink 5.6s infinite;
+}
+
+.modai-mascot-mouth {
+  position: absolute;
+  bottom: 5px;
+  width: 9px;
+  height: 4px;
+  border-bottom: 1.5px solid rgb(103 232 249);
+  border-radius: 0 0 999px 999px;
+  opacity: 0.85;
+  transition:
+    width 180ms ease,
+    height 180ms ease,
+    opacity 180ms ease;
+}
+
+.modai-mascot-face.is-active .modai-mascot-mouth {
+  width: 11px;
+  height: 5px;
+  opacity: 1;
+}
+
+.modai-mascot-face.is-active .modai-mascot-eye {
+  box-shadow:
+    0 0 7px rgba(103, 232, 249, 0.95);
+}
+
+.modai-mascot-antenna {
+  position: absolute;
+  z-index: 1;
+  top: -4px;
+  left: 50%;
+  width: 1px;
+  height: 8px;
+  background: rgba(103, 232, 249, 0.65);
+  transform: translateX(-50%);
+}
+
+.modai-mascot-antenna-dot {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgb(52 211 153);
+  box-shadow:
+    0 0 7px rgba(52, 211, 153, 0.65);
+  transform: translateX(-50%);
+  animation: modai-mascot-pulse 2.4s ease-in-out infinite;
+}
+
+.modai-mascot-ear {
+  position: absolute;
+  top: 11px;
+  width: 4px;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(103, 232, 249, 0.5);
+}
+
+.modai-mascot-ear-left {
+  left: -3px;
+}
+
+.modai-mascot-ear-right {
+  right: -3px;
+}
+
+.modai-mascot-glow {
+  position: absolute;
+  z-index: 0;
+  bottom: 1px;
+  left: 50%;
+  width: 31px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.18);
+  filter: blur(6px);
+  transform: translateX(-50%);
+}
+
+.modai-mascot-face.is-compact {
+  width: 30px;
+  height: 30px;
+  animation: none;
+  transform: scale(0.72);
+}
+
+@keyframes modai-mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes modai-mascot-blink {
+  0%,
+  46%,
+  50%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  48% {
+    transform: scaleY(0.15);
+  }
+}
+
+@keyframes modai-mascot-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: translateX(-50%) scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modai-mascot-face,
+  .modai-mascot-eye,
+  .modai-mascot-antenna-dot {
+    animation: none;
+  }
+}
