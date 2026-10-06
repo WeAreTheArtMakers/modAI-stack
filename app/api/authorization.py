@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.database import Document, KnowledgeBase, Membership, Workspace
+from app.models.database import ChatSession, Document, KnowledgeBase, Membership, Workspace
 
 ROLE_ORDER = {"user": 1, "manager": 2, "admin": 3}
 def role_allows(role: str, minimum: str) -> bool: return ROLE_ORDER.get(role, 0) >= ROLE_ORDER[minimum]
@@ -145,6 +145,29 @@ async def resolve_knowledge_base_scope(
     if len(scopes) != 1:
         raise HTTPException(400, "Selected knowledge bases must share a workspace")
     return [row[0].id for row in rows], rows[0]
+
+async def require_assistant_conversation_access(
+    db: AsyncSession,
+    user: dict,
+    conversation_id: int,
+) -> ChatSession:
+    conversation = await db.scalar(
+        select(ChatSession).where(
+            ChatSession.id == conversation_id,
+            ChatSession.user_id == int(user["sub"]),
+            ChatSession.workspace_id.is_not(None),
+        )
+    )
+    if conversation is None:
+        raise HTTPException(404, "Conversation not found")
+
+    await require_workspace_access(
+        db,
+        user,
+        conversation.workspace_id,
+    )
+    return conversation
+
 
 async def require_workspace_role(db: AsyncSession, user: dict, workspace_id: int, role: str) -> Membership:
     return await require_workspace_access(db, user, workspace_id, role)

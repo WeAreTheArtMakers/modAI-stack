@@ -34,6 +34,31 @@ class CurrentUserResponse(BaseModel):
     workspaces: list[WorkspaceResponse]
 class ChatRequest(BaseModel): prompt: str = Field(min_length=1, max_length=12000)
 class ChatResponse(BaseModel): answer: str
+
+
+class AssistantConversationCreate(BaseModel):
+    workspace_id: int = Field(gt=0)
+    title: str | None = Field(default=None, max_length=200)
+
+
+class AssistantConversationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    workspace_id: int
+    title: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    archived_at: datetime | None = None
+
+
+class AssistantConversationListResponse(BaseModel):
+    items: list[AssistantConversationResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 class Source(BaseModel):
     document: str
     score: float
