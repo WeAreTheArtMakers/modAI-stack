@@ -245,3 +245,455 @@ async def test_websocket_rag_passes_postgres_session_to_retrieval(
 
     assert {"type": "token", "data": "token"} in ws.messages
     assert {"type": "complete"} in ws.messages
+
+
+@pytest.mark.asyncio
+async def test_http_rag_persists_only_after_generation_completes(
+    monkeypatch,
+):
+    import app.api.routes.rag as rag_module
+    from app.models.schemas import RagRequest, Source
+
+    events = []
+
+    class NoopLimiter:
+        async def enforce(self, *_args):
+            return None
+
+        async def close(self):
+            return None
+
+    async def resolve_scope(
+        _db,
+        _user,
+        knowledge_base_ids,
+    ):
+        assert knowledge_base_ids == [4]
+        return (
+            [4],
+            (
+                SimpleNamespace(id=4),
+                SimpleNamespace(
+                    id=3,
+                    organization_id=2,
+                ),
+                SimpleNamespace(role="user"),
+            ),
+        )
+
+    async def require_turn_scope(
+        _db,
+        _user,
+        conversation_id,
+        workspace_id,
+    ):
+        events.append(
+            (
+                "validated",
+                conversation_id,
+                workspace_id,
+            )
+        )
+        return SimpleNamespace(id=12)
+
+    async def retrieve(_question, **_kwargs):
+        return SimpleNamespace(
+            prompt="prompt",
+            sources=[
+                Source(
+                    document="guide.pdf",
+                    document_id=8,
+                    chunk_index=1,
+                    score=0.9,
+                    text="source text",
+                )
+            ],
+        )
+
+    class FakeProvider:
+        async def generate(self, prompt):
+            assert prompt == "prompt"
+            events.append("generated")
+            return "completed answer"
+
+    async def persist(
+        _db,
+        _user,
+        **kwargs,
+    ):
+        events.append(
+            (
+                "persisted",
+                kwargs,
+            )
+        )
+
+    monkeypatch.setattr(
+        rag_module,
+        "RedisRateLimiter",
+        NoopLimiter,
+    )
+    monkeypatch.setattr(
+        rag_module,
+        "resolve_knowledge_base_scope",
+        resolve_scope,
+    )
+    monkeypatch.setattr(
+        rag_module,
+        "require_conversation_turn_scope",
+        require_turn_scope,
+    )
+    monkeypatch.setattr(
+        rag_module,
+        "retrieve_rag_context",
+        retrieve,
+    )
+    monkeypatch.setattr(
+        rag_module,
+        "OllamaProvider",
+        lambda: FakeProvider(),
+    )
+    monkeypatch.setattr(
+        rag_module,
+        "persist_completed_turn",
+        persist,
+    )
+
+    response = await rag_module.query(
+        RagRequest(
+            question="question",
+            knowledge_base_ids=[4],
+            conversation_id=12,
+        ),
+        None,
+        user={"sub": "7"},
+        db=object(),
+    )
+
+    assert response.answer == "completed answer"
+
+    assert events[0] == (
+        "validated",
+        12,
+        3,
+    )
+    assert events[1] == "generated"
+    assert events[2][0] == "persisted"
+    assert events[2][1]["conversation_id"] == 12
+    assert events[2][1]["workspace_id"] == 3
+    assert events[2][1]["question"] == "question"
+    assert events[2][1]["answer"] == (
+        "completed answer"
+    )
+
+
+@pytest.mark.asyncio
+async def test_websocket_rag_persists_before_complete_event(
+    monkeypatch,
+):
+    import app.api.websocket.rag as websocket_rag_module
+    from app.models.schemas import Source
+    from starlette.websockets import WebSocketDisconnect
+
+    db = object()
+    timeline = []
+
+    class SessionContext:
+        async def __aenter__(self):
+            return db
+
+        async def __aexit__(self, *_args):
+            return None
+
+    class FakeWebSocket:
+        def __init__(self):
+            self.receive_count = 0
+            self.messages = []
+
+        async def accept(self):
+            return None
+
+        async def receive_json(self):
+            self.receive_count += 1
+
+            if self.receive_count == 1:
+                return {
+                    "question": "question",
+                    "knowledge_base_ids": [4],
+                    "conversation_id": 12,
+                }
+
+            raise WebSocketDisconnect()
+
+        async def send_json(self, value):
+            self.messages.append(value)
+            timeline.append(
+                (
+                    "send",
+                    value["type"],
+                )
+            )
+
+        async def close(self, code=None):
+            return None
+
+    async def fake_user(_ws, _scope):
+        return {"sub": "7"}
+
+    async def resolve_scope(
+        _db,
+        _user,
+        _knowledge_base_ids,
+    ):
+        return (
+            [4],
+            (
+                SimpleNamespace(id=4),
+                SimpleNamespace(
+                    id=3,
+                    organization_id=2,
+                ),
+                SimpleNamespace(role="user"),
+            ),
+        )
+
+    async def require_turn_scope(
+        _db,
+        _user,
+        conversation_id,
+        workspace_id,
+    ):
+        assert conversation_id == 12
+        assert workspace_id == 3
+        timeline.append(("validated", 12))
+        return SimpleNamespace(id=12)
+
+    async def retrieve(_question, **_kwargs):
+        return SimpleNamespace(
+            prompt="prompt",
+            sources=[
+                Source(
+                    document="guide.pdf",
+                    document_id=8,
+                    chunk_index=1,
+                    score=0.9,
+                    text="source text",
+                )
+            ],
+        )
+
+    class FakeProvider:
+        async def stream(self, prompt):
+            assert prompt == "prompt"
+            yield "hello "
+            yield "world"
+
+    async def persist(
+        _db,
+        _user,
+        **kwargs,
+    ):
+        timeline.append(
+            (
+                "persist",
+                kwargs["answer"],
+            )
+        )
+        assert kwargs["conversation_id"] == 12
+        assert kwargs["workspace_id"] == 3
+
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "websocket_user",
+        fake_user,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "SessionLocal",
+        lambda: SessionContext(),
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "resolve_knowledge_base_scope",
+        resolve_scope,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "require_conversation_turn_scope",
+        require_turn_scope,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "retrieve_rag_context",
+        retrieve,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "provider",
+        FakeProvider(),
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "persist_completed_turn",
+        persist,
+    )
+
+    ws = FakeWebSocket()
+
+    await websocket_rag_module.websocket_rag(ws)
+
+    assert (
+        "persist",
+        "hello world",
+    ) in timeline
+
+    persist_index = timeline.index(
+        (
+            "persist",
+            "hello world",
+        )
+    )
+    complete_index = timeline.index(
+        (
+            "send",
+            "complete",
+        )
+    )
+
+    assert persist_index < complete_index
+
+
+@pytest.mark.asyncio
+async def test_websocket_rag_does_not_persist_partial_provider_failure(
+    monkeypatch,
+):
+    import app.api.websocket.rag as websocket_rag_module
+    from starlette.websockets import WebSocketDisconnect
+
+    db = object()
+    persisted = []
+
+    class SessionContext:
+        async def __aenter__(self):
+            return db
+
+        async def __aexit__(self, *_args):
+            return None
+
+    class FakeWebSocket:
+        def __init__(self):
+            self.receive_count = 0
+            self.messages = []
+
+        async def accept(self):
+            return None
+
+        async def receive_json(self):
+            self.receive_count += 1
+
+            if self.receive_count == 1:
+                return {
+                    "question": "question",
+                    "knowledge_base_ids": [4],
+                    "conversation_id": 12,
+                }
+
+            raise WebSocketDisconnect()
+
+        async def send_json(self, value):
+            self.messages.append(value)
+
+        async def close(self, code=None):
+            return None
+
+    async def fake_user(_ws, _scope):
+        return {"sub": "7"}
+
+    async def resolve_scope(
+        _db,
+        _user,
+        _knowledge_base_ids,
+    ):
+        return (
+            [4],
+            (
+                SimpleNamespace(id=4),
+                SimpleNamespace(
+                    id=3,
+                    organization_id=2,
+                ),
+                SimpleNamespace(role="user"),
+            ),
+        )
+
+    async def require_turn_scope(
+        *_args,
+    ):
+        return SimpleNamespace(id=12)
+
+    async def retrieve(_question, **_kwargs):
+        return SimpleNamespace(
+            prompt="prompt",
+            sources=[],
+        )
+
+    class FailingProvider:
+        async def stream(self, _prompt):
+            yield "partial"
+            raise RuntimeError("provider failed")
+
+    async def persist(*_args, **_kwargs):
+        persisted.append(True)
+
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "websocket_user",
+        fake_user,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "SessionLocal",
+        lambda: SessionContext(),
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "resolve_knowledge_base_scope",
+        resolve_scope,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "require_conversation_turn_scope",
+        require_turn_scope,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "retrieve_rag_context",
+        retrieve,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "provider",
+        FailingProvider(),
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "persist_completed_turn",
+        persist,
+    )
+
+    ws = FakeWebSocket()
+
+    await websocket_rag_module.websocket_rag(ws)
+
+    assert persisted == []
+    assert {
+        "type": "token",
+        "data": "partial",
+    } in ws.messages
+    assert {
+        "type": "error",
+        "data": "RAG streaming failed",
+    } in ws.messages
+    assert {
+        "type": "complete",
+    } not in ws.messages
