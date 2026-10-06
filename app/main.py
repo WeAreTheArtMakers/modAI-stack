@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app.core.config import get_settings
 from app.db.session import init_db
-from app.api.routes import admin, audit, auth, chat, documents, health, knowledge_bases, metrics, models, rag, retrieval, workspaces
+from app.api.routes import admin, assistant_conversations, audit, auth, chat, documents, health, knowledge_bases, metrics, models, rag, retrieval, workspaces
 from app.api.websocket import chat as ws_chat
 from app.api.websocket import indexing as ws_indexing
 from app.api.websocket import rag as ws_rag
@@ -88,4 +88,4 @@ async def request_metrics(request: Request, call_next):
         return response
     finally:
         request_id_context.reset(token)
-app.include_router(auth.router); app.include_router(chat.router); app.include_router(documents.router); app.include_router(health.router); app.include_router(knowledge_bases.router); app.include_router(workspaces.router); app.include_router(models.router); app.include_router(rag.router); app.include_router(retrieval.router); app.include_router(audit.router); app.include_router(admin.router); app.include_router(metrics.router); app.include_router(ws_chat.router); app.include_router(ws_indexing.router); app.include_router(ws_rag.router); app.include_router(ws_models.router)
+app.include_router(auth.router); app.include_router(assistant_conversations.router); app.include_router(chat.router); app.include_router(documents.router); app.include_router(health.router); app.include_router(knowledge_bases.router); app.include_router(workspaces.router); app.include_router(models.router); app.include_router(rag.router); app.include_router(retrieval.router); app.include_router(audit.router); app.include_router(admin.router); app.include_router(metrics.router); app.include_router(ws_chat.router); app.include_router(ws_indexing.router); app.include_router(ws_rag.router); app.include_router(ws_models.router)
