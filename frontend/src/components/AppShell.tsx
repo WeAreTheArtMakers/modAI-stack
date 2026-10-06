@@ -7,6 +7,7 @@ import { Logo } from "./Logo";
 import { MascotOverlay } from "./mascot/MascotOverlay";
 import { useAuth } from "../auth/AuthContext";
 import { WorkspaceProvider, useWorkspace } from "../workspace/WorkspaceContext";
+import { ThemeToggle } from "../theme/ThemeToggle";
 
 const navItems = [
   { to: "/", label: "Genel Bakış", icon: LayoutDashboard },
@@ -53,7 +54,7 @@ function ShellContent() {
   </aside>;
 
   return <div className="flex min-h-screen bg-cloud">{sidebar}{mobileOpen && <button className="fixed inset-0 z-30 bg-ink/20 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Menüyü kapat" />}
-    <main className="min-w-0 flex-1"><header className="flex h-20 items-center justify-between border-b border-slate-200/80 bg-white/80 px-5 backdrop-blur lg:px-10"><button className="rounded-xl p-2 text-slate-500 hover:bg-cloud lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Menüyü aç"><Menu size={21} /></button><div className="hidden items-center gap-2 text-sm text-slate-500 lg:flex"><Activity size={16} className="text-cyan" /> Local-first enterprise AI</div><div className="ml-auto flex items-center gap-3 text-xs text-slate-500"><span className={`h-2 w-2 rounded-full ${socketState === "open" ? "bg-emerald-500" : socketState === "connecting" ? "bg-amber-400 pulse-soft" : "bg-slate-300"}`} /> {socketState === "open" ? "İndeks akışı aktif" : socketState === "connecting" ? "Bağlanıyor" : "İndeks akışı beklemede"}</div></header><div className="mx-auto max-w-[1500px] px-5 py-8 lg:px-10"><Outlet context={{ currentWorkspace: current }} /></div></main>
+    <main className="min-w-0 flex-1"><header className="flex h-20 items-center justify-between border-b border-slate-200/80 bg-white/80 px-5 backdrop-blur lg:px-10"><button className="rounded-xl p-2 text-slate-500 hover:bg-cloud lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Menüyü aç"><Menu size={21} /></button><div className="hidden items-center gap-2 text-sm text-slate-500 lg:flex"><Activity size={16} className="text-cyan" /> Local-first enterprise AI</div><div className="ml-auto flex items-center gap-3"><ThemeToggle /><div className="flex items-center gap-2 text-xs text-slate-500"><span className={`h-2 w-2 rounded-full ${socketState === "open" ? "bg-emerald-500" : socketState === "connecting" ? "bg-amber-400 pulse-soft" : "bg-slate-300"}`} /> {socketState === "open" ? "İndeks akışı aktif" : socketState === "connecting" ? "Bağlanıyor" : "İndeks akışı beklemede"}</div></div></header><div className="mx-auto max-w-[1500px] px-5 py-8 lg:px-10"><Outlet context={{ currentWorkspace: current }} /></div></main>
     <MascotOverlay />
   </div>;
 }

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppShell from "../components/AppShell";
+import { ThemeProvider } from "../theme/ThemeProvider";
 import { AdminPage } from "../pages/AdminPage";
 import type { UserContext } from "../types";
 
@@ -20,7 +21,7 @@ vi.mock("../api/websocket", () => ({ connectIndexing: () => vi.fn() }));
 
 function renderShell(route = "/") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[route]}><Routes><Route element={<AppShell />}><Route path="/" element={<p>Dashboard</p>} /><Route path="/admin/memberships" element={<AdminPage section="memberships" />} /></Route></Routes></MemoryRouter></QueryClientProvider>);
+  return render(<ThemeProvider><QueryClientProvider client={client}><MemoryRouter initialEntries={[route]}><Routes><Route element={<AppShell />}><Route path="/" element={<p>Dashboard</p>} /><Route path="/admin/memberships" element={<AdminPage section="memberships" />} /></Route></Routes></MemoryRouter></QueryClientProvider></ThemeProvider>);
 }
 
 beforeEach(() => {
