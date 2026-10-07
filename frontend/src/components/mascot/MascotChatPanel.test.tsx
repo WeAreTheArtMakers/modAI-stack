@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   waitFor,
@@ -24,12 +25,24 @@ import {
 
 const mocks = vi.hoisted(() => ({
   listKnowledgeBases: vi.fn(),
+  listAssistantConversations: vi.fn(),
+  createAssistantConversation: vi.fn(),
+  getAssistantConversation: vi.fn(),
   streamRag: vi.fn(),
 }));
 
 vi.mock("../../api/knowledgeBases", () => ({
   listKnowledgeBases:
     mocks.listKnowledgeBases,
+}));
+
+vi.mock("../../api/assistantConversations", () => ({
+  listAssistantConversations:
+    mocks.listAssistantConversations,
+  createAssistantConversation:
+    mocks.createAssistantConversation,
+  getAssistantConversation:
+    mocks.getAssistantConversation,
 }));
 
 vi.mock("../../api/websocket", () => ({
@@ -68,6 +81,37 @@ beforeEach(() => {
 
   mocks.streamRag.mockResolvedValue(
     undefined,
+  );
+
+  mocks.listAssistantConversations.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
+  });
+  mocks.createAssistantConversation.mockImplementation(
+    async (workspaceId: number) => ({
+      id: 100 + workspaceId,
+      workspace_id: workspaceId,
+      title: null,
+      created_at: null,
+      updated_at: null,
+      archived_at: null,
+    }),
+  );
+  mocks.getAssistantConversation.mockImplementation(
+    async (id: number) => ({
+      id,
+      workspace_id: id - 100,
+      title: null,
+      created_at: null,
+      updated_at: null,
+      archived_at: null,
+      messages: [],
+      message_total: 0,
+      message_limit: 100,
+      message_offset: 0,
+    }),
   );
 });
 
@@ -404,8 +448,271 @@ describe("MascotChatPanel", () => {
       expect(call[3]).toBeInstanceOf(
         AbortSignal,
       );
+      expect(call[4]).toEqual({ conversationId: 107 });
+      expect(mocks.createAssistantConversation)
+        .toHaveBeenCalledWith(7);
 
       expect(input).toHaveValue("");
+    },
+  );
+
+  it(
+    "hydrates the active conversation in chronological order and continues it",
+    async () => {
+      const user = userEvent.setup();
+      mocks.listAssistantConversations.mockResolvedValue({
+        items: [{
+          id: 42,
+          workspace_id: 7,
+          title: null,
+          created_at: null,
+          updated_at: null,
+          archived_at: null,
+        }],
+        total: 1,
+        limit: 100,
+        offset: 0,
+      });
+      mocks.getAssistantConversation.mockResolvedValue({
+        id: 42,
+        workspace_id: 7,
+        title: null,
+        created_at: null,
+        updated_at: null,
+        archived_at: null,
+        messages: [
+          {
+            id: 8,
+            role: "user",
+            content: "Earlier question",
+            sources: [],
+            created_at: null,
+          },
+          {
+            id: 9,
+            role: "assistant",
+            content: "Earlier answer",
+            sources: [{
+              document: "policy.pdf",
+              score: 0.9,
+              document_id: 5,
+              chunk_index: 2,
+            }],
+            created_at: null,
+          },
+        ],
+        message_total: 2,
+        message_limit: 100,
+        message_offset: 0,
+      });
+
+      render(
+        <MascotChatPanel
+          workspaceId={7}
+          onClose={vi.fn()}
+        />,
+      );
+
+      expect(await screen.findByText("Earlier question"))
+        .toBeInTheDocument();
+      expect(screen.getByText("Earlier answer"))
+        .toBeInTheDocument();
+      expect(screen.getByText("1 kaynak"))
+        .toBeInTheDocument();
+
+      const input = screen.getByRole(
+        "textbox",
+        { name: "Maskota mesaj yaz" },
+      );
+      await user.type(input, "Follow-up question");
+      await user.click(screen.getByRole(
+        "button",
+        { name: "Mesaj gönder" },
+      ));
+
+      await waitFor(() => expect(mocks.streamRag).toHaveBeenCalledTimes(1));
+      expect(mocks.createAssistantConversation)
+        .not.toHaveBeenCalled();
+      expect(mocks.streamRag.mock.calls[0][4])
+        .toEqual({ conversationId: 42 });
+    },
+  );
+
+  it(
+    "uses only the newly selected workspace conversation after a workspace switch",
+    async () => {
+      const user = userEvent.setup();
+      mocks.listAssistantConversations.mockImplementation(
+        async (workspaceId: number) => ({
+          items: [{
+            id: workspaceId === 7 ? 42 : 84,
+            workspace_id: workspaceId,
+            title: null,
+            created_at: null,
+            updated_at: null,
+            archived_at: null,
+          }],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }),
+      );
+      mocks.getAssistantConversation.mockImplementation(
+        async (id: number) => ({
+          id,
+          workspace_id: id === 42 ? 7 : 8,
+          title: null,
+          created_at: null,
+          updated_at: null,
+          archived_at: null,
+          messages: [{
+            id,
+            role: "assistant",
+            content: id === 42 ? "Workspace seven history" : "Workspace eight history",
+            sources: [],
+            created_at: null,
+          }],
+          message_total: 1,
+          message_limit: 100,
+          message_offset: 0,
+        }),
+      );
+
+      const view = render(
+        <MascotChatPanel
+          workspaceId={7}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(await screen.findByText("Workspace seven history"))
+        .toBeInTheDocument();
+
+      view.rerender(
+        <MascotChatPanel
+          workspaceId={8}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(await screen.findByText("Workspace eight history"))
+        .toBeInTheDocument();
+      expect(screen.queryByText("Workspace seven history"))
+        .not.toBeInTheDocument();
+
+      const input = await screen.findByRole(
+        "textbox",
+        { name: "Maskota mesaj yaz" },
+      );
+      await user.type(input, "Question in workspace eight");
+      await user.click(screen.getByRole(
+        "button",
+        { name: "Mesaj gönder" },
+      ));
+
+      await waitFor(() => expect(mocks.streamRag).toHaveBeenCalledTimes(1));
+      expect(mocks.streamRag.mock.calls[0][0]).toEqual([99]);
+      expect(mocks.streamRag.mock.calls[0][4])
+        .toEqual({ conversationId: 84 });
+    },
+  );
+
+  it(
+    "ignores a stale conversation-list response from the previous workspace",
+    async () => {
+      let resolveOldList!: (value: {
+        items: Array<{
+          id: number;
+          workspace_id: number;
+          title: null;
+          created_at: null;
+          updated_at: null;
+          archived_at: null;
+        }>;
+        total: number;
+        limit: number;
+        offset: number;
+      }) => void;
+      mocks.listAssistantConversations.mockImplementation(
+        (workspaceId: number) => {
+          if (workspaceId === 7) {
+            return new Promise((resolve) => {
+              resolveOldList = resolve;
+            });
+          }
+          return Promise.resolve({
+            items: [{
+              id: 84,
+              workspace_id: 8,
+              title: null,
+              created_at: null,
+              updated_at: null,
+              archived_at: null,
+            }],
+            total: 1,
+            limit: 100,
+            offset: 0,
+          });
+        },
+      );
+      mocks.getAssistantConversation.mockImplementation(
+        async (id: number) => ({
+          id,
+          workspace_id: id === 42 ? 7 : 8,
+          title: null,
+          created_at: null,
+          updated_at: null,
+          archived_at: null,
+          messages: [{
+            id,
+            role: "assistant",
+            content: id === 42 ? "Stale workspace result" : "Current workspace result",
+            sources: [],
+            created_at: null,
+          }],
+          message_total: 1,
+          message_limit: 100,
+          message_offset: 0,
+        }),
+      );
+
+      const view = render(
+        <MascotChatPanel
+          workspaceId={7}
+          onClose={vi.fn()}
+        />,
+      );
+      view.rerender(
+        <MascotChatPanel
+          workspaceId={8}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(await screen.findByText("Current workspace result"))
+        .toBeInTheDocument();
+
+      await act(async () => {
+        resolveOldList({
+          items: [{
+            id: 42,
+            workspace_id: 7,
+            title: null,
+            created_at: null,
+            updated_at: null,
+            archived_at: null,
+          }],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        });
+      });
+
+      expect(mocks.getAssistantConversation)
+        .toHaveBeenCalledTimes(1);
+      expect(mocks.getAssistantConversation)
+        .toHaveBeenCalledWith(84);
+      expect(screen.queryByText("Stale workspace result"))
+        .not.toBeInTheDocument();
+      expect(screen.getByText("Current workspace result"))
+        .toBeInTheDocument();
     },
   );
 

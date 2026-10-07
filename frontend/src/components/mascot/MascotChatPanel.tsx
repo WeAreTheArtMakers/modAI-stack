@@ -17,6 +17,12 @@ import {
 } from "../../api/client";
 
 import {
+  createAssistantConversation,
+  getAssistantConversation,
+  listAssistantConversations,
+} from "../../api/assistantConversations";
+
+import {
   listKnowledgeBases,
 } from "../../api/knowledgeBases";
 
@@ -254,7 +260,29 @@ export function MascotChatPanel({
   const abortRef =
     useRef<AbortController | null>(null);
 
+  const submissionRef = useRef(false);
+  const workspaceGenerationRef = useRef(0);
+  const activeWorkspaceRef = useRef<number | null>(null);
+  const conversationRef = useRef<{
+    workspaceId: number;
+    id: number;
+  } | null>(null);
+  const createConversationRef = useRef<{
+    workspaceId: number;
+    promise: Promise<number>;
+  } | null>(null);
+  const workspaceLoadRef = useRef<{
+    workspaceId: number;
+    promise: Promise<void>;
+  } | null>(null);
+
   useEffect(() => {
+    const generation =
+      workspaceGenerationRef.current + 1;
+    workspaceGenerationRef.current = generation;
+    activeWorkspaceRef.current = workspaceId;
+    submissionRef.current = false;
+
     const previousController = abortRef.current;
 
     abortRef.current = null;
@@ -266,9 +294,11 @@ export function MascotChatPanel({
     setMessages(INITIAL_MESSAGES);
     setNextId(2);
     setKnowledgeBases([]);
+    conversationRef.current = null;
 
     if (workspaceId === null) {
       setLoadingSources(false);
+      workspaceLoadRef.current = null;
       return;
     }
 
@@ -276,25 +306,76 @@ export function MascotChatPanel({
 
     setLoadingSources(true);
 
-    void listKnowledgeBases()
-      .then((items) => {
-        if (!active) return;
+    const loadWorkspace = async () => {
+      const [knowledgeBaseResult, conversationResult] =
+        await Promise.allSettled([
+          listKnowledgeBases(),
+          listAssistantConversations(workspaceId),
+        ]);
 
+      if (!active || workspaceGenerationRef.current !== generation) {
+        return;
+      }
+
+      if (knowledgeBaseResult.status === "fulfilled") {
         setKnowledgeBases(
-          items.filter(
-            (item) =>
-              item.workspace_id === workspaceId,
+          knowledgeBaseResult.value.filter(
+            (item) => item.workspace_id === workspaceId,
           ),
         );
-      })
-      .catch((reason) => {
-        if (!active) return;
-        setError(getErrorMessage(reason));
-      })
-      .finally(() => {
-        if (!active) return;
+      } else {
+        setError(getErrorMessage(knowledgeBaseResult.reason));
+      }
+
+      if (conversationResult.status === "fulfilled") {
+        const conversation = conversationResult.value.items.find(
+          (item) => item.workspace_id === workspaceId,
+        );
+        if (conversation) {
+          conversationRef.current = {
+            workspaceId,
+            id: conversation.id,
+          };
+          try {
+            const detail = await getAssistantConversation(
+              conversation.id,
+            );
+            if (!active || workspaceGenerationRef.current !== generation) {
+              return;
+            }
+            setMessages([
+              ...INITIAL_MESSAGES,
+              ...detail.messages.map((message) => ({
+                id: -message.id,
+                role: message.role,
+                content: message.content,
+                sources: message.sources.map((source) => ({
+                  ...source,
+                  text: null,
+                })),
+              })),
+            ]);
+          } catch (reason) {
+            if (active) setError(getErrorMessage(reason));
+          }
+        }
+      } else {
+        setError(getErrorMessage(conversationResult.reason));
+      }
+
+      if (active && workspaceGenerationRef.current === generation) {
         setLoadingSources(false);
-      });
+      }
+    };
+
+    const promise = loadWorkspace();
+    workspaceLoadRef.current = { workspaceId, promise };
+    void promise.catch((reason: unknown) => {
+      if (active && workspaceGenerationRef.current === generation) {
+        setError(getErrorMessage(reason));
+        setLoadingSources(false);
+      }
+    });
 
     return () => {
       active = false;
@@ -305,6 +386,43 @@ export function MascotChatPanel({
       controller?.abort();
     };
   }, [workspaceId]);
+
+  async function ensureConversation(
+    targetWorkspaceId: number,
+    generation: number,
+  ): Promise<number> {
+    const loaded = conversationRef.current;
+    if (loaded?.workspaceId === targetWorkspaceId) {
+      return loaded.id;
+    }
+
+    const pending = createConversationRef.current;
+    if (pending?.workspaceId === targetWorkspaceId) {
+      const id = await pending.promise;
+      if (workspaceGenerationRef.current === generation) {
+        conversationRef.current = { workspaceId: targetWorkspaceId, id };
+      }
+      return id;
+    }
+
+    const promise = createAssistantConversation(targetWorkspaceId)
+      .then((conversation) => conversation.id);
+    createConversationRef.current = {
+      workspaceId: targetWorkspaceId,
+      promise,
+    };
+    try {
+      const id = await promise;
+      if (workspaceGenerationRef.current === generation) {
+        conversationRef.current = { workspaceId: targetWorkspaceId, id };
+      }
+      return id;
+    } finally {
+      if (createConversationRef.current?.promise === promise) {
+        createConversationRef.current = null;
+      }
+    }
+  }
 
   const sourceLimitExceeded =
     knowledgeBases.length
@@ -363,7 +481,7 @@ export function MascotChatPanel({
 
     const trimmed = question.trim();
 
-    if (!trimmed || busy) {
+    if (!trimmed || busy || submissionRef.current) {
       return;
     }
 
@@ -438,6 +556,9 @@ export function MascotChatPanel({
     const controller =
       new AbortController();
 
+    const generation = workspaceGenerationRef.current;
+    submissionRef.current = true;
+
     abortRef.current?.abort();
     abortRef.current = controller;
 
@@ -453,6 +574,30 @@ export function MascotChatPanel({
     ]);
 
     try {
+      const currentWorkspaceLoad = workspaceLoadRef.current;
+      if (currentWorkspaceLoad?.workspaceId === workspaceId) {
+        await currentWorkspaceLoad.promise;
+      }
+      if (
+        controller.signal.aborted
+        || workspaceGenerationRef.current !== generation
+        || activeWorkspaceRef.current !== workspaceId
+      ) {
+        return;
+      }
+
+      const activeConversationId = await ensureConversation(
+        workspaceId,
+        generation,
+      );
+      if (
+        controller.signal.aborted
+        || workspaceGenerationRef.current !== generation
+        || activeWorkspaceRef.current !== workspaceId
+      ) {
+        return;
+      }
+
       await streamRag(
         ragScope.knowledgeBaseIds,
         trimmed,
@@ -526,6 +671,7 @@ export function MascotChatPanel({
           );
         },
         controller.signal,
+        { conversationId: activeConversationId },
       );
     } catch (reason) {
       if (
@@ -548,6 +694,7 @@ export function MascotChatPanel({
 
       setError(getErrorMessage(reason));
     } finally {
+      submissionRef.current = false;
       if (abortRef.current === controller) {
         abortRef.current = null;
         setBusy(false);
