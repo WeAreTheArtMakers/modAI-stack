@@ -1,5 +1,5 @@
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from sqlalchemy import text
 
 from app.core.config import get_settings
@@ -10,6 +10,14 @@ from app.services.rag.embeddings import embedding_model_status
 router = APIRouter(tags=["health"])
 @router.get("/health")
 async def health(): return {"status": "ok"}
+
+
+@router.get("/version")
+async def version(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return {"build_sha": get_settings().build_sha}
+
+
 @router.get("/ready")
 async def ready():
     dependencies = {"postgres": False, "redis": False, "qdrant": False}

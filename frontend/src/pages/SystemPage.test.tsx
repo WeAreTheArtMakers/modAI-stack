@@ -3,8 +3,10 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { RetrievalProfileCatalog } from "../types";
 import { SystemPage } from "./SystemPage";
+import { ReleaseBuildPanel } from "./SystemPage";
 
 vi.mock("../api/health", () => ({ getReadiness: vi.fn() }));
+vi.mock("../api/version", () => ({ getBackendVersion: vi.fn() }));
 vi.mock("../api/models", () => ({ getModelStatus: vi.fn() }));
 vi.mock("../api/retrieval", () => ({ getRetrievalProfiles: vi.fn() }));
 
@@ -91,6 +93,16 @@ describe("SystemPage retrieval profile catalog", () => {
     }
     expect(screen.queryByText("API sinyali yok")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("all-MiniLM-L6-v2");
+  });
+
+  it("shows frontend/backend short SHAs and synchronized state", () => {
+    const sha = "abcdef0123456789abcdef0123456789abcdef01";
+    const { container } = render(
+      <ReleaseBuildPanel frontendBuildSha={sha} backendBuildSha={sha.toUpperCase()} />,
+    );
+    expect(screen.getAllByText("abcdef012345")).toHaveLength(2);
+    expect(screen.getByText("Synced")).toBeInTheDocument();
+    expect(container.querySelector(`[title="${sha}"]`)).toBeInTheDocument();
   });
 
   it("shows a failed dependency from /ready as unavailable, not unknown", async () => {
