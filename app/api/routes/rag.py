@@ -25,6 +25,8 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
     try: await limiter.enforce("rag", str(user["sub"]), get_settings().rate_limit_rag_per_minute, 60)
     finally: await limiter.close()
     authorized_kb_ids, kb_scope = await resolve_knowledge_base_scope(db, user, req.knowledge_base_ids)
+    workspace_id = int(kb_scope[1].id)
+    organization_id = int(kb_scope[1].organization_id)
 
     history = None
     if req.conversation_id is not None:
@@ -32,7 +34,7 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
             db,
             user,
             req.conversation_id,
-            kb_scope[1].id,
+            workspace_id,
         )
 
     preferences = await get_effective_assistant_preferences(
@@ -43,8 +45,8 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
         context = await retrieve_rag_context(
             req.question,
             db=db,
-            organization_id=kb_scope[1].organization_id,
-            workspace_id=kb_scope[1].id,
+            organization_id=organization_id,
+            workspace_id=workspace_id,
             knowledge_base_ids=authorized_kb_ids,
             history=history,
             preferences=generation_preference_values(preferences),
@@ -64,7 +66,7 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
             db,
             user,
             conversation_id=req.conversation_id,
-            workspace_id=kb_scope[1].id,
+            workspace_id=workspace_id,
             question=req.question,
             answer=answer,
             sources=context.sources,
