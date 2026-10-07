@@ -1,5 +1,6 @@
 import {
   act,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -539,6 +540,54 @@ describe("MascotChatPanel", () => {
   );
 
   it(
+    "creates only one conversation when two submit events arrive concurrently",
+    async () => {
+      let finishCreate!: (conversation: {
+        id: number;
+        workspace_id: number;
+        title: null;
+        created_at: null;
+        updated_at: null;
+        archived_at: null;
+      }) => void;
+      mocks.createAssistantConversation.mockImplementation(
+        () => new Promise((resolve) => {
+          finishCreate = resolve;
+        }),
+      );
+
+      render(
+        <MascotChatPanel
+          workspaceId={7}
+          onClose={vi.fn()}
+        />,
+      );
+      const input = await screen.findByRole(
+        "textbox",
+        { name: "Maskota mesaj yaz" },
+      );
+      await userEvent.setup().type(input, "Concurrent submission");
+      const form = input.closest("form");
+      expect(form).not.toBeNull();
+      fireEvent.submit(form!);
+      fireEvent.submit(form!);
+
+      await waitFor(() => expect(
+        mocks.createAssistantConversation,
+      ).toHaveBeenCalledTimes(1));
+      await act(async () => finishCreate({
+        id: 107,
+        workspace_id: 7,
+        title: null,
+        created_at: null,
+        updated_at: null,
+        archived_at: null,
+      }));
+      await waitFor(() => expect(mocks.streamRag).toHaveBeenCalledTimes(1));
+    },
+  );
+
+  it(
     "uses only the newly selected workspace conversation after a workspace switch",
     async () => {
       const user = userEvent.setup();
@@ -713,6 +762,157 @@ describe("MascotChatPanel", () => {
         .not.toBeInTheDocument();
       expect(screen.getByText("Current workspace result"))
         .toBeInTheDocument();
+    },
+  );
+
+  it(
+    "ignores a stale conversation-detail response after switching workspaces",
+    async () => {
+      let resolveOldDetail!: (detail: {
+        id: number;
+        workspace_id: number;
+        title: null;
+        created_at: null;
+        updated_at: null;
+        archived_at: null;
+        messages: Array<{
+          id: number;
+          role: "assistant";
+          content: string;
+          sources: [];
+          created_at: null;
+        }>;
+        message_total: number;
+        message_limit: number;
+        message_offset: number;
+      }) => void;
+      mocks.listAssistantConversations.mockImplementation(
+        async (workspaceId: number) => ({
+          items: [{
+            id: workspaceId === 7 ? 42 : 84,
+            workspace_id: workspaceId,
+            title: null,
+            created_at: null,
+            updated_at: null,
+            archived_at: null,
+          }],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }),
+      );
+      mocks.getAssistantConversation.mockImplementation(
+        (id: number) => id === 42
+          ? new Promise((resolve) => {
+              resolveOldDetail = resolve;
+            })
+          : Promise.resolve({
+              id: 84,
+              workspace_id: 8,
+              title: null,
+              created_at: null,
+              updated_at: null,
+              archived_at: null,
+              messages: [{
+                id: 84,
+                role: "assistant" as const,
+                content: "Current workspace detail",
+                sources: [],
+                created_at: null,
+              }],
+              message_total: 1,
+              message_limit: 100,
+              message_offset: 0,
+            }),
+      );
+
+      const view = render(
+        <MascotChatPanel
+          workspaceId={7}
+          onClose={vi.fn()}
+        />,
+      );
+      await waitFor(() => expect(
+        mocks.getAssistantConversation,
+      ).toHaveBeenCalledWith(42));
+      view.rerender(
+        <MascotChatPanel
+          workspaceId={8}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(await screen.findByText("Current workspace detail"))
+        .toBeInTheDocument();
+
+      await act(async () => resolveOldDetail({
+        id: 42,
+        workspace_id: 7,
+        title: null,
+        created_at: null,
+        updated_at: null,
+        archived_at: null,
+        messages: [{
+          id: 42,
+          role: "assistant",
+          content: "Stale workspace detail",
+          sources: [],
+          created_at: null,
+        }],
+        message_total: 1,
+        message_limit: 100,
+        message_offset: 0,
+      }));
+
+      expect(screen.queryByText("Stale workspace detail"))
+        .not.toBeInTheDocument();
+      expect(screen.getByText("Current workspace detail"))
+        .toBeInTheDocument();
+    },
+  );
+
+  it(
+    "aborts an active RAG stream when the workspace changes",
+    async () => {
+      const user = userEvent.setup();
+      let activeSignal: AbortSignal | undefined;
+      mocks.streamRag.mockImplementation(
+        (
+          _ids: number[],
+          _question: string,
+          _onEvent: (event: RagEvent) => void,
+          signal?: AbortSignal,
+        ) => {
+          activeSignal = signal;
+          return new Promise<void>((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              const error = new Error("aborted");
+              error.name = "AbortError";
+              reject(error);
+            }, { once: true });
+          });
+        },
+      );
+      const view = render(
+        <MascotChatPanel
+          workspaceId={7}
+          onClose={vi.fn()}
+        />,
+      );
+      const input = await screen.findByRole(
+        "textbox",
+        { name: "Maskota mesaj yaz" },
+      );
+      await user.type(input, "Abort on workspace switch");
+      await user.click(screen.getByRole("button", { name: "Mesaj gönder" }));
+      await waitFor(() => expect(mocks.streamRag).toHaveBeenCalledTimes(1));
+
+      view.rerender(
+        <MascotChatPanel
+          workspaceId={8}
+          onClose={vi.fn()}
+        />,
+      );
+      await waitFor(() => expect(activeSignal?.aborted).toBe(true));
     },
   );
 
