@@ -16,14 +16,14 @@ class Organization(Base):
     __tablename__ = "organizations"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(150))
-    slug: Mapped[str] = mapped_column(String(150), unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String(150), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     workspaces: Mapped[list["Workspace"]] = relationship(back_populates="organization", cascade="all, delete-orphan")
 
 class Workspace(Base):
     __tablename__ = "workspaces"
     id: Mapped[int] = mapped_column(primary_key=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(150))
     slug: Mapped[str] = mapped_column(String(150))
     organization: Mapped[Organization] = relationship(back_populates="workspaces")
@@ -38,12 +38,12 @@ class KnowledgeBase(Base):
     slug: Mapped[str] = mapped_column(String(150))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     workspace: Mapped[Workspace] = relationship(back_populates="knowledge_bases")
-    __table_args__ = (UniqueConstraint("workspace_id", "slug"),)
+    __table_args__ = (UniqueConstraint("workspace_id", "slug", name="uq_knowledge_bases_workspace_slug"),)
 
 class Membership(Base):
     __tablename__ = "memberships"
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
     workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
     role: Mapped[str] = mapped_column(String(20), default="user")
@@ -81,7 +81,7 @@ class Invitation(Base):
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     version: Mapped[int] = mapped_column(Integer)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
     file_size: Mapped[int] = mapped_column(Integer)
