@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -11,11 +12,14 @@ from app.api.authorization import (
 )
 from app.api.deps import current_user
 from app.db.session import get_db
-from app.models.database import ChatSession
+from app.models.database import ChatSession, Message
 from app.models.schemas import (
     AssistantConversationCreate,
+    AssistantConversationDetailResponse,
     AssistantConversationListResponse,
     AssistantConversationResponse,
+    AssistantMessageResponse,
+    AssistantMessageSource,
 )
 
 
@@ -133,17 +137,81 @@ async def list_assistant_conversations(
 
 @router.get(
     "/{conversation_id}",
-    response_model=AssistantConversationResponse,
+    response_model=AssistantConversationDetailResponse,
 )
 async def get_assistant_conversation(
     conversation_id: int,
+    message_limit: Annotated[
+        int,
+        Query(ge=1, le=100),
+    ] = 50,
+    message_offset: Annotated[
+        int,
+        Query(ge=0),
+    ] = 0,
     user=Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await require_assistant_conversation_access(
-        db,
-        user,
-        conversation_id,
+    conversation = (
+        await require_assistant_conversation_access(
+            db,
+            user,
+            conversation_id,
+        )
+    )
+
+    message_total = await db.scalar(
+        select(func.count(Message.id)).where(
+            Message.session_id == conversation.id
+        )
+    )
+
+    newest_messages = list(
+        (
+            await db.scalars(
+                select(Message)
+                .where(
+                    Message.session_id
+                    == conversation.id
+                )
+                .order_by(Message.id.desc())
+                .offset(message_offset)
+                .limit(message_limit)
+            )
+        ).all()
+    )
+
+    newest_messages.reverse()
+
+    messages = [
+        AssistantMessageResponse(
+            id=message.id,
+            role=message.role,
+            content=message.content,
+            sources=[
+                AssistantMessageSource.model_validate(
+                    source
+                )
+                for source in (
+                    message.sources_json or []
+                )
+            ],
+            created_at=message.created_at,
+        )
+        for message in newest_messages
+    ]
+
+    return AssistantConversationDetailResponse(
+        id=conversation.id,
+        workspace_id=conversation.workspace_id,
+        title=conversation.title,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        archived_at=conversation.archived_at,
+        messages=messages,
+        message_total=message_total or 0,
+        message_limit=message_limit,
+        message_offset=message_offset,
     )
 
 

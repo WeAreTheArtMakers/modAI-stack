@@ -59,6 +59,30 @@ class AssistantConversationListResponse(BaseModel):
     offset: int
 
 
+class AssistantMessageSource(BaseModel):
+    document: str
+    score: float
+    document_id: int | None = None
+    chunk_index: int | None = None
+
+
+class AssistantMessageResponse(BaseModel):
+    id: int
+    role: str
+    content: str
+    sources: list[AssistantMessageSource]
+    created_at: datetime | None = None
+
+
+class AssistantConversationDetailResponse(
+    AssistantConversationResponse
+):
+    messages: list[AssistantMessageResponse]
+    message_total: int
+    message_limit: int
+    message_offset: int
+
+
 class Source(BaseModel):
     document: str
     score: float
