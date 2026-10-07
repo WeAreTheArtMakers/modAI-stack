@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "dataset_version": "1.0.0",
+  "name": "modai-retrieval-fixture-v1",
+  "classification": "fixture",
+  "documents": [
+    {
+      "document_id": "doc-annual-leave-tr",
+      "language": "tr",
+      "text": "Kurgusal Poyraz Teknoloji çalışanları yıllık izin taleplerini en az beş iş günü önce ekip portalından iletir. Yönetici onayı portalda görünmeden izin kesinleşmiş sayılmaz. Acil sağlık izni bu süre kuralının dışındadır."
+    },
+    {
+      "document_id": "doc-benefits-en",
+      "language": "en",
+      "text": "Fictional Northstar Labs provides new employees with a remote-work equipment credit of 480 credits. The credit is available once during the first ninety days and requires a receipt in the staff portal."
+    },
+    {
+      "document_id": "doc-account-security-en",
+      "language": "en",
+      "text": "Identity provider secret rotation audit events are retained for 120 days in the restricted security archive. The audit record contains the rotation timestamp and service identifier, but never the secret value."
+    },
+    {
+      "document_id": "doc-retention-tr",
+      "language": "tr",
+      "text": "Kurgusal güvenlik olaylarında ilk inceleme kaydı 30 gün boyunca olay kasasında tutulur. Hukuki saklama kararı varsa bu süre yetkili uyum ekibi tarafından uzatılabilir. Kimlik sağlayıcı parola döndürme kayıtları ayrı bir politikaya tabidir."
+    },
+    {
+      "document_id": "doc-security-distractor-en",
+      "language": "en",
+      "text": "Service account API credentials rotate every 90 days. Expired credentials are removed from the deployment vault after the replacement is verified. This policy describes credential lifecycle, not identity-provider audit-log retention."
+    },
+    {
+      "document_id": "doc-multi-audit-en",
+      "language": "en",
+      "text": "The fictional Atlas audit register records account-role changes with the actor, timestamp, and request identifier. It does not store passwords, access tokens, or document contents."
+    },
+    {
+      "document_id": "doc-multi-incident-tr",
+      "language": "tr",
+      "text": "Kurgusal Atlas olay incelemesinde teknik inceleme penceresi 48 saat olarak planlanır. İlk bulgular olay kaydına eklenir; doğrulanmamış tahminler kesin sonuç olarak işaretlenmez."
+    },
+    {
+      "document_id": "doc-long-ops",
+      "language": "mixed",
+      "text": "Fictional Aurora Operations Handbook. This document is synthetic and exists only to exercise long-document retrieval behavior. Aurora workers process queued records in small, observable batches. Each batch has a stable sequence number and a human-readable status. Operators review queue depth before changing throughput limits. The staging environment is separate from the production environment. Restart windows are announced in the fictional operations calendar. A completed batch records its start time, completion time, and aggregate item count. Failed records are copied into a retry lane without changing their original audit identity. The retry lane is monitored independently from the primary queue. Duplicate event identifiers are ignored before downstream processing. The service writes a short summary after each completed batch. Summary content excludes customer records because this fixture has no customers. The fictional platform uses UTC for timestamps. Regional dashboards translate presentation labels but never modify stored timestamps. Operators compare the dashboard against the event ledger during a routine review. Capacity planning uses weekly averages and peak-hour observations. A single short spike does not automatically trigger a scaling change. Scaling requests include a reason and an expiration time. Temporary changes are reviewed at the next operations meeting. Each review checks queue depth, retry rate, and worker saturation. A healthy queue drains at the expected rate after a temporary load increase. If the rate remains low, the operator records a diagnostic note. Diagnostic notes reference synthetic component names only. They contain no credentials or network locations. The fictional service uses a separate channel for scheduled maintenance announcements. Maintenance announcements identify the affected component and estimated duration. They avoid promising a recovery time that has not been verified. Before maintenance, operators confirm that the retry lane is not growing unexpectedly. After maintenance, they compare a small set of aggregate counters. These counters are safe operational metadata. They do not include raw message bodies. The handbook recommends keeping monitoring thresholds stable during an experiment. If an experiment changes one threshold, its report names that threshold. Reports distinguish observed values from desired targets. A target is not evidence that the system achieved it. All test identifiers in this handbook are fictional. Aurora queue operators record a compact handoff at the end of each shift. The handoff lists open checks, completed checks, and the next scheduled review. Teams use the same checklist in Turkish and English. The translation preserves the meaning of each operational action. A translated checklist does not create a second source of authority. The approved handbook remains the single synthetic source for this exercise. Operators should not infer missing configuration from an example. When a value is absent, they record it as unknown. Unknown values are never filled with a convenient guess. The fixture includes repeated operational context so the target fact occurs late in the document. This placement helps verify that the shared chunker preserves tail content. It also exercises retrieval when early paragraphs contain broadly related but non-answering terms. During scheduled queue reviews, teams compare accepted and completed record counts, then document any expected delay in the synthetic shift log. The review uses aggregate identifiers and never copies a raw payload. A second reviewer confirms that each recorded variance is explainable. If the numbers disagree, the team pauses conclusions and investigates the queue before changing settings. These steps are descriptive examples for the benchmark corpus, not deployment instructions or production operating policy. The same examples can be read in Turkish and English during onboarding, while timestamps remain language-neutral. An illustrative chart may show a rising queue without proving that a worker is unhealthy. Operators verify queue age and retry rate before filing a fictional incident. The following review notes discuss ordinary queue operations and do not add another numeric retry setting. Teams label examples as examples before sharing them. They remove any accidental personal information from real incident reports. The current fixture contains no real incident report, employee, organization, or private customer data. It is intended for automated engineering validation only. The benchmark must not write this text to the production Qdrant collection. A local in-memory vector store is used for every benchmark run. Query labels are reviewed separately from the document wording. Retrieval metrics compare stable fixture identifiers rather than generated answers. No language model evaluates whether a response sounds correct. This is a small deterministic example and cannot represent an enterprise workload. For the fictional Aurora queue, the retry window is 48 seconds. Aurora workerlar retry window için 48 seconds değerini kullanır; this is the only retry duration specified in this fixture."
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q-leave-tr",
+      "language": "tr",
+      "question": "Poyraz Teknoloji çalışanları yıllık izin talebini kaç iş günü önce iletmeli?",
+      "expected_document_ids": ["doc-annual-leave-tr"],
+      "categories": ["single_document_fact"],
+      "answerable": true,
+      "notes": "Synthetic Turkish fact."
+    },
+    {
+      "query_id": "q-benefit-en",
+      "language": "en",
+      "question": "What is the one-time remote-work equipment credit at Northstar Labs?",
+      "expected_document_ids": ["doc-benefits-en"],
+      "categories": ["single_document_fact"],
+      "answerable": true
+    },
+    {
+      "query_id": "q-identity-audit-en",
+      "language": "en",
+      "question": "How long are identity-provider secret rotation audit events retained?",
+      "expected_document_ids": ["doc-account-security-en"],
+      "categories": ["single_document_fact", "semantic_distractors"],
+      "answerable": true,
+      "notes": "Near-topic distractor discusses API credential expiration, not audit retention."
+    },
+    {
+      "query_id": "q-atlas-multi-mixed",
+      "language": "mixed",
+      "question": "Atlas account-role changes için hangi audit fields tutulur, and what is the planned technical incident review window?",
+      "expected_document_ids": ["doc-multi-audit-en", "doc-multi-incident-tr"],
+      "categories": ["multi_document"],
+      "answerable": true
+    },
+    {
+      "query_id": "q-aurora-long-mixed",
+      "language": "mixed",
+      "question": "Aurora queue için retry window kaç seconds? Please use the handbook value.",
+      "expected_document_ids": ["doc-long-ops"],
+      "expected_chunk_ids": ["doc-long-ops::chunk-0001"],
+      "categories": ["long_document", "semantic_distractors"],
+      "answerable": true,
+      "notes": "The labeled fact is intentionally near the end of a long synthetic document."
+    },
+    {
+      "query_id": "q-incident-retention-tr",
+      "language": "tr",
+      "question": "Kurgusal güvenlik olaylarında ilk inceleme kaydı kaç gün saklanır?",
+      "expected_document_ids": ["doc-retention-tr"],
+      "categories": ["single_document_fact", "semantic_distractors"],
+      "answerable": true
+    },
+    {
+      "query_id": "q-vega-unanswerable-tr",
+      "language": "tr",
+      "question": "Project Vega yedeklerinin saklama süresi kaç gündür?",
+      "expected_document_ids": [],
+      "categories": ["unanswerable", "semantic_distractors"],
+      "answerable": false,
+      "notes": "No fixture document describes Project Vega or backup retention."
+    },
+    {
+      "query_id": "q-aurora-unanswerable-en",
+      "language": "en",
+      "question": "Which employee approved the secret value for the Vega production account?",
+      "expected_document_ids": [],
+      "categories": ["unanswerable", "semantic_distractors"],
+      "answerable": false
+    }
+  ]
+}
