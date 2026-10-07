@@ -57,6 +57,11 @@ async def websocket_rag(ws: WebSocket):
                             req.knowledge_base_ids,
                         )
                     )
+                    workspace_id = int(kb_scope[1].id)
+                    organization_id = int(
+                        kb_scope[1].organization_id
+                    )
+                    del kb_scope
 
                     history = None
                     if req.conversation_id is not None:
@@ -64,7 +69,7 @@ async def websocket_rag(ws: WebSocket):
                             db,
                             user,
                             req.conversation_id,
-                            kb_scope[1].id,
+                            workspace_id,
                         )
 
                     preferences = await get_effective_assistant_preferences(
@@ -74,10 +79,8 @@ async def websocket_rag(ws: WebSocket):
                     context = await retrieve_rag_context(
                         req.question,
                         db=db,
-                        organization_id=(
-                            kb_scope[1].organization_id
-                        ),
-                        workspace_id=kb_scope[1].id,
+                        organization_id=organization_id,
+                        workspace_id=workspace_id,
                         knowledge_base_ids=authorized_kb_ids,
                         history=history,
                         preferences=generation_preference_values(preferences),
@@ -133,7 +136,7 @@ async def websocket_rag(ws: WebSocket):
                             conversation_id=(
                                 req.conversation_id
                             ),
-                            workspace_id=kb_scope[1].id,
+                            workspace_id=workspace_id,
                             question=req.question,
                             answer="".join(answer_parts),
                             sources=context.sources,

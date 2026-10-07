@@ -12,6 +12,7 @@ from app.api.routes import assistant_conversations
 from app.models.database import (
     Base,
     ChatSession,
+    KnowledgeBase,
     Message,
     Membership,
     Organization,
@@ -513,6 +514,101 @@ async def test_completed_turn_rejects_archived_conversation_without_messages(
         ).all()
     )
     assert messages == []
+
+
+@pytest.mark.asyncio
+async def test_http_rag_persists_conversation_turn_after_real_orm_rollback(
+    conversation_session,
+    monkeypatch,
+):
+    """The HTTP RAG rollback must not expire values needed for persistence."""
+    from types import SimpleNamespace
+
+    import app.api.routes.rag as rag_module
+    from app.models.schemas import AssistantPreferencesUpdate, RagRequest
+    from app.services.assistant_preferences import upsert_assistant_preferences
+
+    db, ids = conversation_session
+    workspace_id = ids["workspace_a"]
+    knowledge_base = KnowledgeBase(
+        workspace_id=workspace_id,
+        name="Engineering",
+        slug="engineering-kb",
+    )
+    conversation = ChatSession(
+        user_id=ids["owner_id"],
+        workspace_id=workspace_id,
+        title="RAG lifecycle regression",
+    )
+    db.add_all([knowledge_base, conversation])
+    await db.commit()
+    await db.refresh(knowledge_base)
+    await db.refresh(conversation)
+    await upsert_assistant_preferences(
+        db,
+        ids["owner_id"],
+        AssistantPreferencesUpdate(
+            assistant_name="modAI QA",
+            language="tr",
+            tone="friendly",
+            response_length="short",
+        ),
+    )
+
+    class NoopLimiter:
+        async def enforce(self, *_args):
+            return None
+
+        async def close(self):
+            return None
+
+    provider_calls = 0
+
+    class FakeProvider:
+        async def generate(self, prompt):
+            nonlocal provider_calls
+            provider_calls += 1
+            assert prompt == "completed prompt"
+            return "persisted answer"
+
+    async def retrieve(_question, **_kwargs):
+        assert _kwargs["preferences"] == {
+            "language": "tr",
+            "tone": "friendly",
+            "response_length": "short",
+        }
+        return SimpleNamespace(prompt="completed prompt", sources=[])
+
+    monkeypatch.setattr(rag_module, "RedisRateLimiter", NoopLimiter)
+    monkeypatch.setattr(rag_module, "OllamaProvider", FakeProvider)
+    monkeypatch.setattr(rag_module, "retrieve_rag_context", retrieve)
+
+    response = await rag_module.query(
+        RagRequest(
+            question="What is the lifecycle?",
+            knowledge_base_ids=[knowledge_base.id],
+            conversation_id=conversation.id,
+        ),
+        None,
+        user=ids["owner"],
+        db=db,
+    )
+
+    assert response.answer == "persisted answer"
+    assert provider_calls == 1
+    messages = list(
+        (
+            await db.scalars(
+                select(Message)
+                .where(Message.session_id == conversation.id)
+                .order_by(Message.id)
+            )
+        ).all()
+    )
+    assert [(message.role, message.content) for message in messages] == [
+        ("user", "What is the lifecycle?"),
+        ("assistant", "persisted answer"),
+    ]
 
 
 @pytest.mark.asyncio

@@ -528,9 +528,12 @@ async def test_websocket_rag_persists_before_complete_event(
 
     db = object()
     timeline = []
+    active_session_generation = 0
 
     class SessionContext:
         async def __aenter__(self):
+            nonlocal active_session_generation
+            active_session_generation += 1
             return db
 
         async def __aexit__(self, *_args):
@@ -576,15 +579,28 @@ async def test_websocket_rag_persists_before_complete_event(
         _user,
         _knowledge_base_ids,
     ):
+        generation = active_session_generation
+
+        class ScopedValue:
+            def __init__(self, **values):
+                self._values = values
+
+            def __getattr__(self, name):
+                assert active_session_generation == generation, (
+                    "scope ORM attributes must not be read outside "
+                    "the session that resolved them"
+                )
+                return self._values[name]
+
         return (
             [4],
             (
-                SimpleNamespace(id=4),
-                SimpleNamespace(
+                ScopedValue(id=4),
+                ScopedValue(
                     id=3,
                     organization_id=2,
                 ),
-                SimpleNamespace(role="user"),
+                ScopedValue(role="user"),
             ),
         )
 
@@ -633,6 +649,8 @@ async def test_websocket_rag_persists_before_complete_event(
         _user,
         **kwargs,
     ):
+        assert active_session_generation == 2
+        assert type(kwargs["workspace_id"]) is int
         timeline.append(
             (
                 "persist",
