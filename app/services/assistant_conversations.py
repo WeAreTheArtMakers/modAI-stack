@@ -1,11 +1,15 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.authorization import require_assistant_conversation_access
 from app.models.database import ChatSession, Message
-from app.models.schemas import Source
+from app.models.schemas import AssistantHistoryMessage, Source
+
+
+MAX_PROMPT_HISTORY_MESSAGES = 6
 
 
 async def require_conversation_turn_scope(
@@ -33,6 +37,37 @@ async def require_conversation_turn_scope(
         )
 
     return conversation
+
+
+async def load_conversation_history(
+    db: AsyncSession,
+    user: dict,
+    conversation_id: int,
+    workspace_id: int,
+) -> list[AssistantHistoryMessage]:
+    """Authorize the current turn, then return only bounded prior messages."""
+    conversation = await require_conversation_turn_scope(
+        db,
+        user,
+        conversation_id,
+        workspace_id,
+    )
+    newest_messages = list(
+        (
+            await db.scalars(
+                select(Message)
+                .where(Message.session_id == conversation.id)
+                .order_by(Message.id.desc())
+                .limit(MAX_PROMPT_HISTORY_MESSAGES)
+            )
+        ).all()
+    )
+    newest_messages.reverse()
+    return [
+        AssistantHistoryMessage(role=message.role, content=message.content)
+        for message in newest_messages
+        if message.role in {"user", "assistant"}
+    ]
 
 
 def compact_source_snapshot(

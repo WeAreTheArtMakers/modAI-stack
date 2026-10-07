@@ -11,8 +11,8 @@ from app.services.security import RedisRateLimiter
 from app.core.config import get_settings
 from app.services.observability import metrics
 from app.services.assistant_conversations import (
+    load_conversation_history,
     persist_completed_turn,
-    require_conversation_turn_scope,
 )
 router = APIRouter(tags=["rag"])
 @router.post("/rag/query", response_model=RagResponse)
@@ -22,8 +22,9 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
     finally: await limiter.close()
     authorized_kb_ids, kb_scope = await resolve_knowledge_base_scope(db, user, req.knowledge_base_ids)
 
+    history = None
     if req.conversation_id is not None:
-        await require_conversation_turn_scope(
+        history = await load_conversation_history(
             db,
             user,
             req.conversation_id,
@@ -37,6 +38,7 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
             organization_id=kb_scope[1].organization_id,
             workspace_id=kb_scope[1].id,
             knowledge_base_ids=authorized_kb_ids,
+            history=history,
         )
     except EmbeddingModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=embedding_model_unavailable_detail()) from exc
