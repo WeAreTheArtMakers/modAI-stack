@@ -19,7 +19,10 @@ from app.models.database import (
     Workspace,
 )
 from app.models.schemas import AssistantConversationCreate, Source
-from app.services.assistant_conversations import persist_completed_turn
+from app.services.assistant_conversations import (
+    load_conversation_history,
+    persist_completed_turn,
+)
 
 
 @pytest_asyncio.fixture
@@ -701,3 +704,119 @@ async def test_archived_conversation_detail_remains_readable(
         "Before archive",
         "Stored answer",
     ]
+
+
+@pytest.mark.asyncio
+async def test_prompt_history_loads_latest_six_chronologically_and_is_conversation_scoped(
+    conversation_session,
+):
+    db, ids = conversation_session
+    conversation = await assistant_conversations.create_assistant_conversation(
+        AssistantConversationCreate(
+            workspace_id=ids["workspace_a"],
+            title="Prompt history",
+        ),
+        user=ids["owner"],
+        db=db,
+    )
+    other_conversation = await assistant_conversations.create_assistant_conversation(
+        AssistantConversationCreate(
+            workspace_id=ids["workspace_a"],
+            title="Other history",
+        ),
+        user=ids["owner"],
+        db=db,
+    )
+
+    for index in range(1, 9):
+        db.add(
+            Message(
+                session_id=conversation.id,
+                role="user" if index % 2 else "assistant",
+                content=f"Message {index}",
+                sources_json=[{"document": "old.pdf", "text": "not stored"}],
+            )
+        )
+    db.add(
+        Message(
+            session_id=other_conversation.id,
+            role="user",
+            content="Must not leak from another conversation",
+            sources_json=[],
+        )
+    )
+    await db.commit()
+
+    history = await load_conversation_history(
+        db,
+        ids["owner"],
+        conversation.id,
+        ids["workspace_a"],
+    )
+
+    assert [(message.role, message.content) for message in history] == [
+        ("user", "Message 3"),
+        ("assistant", "Message 4"),
+        ("user", "Message 5"),
+        ("assistant", "Message 6"),
+        ("user", "Message 7"),
+        ("assistant", "Message 8"),
+    ]
+    assert all(not hasattr(message, "sources_json") for message in history)
+
+
+@pytest.mark.asyncio
+async def test_prompt_history_rejects_revoked_workspace_access(
+    conversation_session,
+):
+    db, ids = conversation_session
+    conversation = await assistant_conversations.create_assistant_conversation(
+        AssistantConversationCreate(
+            workspace_id=ids["workspace_a"],
+            title="Revoked access",
+        ),
+        user=ids["owner"],
+        db=db,
+    )
+    await db.delete(await db.get(Membership, ids["owner_membership_id"]))
+    await db.commit()
+
+    with pytest.raises(HTTPException) as error:
+        await load_conversation_history(
+            db,
+            ids["owner"],
+            conversation.id,
+            ids["workspace_a"],
+        )
+
+    assert error.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_prompt_history_rejects_archived_conversation(
+    conversation_session,
+):
+    db, ids = conversation_session
+    conversation = await assistant_conversations.create_assistant_conversation(
+        AssistantConversationCreate(
+            workspace_id=ids["workspace_a"],
+            title="Archived prompt history",
+        ),
+        user=ids["owner"],
+        db=db,
+    )
+    await assistant_conversations.archive_assistant_conversation(
+        conversation.id,
+        user=ids["owner"],
+        db=db,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await load_conversation_history(
+            db,
+            ids["owner"],
+            conversation.id,
+            ids["workspace_a"],
+        )
+
+    assert error.value.status_code == 409

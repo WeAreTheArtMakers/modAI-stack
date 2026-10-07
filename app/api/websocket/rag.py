@@ -8,8 +8,8 @@ from app.api.deps import websocket_user
 from app.db.session import SessionLocal
 from app.models.schemas import RagRequest
 from app.services.assistant_conversations import (
+    load_conversation_history,
     persist_completed_turn,
-    require_conversation_turn_scope,
 )
 from app.services.llm.ollama import OllamaProvider
 from app.services.rag.pipeline import retrieve_rag_context
@@ -54,8 +54,9 @@ async def websocket_rag(ws: WebSocket):
                         )
                     )
 
+                    history = None
                     if req.conversation_id is not None:
-                        await require_conversation_turn_scope(
+                        history = await load_conversation_history(
                             db,
                             user,
                             req.conversation_id,
@@ -70,6 +71,7 @@ async def websocket_rag(ws: WebSocket):
                         ),
                         workspace_id=kb_scope[1].id,
                         knowledge_base_ids=authorized_kb_ids,
+                        history=history,
                     )
                 except EmbeddingModelUnavailableError:
                     await ws.send_json(

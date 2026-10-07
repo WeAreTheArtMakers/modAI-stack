@@ -74,6 +74,13 @@ class AssistantMessageResponse(BaseModel):
     created_at: datetime | None = None
 
 
+class AssistantHistoryMessage(BaseModel):
+    """Minimal untrusted conversation context passed to prompt formatting."""
+
+    role: Literal["user", "assistant"]
+    content: str
+
+
 class AssistantConversationDetailResponse(
     AssistantConversationResponse
 ):
