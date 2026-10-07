@@ -1,3 +1,4 @@
+import unicodedata
 from datetime import datetime
 from typing import Literal
 
@@ -39,6 +40,40 @@ class ChatResponse(BaseModel): answer: str
 class AssistantConversationCreate(BaseModel):
     workspace_id: int = Field(gt=0)
     title: str | None = Field(default=None, max_length=200)
+
+
+AssistantLanguage = Literal["auto", "en", "tr"]
+AssistantTone = Literal["professional", "friendly", "technical", "concise"]
+AssistantResponseLength = Literal["short", "balanced", "detailed"]
+
+
+class AssistantPreferencesUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assistant_name: str = Field(min_length=1, max_length=32)
+    language: AssistantLanguage = "auto"
+    tone: AssistantTone = "professional"
+    response_length: AssistantResponseLength = "balanced"
+
+    @field_validator("assistant_name", mode="before")
+    @classmethod
+    def normalize_assistant_name(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        if any(unicodedata.category(char).startswith("C") for char in value):
+            raise ValueError("assistant_name must not contain control characters")
+        normalized = value.strip()
+        if not normalized or len(normalized) > 32:
+            raise ValueError("assistant_name must contain 1 to 32 characters")
+        return normalized
+
+
+class AssistantPreferencesResponse(BaseModel):
+    assistant_name: str = "modAI"
+    language: AssistantLanguage = "auto"
+    tone: AssistantTone = "professional"
+    response_length: AssistantResponseLength = "balanced"
+    updated_at: datetime | None = None
 
 
 class AssistantConversationResponse(BaseModel):

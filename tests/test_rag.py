@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -7,6 +8,14 @@ from app.models.schemas import AssistantHistoryMessage
 from app.services.rag import pipeline
 from app.services.rag.chunker import chunk_text
 from app.services.rag.pipeline import build_rag_prompt
+
+
+async def fake_assistant_preferences(*_args):
+    return {
+        "language": "tr",
+        "tone": "friendly",
+        "response_length": "short",
+    }
 
 
 def test_chunking_and_prompt_boundary():
@@ -258,6 +267,11 @@ async def test_websocket_rag_passes_postgres_session_to_retrieval(
     )
     monkeypatch.setattr(
         websocket_rag_module,
+        "get_effective_assistant_preferences",
+        fake_assistant_preferences,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
         "retrieve_rag_context",
         retrieve,
     )
@@ -274,6 +288,11 @@ async def test_websocket_rag_passes_postgres_session_to_retrieval(
     assert observed["organization_id"] == 2
     assert observed["workspace_id"] == 3
     assert observed["knowledge_base_ids"] == [4]
+    assert observed["preferences"] == {
+        "language": "tr",
+        "tone": "friendly",
+        "response_length": "short",
+    }
 
     assert {"type": "token", "data": "token"} in ws.messages
     assert {"type": "complete"} in ws.messages
@@ -327,6 +346,11 @@ async def test_http_rag_persists_only_after_generation_completes(
             AssistantHistoryMessage(role="user", content="prior turn")
         ]
         assert _kwargs["knowledge_base_ids"] == [4]
+        assert _kwargs["preferences"] == {
+            "language": "tr",
+            "tone": "friendly",
+            "response_length": "short",
+        }
         return SimpleNamespace(
             prompt="prompt",
             sources=[
@@ -370,6 +394,11 @@ async def test_http_rag_persists_only_after_generation_completes(
     )
     monkeypatch.setattr(
         rag_module,
+        "get_effective_assistant_preferences",
+        fake_assistant_preferences,
+    )
+    monkeypatch.setattr(
+        rag_module,
         "load_conversation_history",
         load_history,
     )
@@ -397,10 +426,11 @@ async def test_http_rag_persists_only_after_generation_completes(
         ),
         None,
         user={"sub": "7"},
-        db=object(),
+        db=SimpleNamespace(rollback=lambda: asyncio.sleep(0)),
     )
 
     assert response.answer == "completed answer"
+    assert events.count("generated") == 1
 
     assert events[0] == (
         "history_loaded",
@@ -415,6 +445,77 @@ async def test_http_rag_persists_only_after_generation_completes(
     assert events[2][1]["answer"] == (
         "completed answer"
     )
+
+
+@pytest.mark.asyncio
+async def test_stateless_http_rag_uses_current_user_preferences_without_history(
+    monkeypatch,
+):
+    import app.api.routes.rag as rag_module
+    from app.models.schemas import RagRequest
+
+    observed = {}
+
+    class NoopLimiter:
+        async def enforce(self, *_args):
+            return None
+
+        async def close(self):
+            return None
+
+    async def resolve_scope(_db, _user, _knowledge_base_ids):
+        return (
+            [4],
+            (
+                SimpleNamespace(id=4),
+                SimpleNamespace(id=3, organization_id=2),
+                SimpleNamespace(role="user"),
+            ),
+        )
+
+    async def get_preferences(_db, user_id):
+        assert user_id == 7
+        return {
+            "assistant_name": "not part of prompt",
+            "language": "en",
+            "tone": "concise",
+            "response_length": "detailed",
+        }
+
+    async def retrieve(_question, **kwargs):
+        observed.update(kwargs)
+        return SimpleNamespace(prompt="controlled prompt", sources=[])
+
+    class FakeProvider:
+        calls = 0
+
+        async def generate(self, _prompt):
+            self.calls += 1
+            return "answer"
+
+    provider = FakeProvider()
+    monkeypatch.setattr(rag_module, "RedisRateLimiter", NoopLimiter)
+    monkeypatch.setattr(rag_module, "resolve_knowledge_base_scope", resolve_scope)
+    monkeypatch.setattr(rag_module, "get_effective_assistant_preferences", get_preferences)
+    monkeypatch.setattr(rag_module, "retrieve_rag_context", retrieve)
+    monkeypatch.setattr(rag_module, "OllamaProvider", lambda: provider)
+
+    response = await rag_module.query(
+        RagRequest(question="question", knowledge_base_ids=[4]),
+        None,
+        user={"sub": "7"},
+        db=SimpleNamespace(rollback=lambda: asyncio.sleep(0)),
+    )
+
+    assert response.answer == "answer"
+    assert observed["history"] is None
+    assert observed["knowledge_base_ids"] == [4]
+    assert observed["preferences"] == {
+        "language": "en",
+        "tone": "concise",
+        "response_length": "detailed",
+    }
+    assert provider.calls == 1
 
 
 @pytest.mark.asyncio
@@ -503,6 +604,11 @@ async def test_websocket_rag_persists_before_complete_event(
             AssistantHistoryMessage(role="assistant", content="prior reply")
         ]
         assert _kwargs["knowledge_base_ids"] == [4]
+        assert _kwargs["preferences"] == {
+            "language": "tr",
+            "tone": "friendly",
+            "response_length": "short",
+        }
         return SimpleNamespace(
             prompt="prompt",
             sources=[
@@ -550,6 +656,11 @@ async def test_websocket_rag_persists_before_complete_event(
         websocket_rag_module,
         "resolve_knowledge_base_scope",
         resolve_scope,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "get_effective_assistant_preferences",
+        fake_assistant_preferences,
     )
     monkeypatch.setattr(
         websocket_rag_module,
@@ -693,6 +804,11 @@ async def test_websocket_rag_does_not_persist_partial_provider_failure(
         websocket_rag_module,
         "resolve_knowledge_base_scope",
         resolve_scope,
+    )
+    monkeypatch.setattr(
+        websocket_rag_module,
+        "get_effective_assistant_preferences",
+        fake_assistant_preferences,
     )
     monkeypatch.setattr(
         websocket_rag_module,

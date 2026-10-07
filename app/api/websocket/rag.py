@@ -11,6 +11,10 @@ from app.services.assistant_conversations import (
     load_conversation_history,
     persist_completed_turn,
 )
+from app.services.assistant_preferences import (
+    generation_preference_values,
+    get_effective_assistant_preferences,
+)
 from app.services.llm.ollama import OllamaProvider
 from app.services.rag.pipeline import retrieve_rag_context
 from app.services.rag.embeddings import (
@@ -63,6 +67,10 @@ async def websocket_rag(ws: WebSocket):
                             kb_scope[1].id,
                         )
 
+                    preferences = await get_effective_assistant_preferences(
+                        db, int(user["sub"])
+                    )
+
                     context = await retrieve_rag_context(
                         req.question,
                         db=db,
@@ -72,6 +80,7 @@ async def websocket_rag(ws: WebSocket):
                         workspace_id=kb_scope[1].id,
                         knowledge_base_ids=authorized_kb_ids,
                         history=history,
+                        preferences=generation_preference_values(preferences),
                     )
                 except EmbeddingModelUnavailableError:
                     await ws.send_json(

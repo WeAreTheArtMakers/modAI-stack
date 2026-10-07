@@ -11,6 +11,72 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    assistant_preference: Mapped["AssistantPreference | None"] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class AssistantPreference(Base):
+    __tablename__ = "assistant_preferences"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    assistant_name: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="modAI",
+        server_default="modAI",
+    )
+    language: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="auto", server_default="auto"
+    )
+    tone: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="professional",
+        server_default="professional",
+    )
+    response_length: Mapped[str] = mapped_column(
+        String(12),
+        nullable=False,
+        default="balanced",
+        server_default="balanced",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    user: Mapped[User] = relationship(back_populates="assistant_preference")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_assistant_preferences_user_id"),
+        CheckConstraint(
+            "length(assistant_name) BETWEEN 1 AND 32",
+            name="ck_assistant_preferences_name_length",
+        ),
+        CheckConstraint(
+            "language IN ('auto', 'en', 'tr')",
+            name="ck_assistant_preferences_language",
+        ),
+        CheckConstraint(
+            "tone IN ('professional', 'friendly', 'technical', 'concise')",
+            name="ck_assistant_preferences_tone",
+        ),
+        CheckConstraint(
+            "response_length IN ('short', 'balanced', 'detailed')",
+            name="ck_assistant_preferences_response_length",
+        ),
+    )
 
 class Organization(Base):
     __tablename__ = "organizations"

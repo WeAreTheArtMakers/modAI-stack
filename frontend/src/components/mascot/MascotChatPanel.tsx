@@ -7,6 +7,7 @@ import {
 
 import {
   Send,
+  Settings2,
   Sparkles,
   Square,
   X,
@@ -15,6 +16,14 @@ import {
 import {
   getErrorMessage,
 } from "../../api/client";
+import {
+  DEFAULT_ASSISTANT_PREFERENCES,
+  getAssistantPreferences,
+  updateAssistantPreferences,
+  type AssistantPreferences,
+  type AssistantPreferencesUpdate,
+} from "../../api/assistantPreferences";
+import { useAuth } from "../../auth/AuthContext";
 
 import {
   createAssistantConversation,
@@ -236,6 +245,13 @@ export function MascotChatPanel({
   onClose,
   workspaceId = null,
 }: MascotChatPanelProps) {
+  const { user } = useAuth();
+  const [preferences, setPreferences] =
+    useState<AssistantPreferences>(DEFAULT_ASSISTANT_PREFERENCES);
+  const [preferenceDraft, setPreferenceDraft] =
+    useState<AssistantPreferencesUpdate>(DEFAULT_ASSISTANT_PREFERENCES);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
   const [messages, setMessages] =
     useState<Message[]>(INITIAL_MESSAGES);
 
@@ -275,6 +291,32 @@ export function MascotChatPanel({
     workspaceId: number;
     promise: Promise<void>;
   } | null>(null);
+  const currentUserIdRef = useRef(user?.id);
+  currentUserIdRef.current = user?.id;
+
+  useEffect(() => {
+    let active = true;
+    setPreferences(DEFAULT_ASSISTANT_PREFERENCES);
+    setPreferenceDraft(DEFAULT_ASSISTANT_PREFERENCES);
+    setPreferencesOpen(false);
+    void getAssistantPreferences()
+      .then((loaded) => {
+        if (!active) return;
+        setPreferences(loaded);
+        setPreferenceDraft({
+          assistant_name: loaded.assistant_name,
+          language: loaded.language,
+          tone: loaded.tone,
+          response_length: loaded.response_length,
+        });
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(getErrorMessage(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     const generation =
@@ -472,6 +514,30 @@ export function MascotChatPanel({
           : message,
       ),
     );
+  }
+
+  async function savePreferences() {
+    const requestUserId = user?.id;
+    setSavingPreferences(true);
+    setError(null);
+    try {
+      const saved = await updateAssistantPreferences(preferenceDraft);
+      if (requestUserId !== currentUserIdRef.current) return;
+      setPreferences(saved);
+      setPreferenceDraft({
+        assistant_name: saved.assistant_name,
+        language: saved.language,
+        tone: saved.tone,
+        response_length: saved.response_length,
+      });
+      setPreferencesOpen(false);
+    } catch (reason) {
+      if (requestUserId === currentUserIdRef.current) {
+        setError(getErrorMessage(reason));
+      }
+    } finally {
+      setSavingPreferences(false);
+    }
   }
 
   async function submit(
@@ -726,7 +792,7 @@ export function MascotChatPanel({
   return (
     <section
       role="dialog"
-      aria-label="modAI Assistant"
+      aria-label={`${preferences.assistant_name} Assistant`}
       className="flex w-[min(360px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
     >
       <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
@@ -737,7 +803,7 @@ export function MascotChatPanel({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className="truncate text-sm font-bold text-ink">
-              modAI Assistant
+              {preferences.assistant_name} Assistant
             </h2>
 
             <span className="inline-flex items-center gap-1 rounded-full bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan">
@@ -761,12 +827,123 @@ export function MascotChatPanel({
         <button
           type="button"
           className="rounded-lg p-2 text-slate-400 transition hover:bg-cloud hover:text-ink"
+          aria-label="Asistan tercihleri"
+          aria-expanded={preferencesOpen}
+          onClick={() => {
+            setPreferenceDraft({
+              assistant_name: preferences.assistant_name,
+              language: preferences.language,
+              tone: preferences.tone,
+              response_length: preferences.response_length,
+            });
+            setPreferencesOpen((open) => !open);
+          }}
+        >
+          <Settings2 size={16} />
+        </button>
+
+        <button
+          type="button"
+          className="rounded-lg p-2 text-slate-400 transition hover:bg-cloud hover:text-ink"
           aria-label="Maskot sohbetini kapat"
           onClick={onClose}
         >
           <X size={16} />
         </button>
       </header>
+
+      {preferencesOpen && (
+        <section
+          aria-label="Asistan tercihleri"
+          className="border-b border-slate-100 bg-cloud/50 p-3"
+        >
+          <h3 className="mb-3 text-xs font-bold text-ink">
+            Kişiselleştirme
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="col-span-2 text-xs text-slate-600">
+              Asistan adı
+              <input
+                className="field mt-1 py-2 text-sm"
+                aria-label="Asistan adı"
+                maxLength={32}
+                value={preferenceDraft.assistant_name}
+                onChange={(event) => setPreferenceDraft((current) => ({
+                  ...current,
+                  assistant_name: event.target.value,
+                }))}
+              />
+            </label>
+            <label className="text-xs text-slate-600">
+              Dil
+              <select
+                className="field mt-1 py-2 text-sm"
+                aria-label="Yanıt dili"
+                value={preferenceDraft.language}
+                onChange={(event) => setPreferenceDraft((current) => ({
+                  ...current,
+                  language: event.target.value as AssistantPreferencesUpdate["language"],
+                }))}
+              >
+                <option value="auto">Otomatik</option>
+                <option value="en">English</option>
+                <option value="tr">Türkçe</option>
+              </select>
+            </label>
+            <label className="text-xs text-slate-600">
+              Ton
+              <select
+                className="field mt-1 py-2 text-sm"
+                aria-label="Yanıt tonu"
+                value={preferenceDraft.tone}
+                onChange={(event) => setPreferenceDraft((current) => ({
+                  ...current,
+                  tone: event.target.value as AssistantPreferencesUpdate["tone"],
+                }))}
+              >
+                <option value="professional">Profesyonel</option>
+                <option value="friendly">Samimi</option>
+                <option value="technical">Teknik</option>
+                <option value="concise">Kısa ve net</option>
+              </select>
+            </label>
+            <label className="col-span-2 text-xs text-slate-600">
+              Yanıt uzunluğu
+              <select
+                className="field mt-1 py-2 text-sm"
+                aria-label="Yanıt uzunluğu"
+                value={preferenceDraft.response_length}
+                onChange={(event) => setPreferenceDraft((current) => ({
+                  ...current,
+                  response_length: event.target.value as AssistantPreferencesUpdate["response_length"],
+                }))}
+              >
+                <option value="short">Kısa</option>
+                <option value="balanced">Dengeli</option>
+                <option value="detailed">Detaylı</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              className="button-secondary px-3 py-2 text-xs"
+              onClick={() => setPreferencesOpen(false)}
+              disabled={savingPreferences}
+            >
+              İptal
+            </button>
+            <button
+              type="button"
+              className="button-primary px-3 py-2 text-xs"
+              onClick={() => void savePreferences()}
+              disabled={savingPreferences || !preferenceDraft.assistant_name.trim()}
+            >
+              {savingPreferences ? "Kaydediliyor…" : "Kaydet"}
+            </button>
+          </div>
+        </section>
+      )}
 
       <div
         className="max-h-72 space-y-3 overflow-y-auto p-4"
