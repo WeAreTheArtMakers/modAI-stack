@@ -14,6 +14,10 @@ from app.services.assistant_conversations import (
     load_conversation_history,
     persist_completed_turn,
 )
+from app.services.assistant_preferences import (
+    generation_preference_values,
+    get_effective_assistant_preferences,
+)
 router = APIRouter(tags=["rag"])
 @router.post("/rag/query", response_model=RagResponse)
 async def query(req: RagRequest, request: Request, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
@@ -31,6 +35,10 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
             kb_scope[1].id,
         )
 
+    preferences = await get_effective_assistant_preferences(
+        db, int(user["sub"])
+    )
+
     try:
         context = await retrieve_rag_context(
             req.question,
@@ -39,10 +47,15 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
             workspace_id=kb_scope[1].id,
             knowledge_base_ids=authorized_kb_ids,
             history=history,
+            preferences=generation_preference_values(preferences),
         )
     except EmbeddingModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=embedding_model_unavailable_detail()) from exc
     metrics.event("rag_requests")
+
+    # Retrieval, authorization, and preference reads are complete. Do not keep
+    # their transaction open while waiting for model generation.
+    await db.rollback()
 
     answer = await OllamaProvider().generate(context.prompt)
 

@@ -14,7 +14,12 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from "vitest";
+
+vi.mock("../../auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: 5 } }),
+}));
 
 import {
   MascotOverlay,

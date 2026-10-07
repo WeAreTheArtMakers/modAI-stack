@@ -30,6 +30,13 @@ const mocks = vi.hoisted(() => ({
   createAssistantConversation: vi.fn(),
   getAssistantConversation: vi.fn(),
   streamRag: vi.fn(),
+  getAssistantPreferences: vi.fn(),
+  updateAssistantPreferences: vi.fn(),
+  userId: 5,
+}));
+
+vi.mock("../../auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: mocks.userId } }),
 }));
 
 vi.mock("../../api/knowledgeBases", () => ({
@@ -50,8 +57,29 @@ vi.mock("../../api/websocket", () => ({
   streamRag: mocks.streamRag,
 }));
 
+vi.mock("../../api/assistantPreferences", async () => {
+  const actual = await vi.importActual<typeof import("../../api/assistantPreferences")>("../../api/assistantPreferences");
+  return {
+    ...actual,
+    getAssistantPreferences: mocks.getAssistantPreferences,
+    updateAssistantPreferences: mocks.updateAssistantPreferences,
+  };
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.userId = 5;
+  mocks.getAssistantPreferences.mockResolvedValue({
+    assistant_name: "modAI",
+    language: "auto",
+    tone: "professional",
+    response_length: "balanced",
+    updated_at: null,
+  });
+  mocks.updateAssistantPreferences.mockImplementation(async (value) => ({
+    ...value,
+    updated_at: "2026-10-07T00:00:00Z",
+  }));
 
   mocks.listKnowledgeBases.mockResolvedValue([
     {
@@ -145,6 +173,119 @@ describe("MascotChatPanel", () => {
       ).toBeInTheDocument();
     },
   );
+
+  it("loads and displays a stored assistant name", async () => {
+    const user = userEvent.setup();
+    mocks.getAssistantPreferences.mockResolvedValueOnce({
+      assistant_name: "Aurora",
+      language: "tr",
+      tone: "friendly",
+      response_length: "short",
+      updated_at: null,
+    });
+    render(<MascotChatPanel workspaceId={7} onClose={vi.fn()} />);
+    expect(await screen.findByRole("dialog", { name: "Aurora Assistant" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Asistan tercihleri" }));
+    expect(screen.getByRole("textbox", { name: "Asistan adı" })).toHaveValue("Aurora");
+    expect(screen.getByRole("combobox", { name: "Yanıt dili" })).toHaveValue("tr");
+    expect(screen.getByRole("combobox", { name: "Yanıt tonu" })).toHaveValue("friendly");
+    expect(screen.getByRole("combobox", { name: "Yanıt uzunluğu" })).toHaveValue("short");
+    expect(mocks.getAssistantPreferences).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves controlled settings, updates the name, and keeps conversation history", async () => {
+    const user = userEvent.setup();
+    mocks.listAssistantConversations.mockResolvedValueOnce({
+      items: [{
+        id: 107,
+        workspace_id: 7,
+        title: null,
+        created_at: null,
+        updated_at: null,
+        archived_at: null,
+      }],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    mocks.getAssistantConversation.mockResolvedValueOnce({
+      id: 107,
+      workspace_id: 7,
+      title: null,
+      created_at: null,
+      updated_at: null,
+      archived_at: null,
+      messages: [{
+        id: 22,
+        role: "assistant",
+        content: "Earlier conversation stays here",
+        sources: [],
+        created_at: null,
+      }],
+      message_total: 1,
+      message_limit: 100,
+      message_offset: 0,
+    });
+
+    render(<MascotChatPanel workspaceId={7} onClose={vi.fn()} />);
+    expect(await screen.findByText("Earlier conversation stays here")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Asistan tercihleri" }));
+    expect(screen.getByRole("combobox", { name: "Yanıt dili" })).toHaveValue("auto");
+    await user.clear(screen.getByRole("textbox", { name: "Asistan adı" }));
+    await user.type(screen.getByRole("textbox", { name: "Asistan adı" }), "Aurora");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Yanıt dili" }), "tr");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Yanıt tonu" }), "friendly");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Yanıt uzunluğu" }), "short");
+    await user.click(screen.getByRole("button", { name: "Kaydet" }));
+
+    expect(mocks.updateAssistantPreferences).toHaveBeenCalledWith({
+      assistant_name: "Aurora",
+      language: "tr",
+      tone: "friendly",
+      response_length: "short",
+    });
+    expect(await screen.findByRole("dialog", { name: "Aurora Assistant" })).toBeInTheDocument();
+    expect(screen.getByText("Earlier conversation stays here")).toBeInTheDocument();
+    expect(mocks.createAssistantConversation).not.toHaveBeenCalled();
+  });
+
+  it("does not reload user preferences on workspace changes", async () => {
+    const { rerender } = render(<MascotChatPanel workspaceId={7} onClose={vi.fn()} />);
+    await screen.findByText("2 yetkili KB · kaynak destekli");
+    rerender(<MascotChatPanel workspaceId={8} onClose={vi.fn()} />);
+    await waitFor(() => expect(mocks.listKnowledgeBases).toHaveBeenCalledTimes(2));
+    expect(mocks.getAssistantPreferences).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retain a previous account's preference while the next account loads", async () => {
+    let finishNext: ((value: { assistant_name: string; language: "auto"; tone: "professional"; response_length: "balanced"; updated_at: null }) => void) | undefined;
+    mocks.getAssistantPreferences
+      .mockResolvedValueOnce({ assistant_name: "Account A", language: "auto", tone: "professional", response_length: "balanced", updated_at: null })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishNext = resolve; }));
+    const { rerender } = render(<MascotChatPanel workspaceId={7} onClose={vi.fn()} />);
+    expect(await screen.findByRole("dialog", { name: "Account A Assistant" })).toBeInTheDocument();
+    mocks.userId = 6;
+    rerender(<MascotChatPanel workspaceId={7} onClose={vi.fn()} />);
+    expect(await screen.findByRole("dialog", { name: "modAI Assistant" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Account A Assistant" })).not.toBeInTheDocument();
+    finishNext?.({ assistant_name: "Account B", language: "auto", tone: "professional", response_length: "balanced", updated_at: null });
+    expect(await screen.findByRole("dialog", { name: "Account B Assistant" })).toBeInTheDocument();
+  });
+
+  it("keeps current preferences visible and shows an error when saving fails", async () => {
+    const user = userEvent.setup();
+    mocks.getAssistantPreferences.mockResolvedValueOnce({
+      assistant_name: "Aurora", language: "auto", tone: "professional", response_length: "balanced", updated_at: null,
+    });
+    mocks.updateAssistantPreferences.mockRejectedValueOnce(new Error("Save failed"));
+    render(<MascotChatPanel workspaceId={7} onClose={vi.fn()} />);
+    await screen.findByRole("dialog", { name: "Aurora Assistant" });
+    await user.click(screen.getByRole("button", { name: "Asistan tercihleri" }));
+    await user.click(screen.getByRole("button", { name: "Kaydet" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Save failed");
+    expect(screen.getByRole("dialog", { name: "Aurora Assistant" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Asistan tercihleri" })).toBeInTheDocument();
+  });
 
   it(
     "answers assistant identity locally without calling RAG",
