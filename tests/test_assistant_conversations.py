@@ -510,3 +510,194 @@ async def test_completed_turn_rejects_archived_conversation_without_messages(
         ).all()
     )
     assert messages == []
+
+
+@pytest.mark.asyncio
+async def test_conversation_detail_returns_latest_messages_chronologically(
+    conversation_session,
+):
+    db, ids = conversation_session
+
+    conversation = (
+        await assistant_conversations.create_assistant_conversation(
+            AssistantConversationCreate(
+                workspace_id=ids["workspace_a"],
+                title="History",
+            ),
+            user=ids["owner"],
+            db=db,
+        )
+    )
+
+    for number in range(1, 4):
+        await persist_completed_turn(
+            db,
+            ids["owner"],
+            conversation_id=conversation.id,
+            workspace_id=ids["workspace_a"],
+            question=f"Question {number}",
+            answer=f"Answer {number}",
+            sources=[
+                Source(
+                    document=f"guide-{number}.pdf",
+                    document_id=number,
+                    chunk_index=number - 1,
+                    score=0.9,
+                    text=(
+                        "Source text must not appear "
+                        "in conversation detail"
+                    ),
+                )
+            ],
+        )
+
+    detail = (
+        await assistant_conversations.get_assistant_conversation(
+            conversation.id,
+            message_limit=4,
+            message_offset=0,
+            user=ids["owner"],
+            db=db,
+        )
+    )
+
+    assert detail.message_total == 6
+    assert detail.message_limit == 4
+    assert detail.message_offset == 0
+
+    assert [
+        (message.role, message.content)
+        for message in detail.messages
+    ] == [
+        ("user", "Question 2"),
+        ("assistant", "Answer 2"),
+        ("user", "Question 3"),
+        ("assistant", "Answer 3"),
+    ]
+
+    assert [
+        message.id
+        for message in detail.messages
+    ] == sorted(
+        message.id
+        for message in detail.messages
+    )
+
+    latest_source = detail.messages[-1].sources[0]
+
+    assert latest_source.document == "guide-3.pdf"
+    assert latest_source.document_id == 3
+    assert latest_source.chunk_index == 2
+    assert latest_source.score == 0.9
+
+    source_payload = latest_source.model_dump()
+
+    assert "text" not in source_payload
+    assert "session_id" not in (
+        detail.messages[-1].model_dump()
+    )
+
+
+@pytest.mark.asyncio
+async def test_conversation_detail_message_offset_moves_backward_from_newest(
+    conversation_session,
+):
+    db, ids = conversation_session
+
+    conversation = (
+        await assistant_conversations.create_assistant_conversation(
+            AssistantConversationCreate(
+                workspace_id=ids["workspace_a"],
+                title="Older history",
+            ),
+            user=ids["owner"],
+            db=db,
+        )
+    )
+
+    for number in range(1, 4):
+        await persist_completed_turn(
+            db,
+            ids["owner"],
+            conversation_id=conversation.id,
+            workspace_id=ids["workspace_a"],
+            question=f"Q{number}",
+            answer=f"A{number}",
+            sources=[],
+        )
+
+    detail = (
+        await assistant_conversations.get_assistant_conversation(
+            conversation.id,
+            message_limit=4,
+            message_offset=4,
+            user=ids["owner"],
+            db=db,
+        )
+    )
+
+    assert detail.message_total == 6
+    assert detail.message_limit == 4
+    assert detail.message_offset == 4
+
+    assert [
+        (message.role, message.content)
+        for message in detail.messages
+    ] == [
+        ("user", "Q1"),
+        ("assistant", "A1"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_archived_conversation_detail_remains_readable(
+    conversation_session,
+):
+    db, ids = conversation_session
+
+    conversation = (
+        await assistant_conversations.create_assistant_conversation(
+            AssistantConversationCreate(
+                workspace_id=ids["workspace_a"],
+                title="Archived history",
+            ),
+            user=ids["owner"],
+            db=db,
+        )
+    )
+
+    await persist_completed_turn(
+        db,
+        ids["owner"],
+        conversation_id=conversation.id,
+        workspace_id=ids["workspace_a"],
+        question="Before archive",
+        answer="Stored answer",
+        sources=[],
+    )
+
+    await assistant_conversations.archive_assistant_conversation(
+        conversation.id,
+        user=ids["owner"],
+        db=db,
+    )
+
+    detail = (
+        await assistant_conversations.get_assistant_conversation(
+            conversation.id,
+            message_limit=50,
+            message_offset=0,
+            user=ids["owner"],
+            db=db,
+        )
+    )
+
+    assert detail.archived_at is not None
+    assert detail.message_total == 2
+    assert [
+        message.content
+        for message in detail.messages
+    ] == [
+        "Before archive",
+        "Stored answer",
+    ]
