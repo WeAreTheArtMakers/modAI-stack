@@ -45,6 +45,7 @@ export function streamRag(
   question: string,
   onEvent: (event: RagEvent) => void,
   signal?: AbortSignal,
+  options: { conversationId?: number } = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     let socket: WebSocket | null = null;
@@ -94,10 +95,18 @@ export function streamRag(
       socket = nextSocket;
 
       nextSocket.onopen = () => {
-        nextSocket.send(JSON.stringify({
+        const payload: {
+          question: string;
+          knowledge_base_ids: number[];
+          conversation_id?: number;
+        } = {
           question,
           knowledge_base_ids: knowledgeBaseIds,
-        }));
+        };
+        if (options.conversationId !== undefined) {
+          payload.conversation_id = options.conversationId;
+        }
+        nextSocket.send(JSON.stringify(payload));
       };
 
       nextSocket.onmessage = (message) => {

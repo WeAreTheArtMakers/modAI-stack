@@ -68,6 +68,44 @@ export interface Source {
   text: string | null;
 }
 
+export interface AssistantConversationSummary {
+  id: number;
+  workspace_id: number;
+  title: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  archived_at: string | null;
+}
+
+export interface AssistantConversationMessageSource {
+  document: string;
+  score: number;
+  document_id: number | null;
+  chunk_index: number | null;
+}
+
+export interface AssistantConversationMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  sources: AssistantConversationMessageSource[];
+  created_at: string | null;
+}
+
+export interface AssistantConversationDetail extends AssistantConversationSummary {
+  messages: AssistantConversationMessage[];
+  message_total: number;
+  message_limit: number;
+  message_offset: number;
+}
+
+export interface AssistantConversationList {
+  items: AssistantConversationSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface IndexingEvent {
   type: "index_progress";
   organization_id: number | null;

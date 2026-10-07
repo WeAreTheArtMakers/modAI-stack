@@ -94,17 +94,63 @@ describe("Web Console critical UI", () => {
       onclose: (() => void) | null = null;
       onerror: (() => void) | null = null;
       constructor() { RagWebSocket.instances.push(this); }
-      send() {}
+      sent: string[] = [];
+      send(payload: string) { this.sent.push(payload); }
       close() {}
     }
     vi.stubGlobal("WebSocket", RagWebSocket);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ticket: "short-lived-ticket" }), { status: 200 })));
     const promise = streamRag([4], "test", vi.fn());
     await waitFor(() => expect(RagWebSocket.instances).toHaveLength(1));
-    RagWebSocket.instances[0].onopen?.();
-    RagWebSocket.instances[0].onclose?.();
+    const socket = RagWebSocket.instances[0];
+    socket.onopen?.();
+    expect(JSON.parse(socket.sent[0])).toEqual({
+      question: "test",
+      knowledge_base_ids: [4],
+    });
+    socket.onclose?.();
     await expect(promise).rejects.toThrow("beklenmedik şekilde kapandı");
     vi.unstubAllGlobals();
+  });
+
+  it("includes conversation_id only when the Mascot opts into history", async () => {
+    class RagWebSocket {
+      static instances: RagWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      sent: string[] = [];
+      constructor() { RagWebSocket.instances.push(this); }
+      send(payload: string) { this.sent.push(payload); }
+      close() { this.onclose?.(); }
+    }
+
+    vi.stubGlobal("WebSocket", RagWebSocket);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ticket: "short-lived-ticket" }), { status: 200 })));
+    try {
+      const promise = streamRag(
+        [8, 9],
+        "follow up",
+        vi.fn(),
+        undefined,
+        { conversationId: 42 },
+      );
+      await waitFor(() => expect(RagWebSocket.instances).toHaveLength(1));
+      const socket = RagWebSocket.instances[0];
+      socket.onopen?.();
+      expect(JSON.parse(socket.sent[0])).toEqual({
+        question: "follow up",
+        knowledge_base_ids: [8, 9],
+        conversation_id: 42,
+      });
+      socket.onmessage?.(new MessageEvent("message", {
+        data: JSON.stringify({ type: "complete" }),
+      }));
+      await expect(promise).resolves.toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("aborts an in-flight RAG WebSocket and rejects with AbortError", async () => {
