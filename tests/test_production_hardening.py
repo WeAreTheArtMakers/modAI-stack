@@ -129,6 +129,24 @@ def test_liveness_returns_request_id_and_backend_security_headers():
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
 
 
+def test_public_version_endpoint_returns_build_sha_without_caching(monkeypatch):
+    monkeypatch.setattr(health, "get_settings", lambda: SimpleNamespace(build_sha="a" * 40))
+    with TestClient(main.app) as client:
+        response = client.get("/version")
+    assert response.status_code == 200
+    assert response.json() == {"build_sha": "a" * 40}
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_build_sha_setting_reads_environment_and_defaults_for_development(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.delenv("BUILD_SHA", raising=False)
+    assert Settings(_env_file=None).build_sha == "development"
+    monkeypatch.setenv("BUILD_SHA", "b" * 40)
+    assert Settings(_env_file=None).build_sha == "b" * 40
+
+
 def test_platform_admin_endpoints_are_not_granted_to_tenant_admins():
     class EmptyDb:
         async def scalars(self, _statement):

@@ -3,6 +3,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_BUILD_SHA: ${BUILD_SHA:-development}
     ports:
       - "5173:80"
     depends_on:
@@ -13,6 +15,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILD_SHA: ${BUILD_SHA:-development}
 
     ports:
       - "8000:8000"
@@ -52,6 +56,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILD_SHA: ${BUILD_SHA:-development}
     command: ["python", "-m", "app.worker"]
     env_file:
       - .env

@@ -176,6 +176,14 @@ docker compose up --build
 
 Compose; `frontend`, `api`, `worker`, `postgres`, `redis` ve `qdrant` servislerini başlatır. Arayüz `http://localhost:5173`, API `http://localhost:8000`, Qdrant `http://localhost:6333`, host tarafından erişilen PostgreSQL ise `localhost:55432` adresindedir. Arayüzün `/api` ve `/ws` istekleri mevcut Nginx yapılandırmasıyla API'ye yönlendirilir. Docker içindeki API, Mac'teki Ollama'ya `host.docker.internal:11434` üzerinden bağlanır. `GET /health` yalnızca API'nin ayakta olduğunu; `GET /ready` ise bağımlılıkların durumunu gösterir. Tam RAG için Ollama generation modeli ve SentenceTransformer embedding modeli ayrıca hazır olmalıdır.
 
+**Release imajları:** API, worker ve frontend’in aynı Git kaynağını raporlaması için üç imajı tek build argümanıyla oluşturun:
+
+```bash
+BUILD_SHA="$(git rev-parse HEAD)" docker compose build api worker frontend
+```
+
+SHA kalıcı `.env` ayarı değildir; doğrudan build’e aktarılır. Sistem sayfası frontend/backend kısa SHA’larını gösterir, uygulama da geçerli iki release SHA’sı farklıysa elle yenileme uyarısı verir. Version observability özelliğinin ilk dağıtımı, bu kodu henüz içermeyen eski açık sekmeleri algılayamaz; bu sekmelerin bir kez yenilenmesi gerekir. Sonraki dağıtımlar feature’ı yüklemiş sekmelerde otomatik tespit edilir.
+
 **Host üzerinde backend geliştirme:** Depo kökünde çalışın; PostgreSQL, Redis ve Qdrant erişilebilir olmalıdır. Yerel `.env` içindeki `DATABASE_URL` **`postgresql+asyncpg://`** sürücüsünü kullanmalı ve Compose PostgreSQL'i için `localhost:55432` adresini göstermelidir (`.env.example` içindeki `5432` değeri host Compose portu değildir). API konteyneri zaten host `8000` portunu kullanıyorsa onu ve host Uvicorn'u aynı anda bu portta çalıştırmayın.
 
 ```bash

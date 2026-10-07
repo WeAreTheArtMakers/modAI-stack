@@ -10,11 +10,13 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { getReadiness } from "../api/health";
+import { getBackendVersion } from "../api/version";
 import { getModelStatus } from "../api/models";
 import { getRetrievalProfiles } from "../api/retrieval";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/State";
 import type { RetrievalProfile, RetrievalProfileAvailability } from "../types";
+import { FRONTEND_BUILD_SHA, isReleaseSha, shortSha, versionsMismatch } from "../version";
 
 const availabilityLabels: Record<RetrievalProfileAvailability, string> = {
   active: "Aktif",
@@ -56,9 +58,45 @@ function ProfileCard({ profile }: { profile: RetrievalProfile }) {
   );
 }
 
+export function ReleaseBuildPanel({
+  frontendBuildSha = FRONTEND_BUILD_SHA,
+  backendBuildSha,
+}: {
+  frontendBuildSha?: string;
+  backendBuildSha?: string;
+}) {
+  const versionMismatch = versionsMismatch(frontendBuildSha, backendBuildSha);
+  const versionsSynced = isReleaseSha(frontendBuildSha)
+    && isReleaseSha(backendBuildSha)
+    && !versionMismatch;
+
+  return (
+    <section className="panel mt-6 p-5 sm:p-6" aria-labelledby="release-build-heading">
+      <p className="eyebrow">Release / Build</p>
+      <h2 id="release-build-heading" className="mt-2 text-xl font-bold text-ink">Dağıtım sürümü</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl bg-cloud p-4">
+          <p className="text-xs font-semibold text-slate-500">Frontend</p>
+          <p className="mt-1 font-mono text-sm text-ink" title={frontendBuildSha}>{shortSha(frontendBuildSha)}</p>
+        </div>
+        <div className="rounded-xl bg-cloud p-4">
+          <p className="text-xs font-semibold text-slate-500">Backend</p>
+          <p className="mt-1 font-mono text-sm text-ink" title={backendBuildSha ?? "Backend version unavailable"}>
+            {backendBuildSha ? shortSha(backendBuildSha) : "Development build"}
+          </p>
+        </div>
+      </div>
+      <p className={`mt-4 text-sm font-semibold ${versionMismatch ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>
+        {versionMismatch ? "Version mismatch" : versionsSynced ? "Synced" : "Development build"}
+      </p>
+    </section>
+  );
+}
+
 export function SystemPage() {
   const readiness = useQuery({ queryKey: ["readiness"], queryFn: getReadiness, refetchInterval: 30_000 });
   const models = useQuery({ queryKey: ["model-status"], queryFn: getModelStatus, refetchInterval: 30_000 });
+  const backendVersion = useQuery({ queryKey: ["backend-version"], queryFn: getBackendVersion, retry: false });
   const profiles = useQuery({
     queryKey: ["retrieval-profiles"],
     queryFn: getRetrievalProfiles,
@@ -73,6 +111,7 @@ export function SystemPage() {
   }
 
   const ollama = models.data?.providers.find((provider) => provider.provider === "ollama");
+  const backendBuildSha = backendVersion.data?.build_sha;
   const activeProfile = profiles.data?.profiles.find((profile) => profile.active);
   const services = [
     { name: "API", detail: "FastAPI", ok: readiness.data ? true : readiness.error ? false : undefined, icon: Server },
@@ -127,6 +166,8 @@ export function SystemPage() {
           </div>
         ))}
       </div>
+
+      <ReleaseBuildPanel backendBuildSha={backendBuildSha} />
 
       <section className="panel mt-6 p-5 sm:p-6" aria-labelledby="retrieval-profile-heading">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
