@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from "react";
 import { Link } from "react-router";
-import { AudioLines, Check, Download, FileText, Lock, Mic, Pencil, Send, Square, Volume2, VolumeX, X } from "lucide-react";
+import { AudioLines, Check, Download, FileText, Lock, Mic, Pencil, Plus, Send, Square, Volume2, VolumeX, X } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "../components/State";
 import { useAuth } from "../auth/AuthContext";
 import { canManage } from "../lib";
 import { useKnowledgeBaseSelection } from "../workspace/useKnowledgeBaseSelection";
 import { SourceCard } from "./ChatPage";
-import { EMA_LIGHTNING, ORT_RUNTIME_BYTES, SPEECH_SPEEDS, WHISPER } from "../voice/config";
+import { EMA_LIGHTNING, ORT_RUNTIME_BYTES, SPEECH_SPEEDS, VOICE_TITLE_PREFIX, WHISPER } from "../voice/config";
 import { VoiceMascot, phaseLabel } from "../voice/VoiceMascot";
 import { VoiceWave } from "../voice/VoiceWave";
 import { useVoiceAssistant, type TurnMetrics, type VoiceDependencies, type VoicePhase, type VoiceTurn } from "../voice/useVoiceAssistant";
@@ -43,7 +43,66 @@ function MetricsLine({ metrics }: { metrics: TurnMetrics }) {
   return parts.length ? <p className="mt-2 text-[11px] text-slate-400" data-testid="turn-metrics">{parts.join(" · ")}</p> : null;
 }
 
+const STAGE_LABELS: Record<string, string> = {
+  recording: "Kayıt süresi",
+  sttCapture: "Kaydı sonlandırma + çözme/16 kHz",
+  sttTransferIn: "Ses → konuşma modeli",
+  sttQueueWait: "Model sırası / model hazırlığı",
+  sttInference: "Whisper çıkarımı",
+  sttTransferBack: "Metin → sayfa",
+  review: "Transkripti inceleme (kullanıcı)",
+  conversationCreate: "Görüşme oluşturma",
+  ragTicket: "WebSocket bileti",
+  ragConnect: "WebSocket bağlantısı",
+  ragServerToSources: "Sunucu: yetki + arama + prompt",
+  sourcesToFirstToken: "Model yükleme (soğuksa) + prompt işleme",
+  ragToFirstToken: "İstek → ilk kelime",
+  firstTokenToPhrase: "İlk kelime → ilk cümle",
+  phraseToTtsStart: "Cümle → ses sentezi başlangıcı",
+  ttsToFirstBuffer: "Sentez → ilk ses parçası",
+  bufferToAudible: "Ses parçası → duyulur",
+  stopToFirstAudible: "Konuşma bitti → ilk ses",
+  answerGeneration: "Yanıt üretimi (tamamı)",
+  playback: "Konuşma süresi",
+  stopToSpeechEnd: "Konuşma bitti → yanıt bitti",
+};
+const SERVER_LABELS: Record<string, string> = {
+  authorization_ms: "yetki + geçmiş + tercihler",
+  embedding_ms: "soru gömme",
+  retrieval_ms: "Qdrant arama",
+  liveness_ms: "belge geçerlilik kontrolü",
+  prompt_ms: "prompt oluşturma",
+  prompt_chars: "prompt uzunluğu (karakter)",
+  first_token_ms: "model: ilk kelime",
+  load_ms: "model yükleme",
+  prompt_eval_ms: "prompt işleme",
+  prompt_eval_count: "prompt token",
+  eval_ms: "üretim",
+  eval_count: "üretilen token",
+};
+
+function TimingDetails({ metrics }: { metrics: TurnMetrics }) {
+  const stages = Object.entries(metrics.stages ?? {});
+  const server = Object.entries(metrics.server ?? {}).filter(([key, value]) => value !== null && key in SERVER_LABELS);
+  if (!stages.length && !server.length && !metrics.audio) return null;
+  const audio = metrics.audio;
+  return <details className="mt-2 text-[11px] text-slate-500" data-testid="timing-details"><summary className="cursor-pointer font-semibold text-slate-400">Ayrıntılı süreler</summary>
+    <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5">
+      {stages.map(([name, value]) => <div key={name} className="contents"><dt>{STAGE_LABELS[name] ?? name}</dt><dd className="text-right tabular-nums">{value} ms</dd></div>)}
+      {server.map(([name, value]) => <div key={name} className="contents"><dt>Sunucu · {SERVER_LABELS[name]}</dt><dd className="text-right tabular-nums">{value}{name.endsWith("_ms") ? " ms" : ""}</dd></div>)}
+      {metrics.stt && <div className="contents"><dt>Konuşma modeli</dt><dd className="text-right">{metrics.stt.backend === "webgpu" ? "WebGPU" : "WASM"}{metrics.stt.warm === false ? " · ilk yükleme sırasında" : ""}</dd></div>}
+      {audio && <div className="contents"><dt>Ses</dt><dd className="text-right tabular-nums">{audio.inputSampleRate ? `${audio.inputSampleRate} Hz → ` : ""}16000 Hz · {(audio.durationMs / 1000).toFixed(1)} sn → {(audio.trimmedDurationMs / 1000).toFixed(1)} sn (baş {Math.round(audio.trimmedLeadingMs)} / son {Math.round(audio.trimmedTrailingMs)} ms kırpıldı) · RMS {audio.rms.toFixed(3)} · tepe {audio.peak.toFixed(2)}{audio.clippedPercent > 0.1 ? ` · kırpılma %${audio.clippedPercent.toFixed(1)}` : ""}</dd></div>}
+    </dl>
+  </details>;
+}
+
+function conversationLabel(title: string | null, id: number): string {
+  if (!title) return `Adsız görüşme #${id}`;
+  return title.startsWith(VOICE_TITLE_PREFIX) ? `Sesli · ${title.slice(VOICE_TITLE_PREFIX.length)}` : title;
+}
+
 function SpokenLine({ turn }: { turn: VoiceTurn }) {
+  if (turn.restored) return null;
   if (turn.metrics.speech === "off") return <p className="mt-1 text-[11px] text-slate-400">Sesli yanıt kapalı</p>;
   if (!turn.phrases) return null;
   const done = turn.spokenPhrases >= turn.phrases;
@@ -79,7 +138,7 @@ function QuestionBubble({ turn, onCorrect }: { turn: VoiceTurn; onCorrect: (text
     </form>;
   }
   return <div className="max-w-xl rounded-2xl bg-ink px-4 py-3 text-sm text-white">
-    <div className="mb-1 flex items-center justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">{turn.origin === "voice" ? "Tanınan konuşma" : "Yazılı soru"}{turn.corrected ? " · düzeltildi" : ""}</p>{turn.origin === "voice" && <button type="button" className="flex items-center gap-1 text-[11px] font-semibold text-cyan hover:text-white" onClick={() => setEditing(true)}><Pencil size={11} /> Düzelt</button>}</div>
+    <div className="mb-1 flex items-center justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">{turn.restored ? "Kayıtlı soru" : turn.origin === "voice" ? "Tanınan konuşma" : "Yazılı soru"}{turn.corrected ? " · düzeltildi" : ""}</p>{turn.origin === "voice" && !turn.restored && <button type="button" className="flex items-center gap-1 text-[11px] font-semibold text-cyan hover:text-white" onClick={() => setEditing(true)}><Pencil size={11} /> Düzelt</button>}</div>
     {turn.question}
   </div>;
 }
@@ -87,7 +146,7 @@ function QuestionBubble({ turn, onCorrect }: { turn: VoiceTurn; onCorrect: (text
 export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }) {
   const { user } = useAuth();
   const { current, kbs, available, selected, toggle } = useKnowledgeBaseSelection();
-  const voice = useVoiceAssistant(selected, dependencies);
+  const voice = useVoiceAssistant(selected, current?.id ?? null, dependencies);
   const [typed, setTyped] = useState("");
   const pressRef = useRef<number | null>(null);
 
@@ -175,13 +234,25 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
                 <div className="flex overflow-hidden rounded-full border border-white/15">{SPEECH_SPEEDS.map((value) => <label key={value} className={`cursor-pointer px-2.5 py-1 transition focus-within:ring-2 focus-within:ring-cyan ${voice.speed === value ? "bg-cyan text-white" : "hover:bg-white/10"}`}><input type="radio" name="voice-speed" className="sr-only" value={value} checked={voice.speed === value} onChange={() => voice.setSpeed(value)} aria-label={`Konuşma hızı ${formatSpeed(value)}`} />{formatSpeed(value)}</label>)}</div>
               </fieldset>
               <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" className="accent-cyan" checked={voice.review} onChange={(event) => voice.setReview(event.target.checked)} />Göndermeden önce soruyu göster</label>
+              <label className="flex items-center gap-2">Yanıt dili<select className="rounded-full border border-white/15 bg-transparent px-2 py-1 text-xs text-slate-200" value={voice.answerLanguage} onChange={(event) => voice.setAnswerLanguage(event.target.value === "auto" ? "auto" : "tr")}><option value="tr" className="text-ink">Türkçe</option><option value="auto" className="text-ink">Soru diline göre</option></select></label>
             </div>
             <p className="mt-5 flex items-center gap-1.5 text-[11px] text-slate-500"><Lock size={12} /> Ses kaydınız bu cihazdan çıkmaz; yalnızca tanınan metin yetkili RAG servisine gönderilir.</p>
           </div>
         </div>
 
         <div className="panel p-5 sm:p-6">
-          <p className="eyebrow">Konuşma</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="eyebrow">Konuşma</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select aria-label="Görüşme seç" className="field h-9 max-w-[280px] py-1 text-xs" value={voice.activeConversationId ?? ""} onChange={(event) => { if (event.target.value) voice.selectConversation(Number(event.target.value)); }} disabled={!voice.conversations.length}>
+                <option value="">{voice.activeConversationId === null ? "Yeni görüşme (ilk soruyla kaydedilir)" : "Görüşme seçin"}</option>
+                {voice.conversations.map((item) => <option key={item.id} value={item.id}>{conversationLabel(item.title, item.id)}</option>)}
+              </select>
+              <button type="button" className="button-secondary h-9 px-3 text-xs" onClick={voice.newConversation}><Plus size={14} /> Yeni görüşme</button>
+            </div>
+          </div>
+          {voice.conversationStatus === "loading" && <p className="mt-3 text-xs text-slate-400" role="status">Kayıtlı görüşme yükleniyor…</p>}
+          {voice.conversationStatus === "error" && <p className="mt-3 text-xs text-red-600" role="status">Kayıtlı görüşmeler yüklenemedi; yeni sorular yine de yanıtlanır.</p>}
           <div className="mt-4 space-y-5" aria-live="polite">
             {!voice.turns.length && <p className="text-sm text-slate-500">Henüz bir soru sorulmadı. Örneğin: “Yıllık izin başvurusunu ne kadar önce yapmalıyım?”</p>}
             {voice.turns.map((turn) => <article key={turn.id} className="space-y-3" data-testid="voice-turn">
@@ -190,10 +261,13 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
                 {turn.answer || (turn.streaming ? <span className="text-slate-400">Yanıt hazırlanıyor…</span> : turn.error ? null : "Yanıt alınamadı.")}
                 {turn.streaming && turn.answer && <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-cyan align-middle" />}
                 {turn.error && <p className="mt-2 text-sm text-red-600">{turn.error}</p>}
-                {turn.stopped && <p className="mt-2 text-xs font-semibold text-slate-400">Durduruldu</p>}
+                {turn.stopped && <p className="mt-2 text-xs font-semibold text-slate-400">Durduruldu · tamamlanmayan yanıt görüşme geçmişine kaydedilmez</p>}
+                {turn.local && <p className="mt-2 text-xs text-slate-400">Belgelerde arama yapılmadı · görüşme geçmişine kaydedilmez</p>}
+                {turn.unspokenForeign > 0 && <p className="mt-2 text-xs text-amber-700" role="note">{turn.unspokenForeign} bölüm Türkçe olmadığı için Türkçe sesle okunmadı; metin olarak gösteriliyor.</p>}
                 {turn.sources.length > 0 && <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-cyan"><FileText size={13} /> {turn.sources.length} kaynak</p>}
                 <SpokenLine turn={turn} />
                 <MetricsLine metrics={turn.metrics} />
+                <TimingDetails metrics={turn.metrics} />
               </div>
             </article>)}
           </div>

@@ -45,7 +45,16 @@ export function streamRag(
   question: string,
   onEvent: (event: RagEvent) => void,
   signal?: AbortSignal,
-  options: { conversationId?: number; onSent?: () => void } = {},
+  options: {
+    conversationId?: number;
+    /** Answer language for this request only (voice); stored preferences are unchanged. */
+    responseLanguage?: "tr" | "en";
+    /** Ask the server for numeric stage timings. */
+    diagnostics?: boolean;
+    onTicket?: () => void;
+    onOpen?: () => void;
+    onSent?: () => void;
+  } = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     let socket: WebSocket | null = null;
@@ -95,16 +104,25 @@ export function streamRag(
       socket = nextSocket;
 
       nextSocket.onopen = () => {
+        options.onOpen?.();
         const payload: {
           question: string;
           knowledge_base_ids: number[];
           conversation_id?: number;
+          response_language?: "tr" | "en";
+          diagnostics?: boolean;
         } = {
           question,
           knowledge_base_ids: knowledgeBaseIds,
         };
         if (options.conversationId !== undefined) {
           payload.conversation_id = options.conversationId;
+        }
+        if (options.responseLanguage !== undefined) {
+          payload.response_language = options.responseLanguage;
+        }
+        if (options.diagnostics) {
+          payload.diagnostics = true;
         }
         nextSocket.send(JSON.stringify(payload));
         options.onSent?.();
@@ -160,6 +178,7 @@ export function streamRag(
     void websocketTicket("rag")
       .then((ticket) => {
         if (finished) return;
+        options.onTicket?.();
 
         attach(
           new WebSocket(

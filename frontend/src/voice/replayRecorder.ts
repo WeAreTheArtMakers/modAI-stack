@@ -1,4 +1,4 @@
-import { MicrophoneError, MICROPHONE_MESSAGES, type Recorder } from "./microphone";
+import { MicrophoneError, MICROPHONE_MESSAGES, measureAudio, type RecordedAudio, type Recorder } from "./microphone";
 
 /**
  * Measurement-only stand-in for the microphone, compiled in only when the build sets
@@ -12,12 +12,12 @@ export class ReplayRecorder implements Recorder {
     this.recording = true;
   }
 
-  async stop(): Promise<Float32Array> {
+  async stop(): Promise<RecordedAudio> {
     this.recording = false;
     const queue = (window as unknown as { __modaiVoiceReplay?: Float32Array[] }).__modaiVoiceReplay;
     const next = queue?.shift();
     if (!next) throw new MicrophoneError("too_short", MICROPHONE_MESSAGES.too_short);
-    return next;
+    return { samples: next, diagnostics: { ...measureAudio(next), finalizeMs: 0, decodeMs: 0 } };
   }
 
   cancel() {

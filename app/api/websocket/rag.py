@@ -1,4 +1,5 @@
 import asyncio
+from time import perf_counter
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
@@ -48,8 +49,10 @@ async def websocket_rag(ws: WebSocket):
                 )
                 continue
 
+            timings: dict[str, float] = {}
             async with SessionLocal() as db:
                 try:
+                    started = perf_counter()
                     authorized_kb_ids, kb_scope = (
                         await resolve_knowledge_base_scope(
                             db,
@@ -75,6 +78,12 @@ async def websocket_rag(ws: WebSocket):
                     preferences = await get_effective_assistant_preferences(
                         db, int(user["sub"])
                     )
+                    timings["authorization_ms"] = (perf_counter() - started) * 1000
+
+                    generation_preferences = generation_preference_values(preferences)
+                    if req.response_language is not None:
+                        # Request-scoped presentation override; the stored preference is untouched.
+                        generation_preferences["language"] = req.response_language
 
                     context = await retrieve_rag_context(
                         req.question,
@@ -83,7 +92,8 @@ async def websocket_rag(ws: WebSocket):
                         workspace_id=workspace_id,
                         knowledge_base_ids=authorized_kb_ids,
                         history=history,
-                        preferences=generation_preference_values(preferences),
+                        preferences=generation_preferences,
+                        response_language=req.response_language,
                     )
                 except EmbeddingModelUnavailableError:
                     await ws.send_json(
@@ -104,22 +114,36 @@ async def websocket_rag(ws: WebSocket):
                     )
                     continue
 
-            await ws.send_json(
-                {
-                    "type": "sources",
-                    "data": [
-                        source.model_dump(mode="json")
-                        for source in context.sources
-                    ],
-                }
-            )
+            sources_event: dict = {
+                "type": "sources",
+                "data": [
+                    source.model_dump(mode="json")
+                    for source in context.sources
+                ],
+            }
+            if req.diagnostics:
+                for name in ("embedding", "retrieval", "liveness", "prompt"):
+                    value = getattr(context, f"{name}_latency_ms", None)
+                    if isinstance(value, (int, float)):
+                        timings[f"{name}_ms"] = value
+                timings["prompt_chars"] = len(context.prompt)
+                sources_event["timings"] = {key: round(value, 1) for key, value in timings.items()}
+            await ws.send_json(sources_event)
 
             answer_parts: list[str] = []
+            generation_stats: dict = {}
+            generation_started = perf_counter()
+            first_token_ms: float | None = None
 
             try:
-                async for token in provider.stream(
-                    context.prompt
-                ):
+                stream = (
+                    provider.stream(context.prompt, stats=generation_stats)
+                    if req.diagnostics
+                    else provider.stream(context.prompt)
+                )
+                async for token in stream:
+                    if first_token_ms is None:
+                        first_token_ms = (perf_counter() - generation_started) * 1000
                     await ws.send_json(
                         {
                             "type": "token",
@@ -142,11 +166,14 @@ async def websocket_rag(ws: WebSocket):
                             sources=context.sources,
                         )
 
-                await ws.send_json(
-                    {
-                        "type": "complete",
+                complete_event: dict = {"type": "complete"}
+                if req.diagnostics:
+                    complete_event["timings"] = {
+                        "first_token_ms": round(first_token_ms, 1) if first_token_ms is not None else None,
+                        "generation_ms": round((perf_counter() - generation_started) * 1000, 1),
+                        **generation_stats,
                     }
-                )
+                await ws.send_json(complete_event)
 
             except (
                 WebSocketDisconnect,

@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebAudioPlayer } from "./audioPlayback";
-import { MicrophoneError, MicrophoneRecorder, trimSilence } from "./microphone";
+import { measureAudio, MicrophoneError, MicrophoneRecorder, trimSilence } from "./microphone";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 import { SentenceBuffer, speakable } from "./sentenceBuffer";
+import { classifyIntent, sentenceLanguage } from "./intent";
+import { stageDurations } from "./timeline";
+import { turnsFromConversation } from "./useVoiceAssistant";
 import { turkishOrdinal } from "./speechText";
 import { WorkerVoiceEngine, type LoadState } from "./voiceEngine";
 
@@ -129,8 +132,9 @@ describe("WorkerVoiceEngine", () => {
     const audio = new Float32Array(16_000);
     const result = voice.transcribe(audio);
     expect(worker.sent[0].transfer).toEqual([audio.buffer]);
-    worker.emit({ type: "transcript", id: 1, text: "merhaba", ms: 300, startedAt: 10, endedAt: 290 });
-    await expect(result).resolves.toEqual({ text: "merhaba", ms: 300, startedAt: 10, endedAt: 290 });
+    worker.emit({ type: "transcript", id: 1, text: "merhaba", ms: 300, receivedAt: 5, startedAt: 10, endedAt: 290, warm: true, backend: "webgpu", audioSeconds: 1 });
+    await expect(result).resolves.toEqual(expect.objectContaining({ text: "merhaba", ms: 300, receivedAt: 5, startedAt: 10, endedAt: 290, warm: true, backend: "webgpu" }));
+    expect((await result).postedAt).toEqual(expect.any(Number));
   });
 
   it("routes audio chunks to their sentence and resolves cancelled sentences", async () => {
@@ -253,16 +257,83 @@ describe("trimSilence", () => {
     return Float32Array.from(out);
   }
 
-  it("keeps the speech plus a 250 ms margin on each side", () => {
+  it("keeps the speech plus a 300 ms margin on each side and reports what it removed", () => {
     const trimmed = trimSilence(signal([[1, 0], [0.6, 0.3], [1.5, 0]]));
-    expect(trimmed.length / 16_000).toBeGreaterThan(1.05);
-    expect(trimmed.length / 16_000).toBeLessThan(1.15);
+    expect(trimmed.samples.length / 16_000).toBeGreaterThan(1.15);
+    expect(trimmed.samples.length / 16_000).toBeLessThan(1.25);
+    expect(trimmed.leadingMs).toBeGreaterThan(650);
+    expect(trimmed.leadingMs).toBeLessThan(720);
+    expect(trimmed.trailingMs).toBeGreaterThan(1150);
+  });
+
+  it("keeps quiet speech instead of trimming it away", () => {
+    const quiet = signal([[0.5, 0], [0.6, 0.012], [0.5, 0]]);
+    const trimmed = trimSilence(quiet);
+    expect(trimmed.samples.length / 16_000).toBeGreaterThan(1.1);
   });
 
   it("leaves audio alone when there is nothing to trim or no speech at all", () => {
     const speech = signal([[0.8, 0.3]]);
-    expect(trimSilence(speech)).toBe(speech);
+    expect(trimSilence(speech).samples).toBe(speech);
     const silence = signal([[2, 0]]);
-    expect(trimSilence(silence)).toBe(silence);
+    expect(trimSilence(silence)).toEqual({ samples: silence, leadingMs: 0, trailingMs: 0 });
+  });
+
+  it("measures level and clipping without keeping the audio", () => {
+    const measured = measureAudio(Float32Array.from([0, 0.5, -1, 1, 0.5]));
+    expect(measured.peak).toBe(1);
+    expect(measured.clippedPercent).toBeCloseTo(40);
+    expect(measured.durationMs).toBeCloseTo(0.3125);
+  });
+});
+
+describe("intent and language", () => {
+  it.each([
+    ["Merhaba", "greeting"],
+    ["Selam, günaydın!", "greeting"],
+    ["Teşekkürler", "thanks"],
+    ["Merhaba, bana nasıl yardımcı olabilirsin?", "capability"],
+    ["Merhaba, benden sürü yardımcı olabilirsin.", "capability"], // what Whisper heard in the owner's test
+    ["Neler yapabilirsin?", "capability"],
+    ["Merhaba, yıllık izin kaç gün?", "question"],
+    ["Masraf iadesinde bana nasıl yardımcı olabilirsin?", "question"],
+    ["Biberist neyar var? Biberist'in de bana hangi belgelardan bir görebilirsin?", "question"],
+  ])("classifies %s as %s", (text, intent) => {
+    expect(classifyIntent(text)).toBe(intent);
+  });
+
+  it.each([
+    ["Every session ends after 12 hours and you must sign in again.", "en"],
+    ["VPN rehberine göre en fazla 2 cihazdan bağlanabilirsiniz.", "tr"],
+    ["Customer Support Service Level Agreement belgesine göre ilk yanıt 30 dakikadır.", "tr"],
+    ["Dokuz on on bir on iki.", "tr"],
+    ["Tamam.", "unknown"],
+  ])("detects the language of %s", (text, language) => {
+    expect(sentenceLanguage(text)).toBe(language);
+  });
+});
+
+describe("restored conversations", () => {
+  it("pairs saved messages into turns in order and keeps only the stored source metadata", () => {
+    const turns = turnsFromConversation({
+      id: 5, workspace_id: 3, title: "Sesli görüşme: x", created_at: null, updated_at: null, archived_at: null,
+      message_total: 3, message_limit: 100, message_offset: 0,
+      messages: [
+        { id: 10, role: "user", content: "Soru 1", sources: [], created_at: null },
+        { id: 11, role: "assistant", content: "Yanıt 1", sources: [{ document: "a.md", score: 0.5, document_id: 1, chunk_index: 0 }], created_at: null },
+        { id: 12, role: "user", content: "Soru 2", sources: [], created_at: null },
+      ],
+    });
+    expect(turns.map((turn) => [turn.question, turn.answer, turn.restored, turn.streaming])).toEqual([["Soru 1", "Yanıt 1", true, false], ["Soru 2", "", true, false]]);
+    expect(turns[0].sources).toEqual([{ document: "a.md", score: 0.5, document_id: 1, chunk_index: 0, text: null }]);
+    expect(new Set(turns.map((turn) => turn.id)).size).toBe(2);
+  });
+});
+
+describe("stage timings", () => {
+  it("separates transfer, queue wait and inference for speech recognition", () => {
+    expect(stageDurations({ recordStop: 0, audioReady: 40, sttPosted: 41, sttReceived: 43, sttStart: 3043, sttEnd: 3743, transcriptReceived: 3745 })).toEqual(
+      expect.objectContaining({ sttCapture: 40, sttTransferIn: 2, sttQueueWait: 3000, sttInference: 700, sttTransferBack: 2 }),
+    );
   });
 });

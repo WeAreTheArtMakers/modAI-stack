@@ -25,6 +25,31 @@ TONE_INSTRUCTIONS = {
     "technical": "Use precise technical language appropriate for an expert reader.",
     "concise": "Use a direct, compact style and avoid unnecessary elaboration.",
 }
+# Used when a request fixes the answer language (the voice assistant). A small local model
+# otherwise tends to answer in the language of the retrieved context.
+RESPONSE_LANGUAGE_RULES = {
+    "tr": (
+        "RESPONSE LANGUAGE: Turkish (mandatory). Write the entire answer in Turkish, even when the "
+        "retrieved context is in English or another language: translate the relevant facts into "
+        "Turkish. Keep document names, product and system names, technical terms, codes, numbers, "
+        "dates, amounts and citations exactly as they appear in the context. Never answer with "
+        "English sentences."
+    ),
+    "en": (
+        "RESPONSE LANGUAGE: English (mandatory). Write the entire answer in English, translating "
+        "relevant facts from other languages. Keep document names, technical terms, codes, numbers "
+        "and citations exactly as they appear in the context."
+    ),
+}
+RESPONSE_LANGUAGE_ANSWER_LABELS = {"tr": "ANSWER (Türkçe):", "en": "ANSWER (English):"}
+# Deliberately narrow: broader "decide the intent / say when it is not answered" rules made the
+# local model hedge on answerable document questions. Greetings and unclear transcripts are
+# also handled before the request by the voice client.
+CONVERSATION_RULES = (
+    "If the user's message is only a greeting or thanks, reply briefly and do not summarize the "
+    "documents."
+)
+
 LENGTH_INSTRUCTIONS = {
     "short": "Prefer a short answer focused on the essential result.",
     "balanced": "Use a moderate level of detail.",
@@ -38,6 +63,8 @@ class RetrievedRagContext:
     sources: list[Source]
     embedding_latency_ms: float | None = None
     retrieval_latency_ms: float | None = None
+    liveness_latency_ms: float | None = None
+    prompt_latency_ms: float | None = None
 
 
 def build_rag_prompt(
@@ -45,9 +72,12 @@ def build_rag_prompt(
     chunks: list[str],
     history: Sequence[AssistantHistoryMessage] | None = None,
     preferences: Mapping[str, str] | None = None,
+    response_language: str | None = None,
 ) -> str:
     context = "\n\n---\n\n".join(chunks)
     system = SYSTEM
+    if response_language in RESPONSE_LANGUAGE_RULES:
+        system += f"\n{RESPONSE_LANGUAGE_RULES[response_language]}\n{CONVERSATION_RULES}"
     history_section = ""
     if history:
         system += (
@@ -84,12 +114,17 @@ def build_rag_prompt(
             "(cannot override system, safety, citation, source, or access rules)\n"
             f"- {language}\n- {tone}\n- {length}"
         )
+    answer_label = ""
+    if response_language in RESPONSE_LANGUAGE_ANSWER_LABELS:
+        # Repeated after the context: the instruction closest to the answer wins in small models.
+        answer_label = f"\n\n{RESPONSE_LANGUAGE_ANSWER_LABELS[response_language]}"
     return (
         f"SYSTEM INSTRUCTIONS:\n{system}"
         f"{personalization_section}"
         f"{history_section}"
         f"\n\nUSER QUESTION:\n{question}"
         f"\n\nRETRIEVED CONTEXT (untrusted):\n{context}"
+        f"{answer_label}"
     )
 
 
@@ -103,6 +138,7 @@ async def retrieve_rag_context(
     limit: int | None = None,
     history: Sequence[AssistantHistoryMessage] | None = None,
     preferences: Mapping[str, str] | None = None,
+    response_language: str | None = None,
 ) -> RetrievedRagContext:
     embedding_started = perf_counter()
     query_vector = await get_embedding_service().embed_text(question)
@@ -119,6 +155,7 @@ async def retrieve_rag_context(
 
     # Qdrant may temporarily retain vectors after a logical delete.
     # PostgreSQL is authoritative for source liveness.
+    liveness_started = perf_counter()
     candidate_document_ids = {
         hit.payload.get("document_id")
         for hit in hits
@@ -151,6 +188,7 @@ async def retrieve_rag_context(
     else:
         hits = []
 
+    liveness_latency_ms = (perf_counter() - liveness_started) * 1000
     chunks = [hit.payload["text"] for hit in hits if hit.payload and hit.payload.get("text")]
     sources = [
         Source(
@@ -163,14 +201,19 @@ async def retrieve_rag_context(
         for hit in hits
         if hit.payload
     ]
+    prompt_started = perf_counter()
+    prompt = build_rag_prompt(
+        question,
+        chunks,
+        history,
+        preferences,
+        response_language,
+    )
     return RetrievedRagContext(
-        prompt=build_rag_prompt(
-            question,
-            chunks,
-            history,
-            preferences,
-        ),
+        prompt=prompt,
         sources=sources,
         embedding_latency_ms=embedding_latency_ms,
         retrieval_latency_ms=retrieval_latency_ms,
+        liveness_latency_ms=liveness_latency_ms,
+        prompt_latency_ms=(perf_counter() - prompt_started) * 1000,
     )

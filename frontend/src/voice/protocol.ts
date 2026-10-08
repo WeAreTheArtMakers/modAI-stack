@@ -15,7 +15,11 @@ export type WorkerResponse =
   | { type: "progress"; component: VoiceComponent; loaded: number; total: number; stage: string }
   | { type: "ready"; component: VoiceComponent; backend: InferenceBackend; ms: number }
   | { type: "load-error"; component: VoiceComponent; message: string }
-  | { type: "transcript"; id: number; text: string; ms: number; startedAt: number; endedAt: number }
+  | {
+      type: "transcript"; id: number; text: string; ms: number;
+      receivedAt: number; startedAt: number; endedAt: number; // worker queue wait = startedAt - receivedAt
+      warm: boolean; backend: InferenceBackend; audioSeconds: number;
+    }
   | { type: "transcribe-error"; id: number; message: string }
   | { type: "audio"; id: number; seq: number; samples: Float32Array; sampleRate: number; synthStartedAt: number; postedAt: number }
   | { type: "spoken"; id: number; seq: number; ms: number }

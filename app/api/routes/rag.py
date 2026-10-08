@@ -1,3 +1,7 @@
+import asyncio
+import logging
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from app.api.deps import current_user
 from app.models.schemas import RagRequest, RagResponse
@@ -18,7 +22,34 @@ from app.services.assistant_preferences import (
     generation_preference_values,
     get_effective_assistant_preferences,
 )
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["rag"])
+
+WARMUP_INTERVAL_SECONDS = 60
+_warmup = {"last": float("-inf"), "task": None}
+
+
+@router.post("/rag/warmup", status_code=202)
+async def warm_up_generation_model(user=Depends(current_user)):
+    """Ask Ollama to load the generation model before the user's next question.
+
+    Authenticated, at most one load request per minute per API process, and Ollama's own
+    keep-alive and memory settings are unchanged. Returns immediately.
+    """
+    del user
+    now = time.monotonic()
+    if now - _warmup["last"] < WARMUP_INTERVAL_SECONDS:
+        return {"status": "recent"}
+    _warmup["last"] = now
+
+    async def load() -> None:
+        try:
+            await OllamaProvider().preload()
+        except Exception:
+            logger.warning("Generation model warm-up failed", extra={"component": "rag"})
+
+    _warmup["task"] = asyncio.create_task(load())
+    return {"status": "warming"}
 @router.post("/rag/query", response_model=RagResponse)
 async def query(req: RagRequest, request: Request, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     limiter = RedisRateLimiter()
@@ -40,6 +71,9 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
     preferences = await get_effective_assistant_preferences(
         db, int(user["sub"])
     )
+    generation_preferences = generation_preference_values(preferences)
+    if req.response_language is not None:
+        generation_preferences["language"] = req.response_language
 
     try:
         context = await retrieve_rag_context(
@@ -49,7 +83,8 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
             workspace_id=workspace_id,
             knowledge_base_ids=authorized_kb_ids,
             history=history,
-            preferences=generation_preference_values(preferences),
+            preferences=generation_preferences,
+            response_language=req.response_language,
         )
     except EmbeddingModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=embedding_model_unavailable_detail()) from exc

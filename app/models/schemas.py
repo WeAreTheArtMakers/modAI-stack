@@ -136,6 +136,11 @@ class RagRequest(BaseModel):
     question: str = Field(min_length=1, max_length=12000)
     knowledge_base_ids: list[int] = Field(default_factory=list, max_length=20)
     conversation_id: int | None = Field(default=None, gt=0)
+    # Presentation only (the voice assistant sends it): the answer language for this request.
+    # It never changes authorization, sources or the user's stored preferences.
+    response_language: Literal["tr", "en"] | None = None
+    # Return numeric stage timings with the stream (no text).
+    diagnostics: bool = False
 class DocumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
