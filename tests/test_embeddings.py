@@ -79,3 +79,35 @@ def test_unavailable_embedding_model_has_a_clear_cache_only_error(monkeypatch):
         embeddings.EmbeddingService()._get_model()
 
     assert calls == [{"cache_folder": None, "local_files_only": True}]
+
+
+def test_concurrent_first_calls_load_the_model_once(monkeypatch):
+    # A warm-up and a question (or two questions after a restart) can both trigger the first
+    # load; parallel SentenceTransformer construction is slow and can fail.
+    import threading
+    import time
+
+    constructed = []
+
+    class SlowSentenceTransformer(FakeEmbeddingModel):
+        def __init__(self, _model_name_or_path, **_kwargs):
+            constructed.append(threading.get_ident())
+            time.sleep(0.2)
+
+    monkeypatch.setattr(
+        embeddings,
+        "get_settings",
+        lambda: SimpleNamespace(
+            embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+            embedding_cache_dir=None,
+            embedding_allow_download=False,
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "sentence_transformers", SimpleNamespace(SentenceTransformer=SlowSentenceTransformer))
+    service = embeddings.EmbeddingService()
+
+    async def both():
+        return await asyncio.gather(service.embed_text("ısınma"), service.embed_text("soru"))
+
+    assert asyncio.run(both()) == [[6.0], [4.0]]
+    assert len(constructed) == 1

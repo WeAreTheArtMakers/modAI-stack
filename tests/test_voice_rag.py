@@ -219,7 +219,12 @@ def test_warmup_requires_authentication_and_is_throttled(monkeypatch):
     async def preload(self):
         calls.append(1)
 
+    class Embeddings:
+        async def embed_text(self, text):
+            return [0.0]
+
     monkeypatch.setattr(OllamaProvider, "preload", preload)
+    monkeypatch.setattr(rag_routes, "get_embedding_service", lambda: Embeddings())
     monkeypatch.setitem(rag_routes._warmup, "last", float("-inf"))
     monkeypatch.setitem(rag_routes._warmup, "task", None)
     with TestClient(main.app) as client:
@@ -243,17 +248,24 @@ async def test_warmup_never_overlaps_a_running_load_and_closes_its_client(monkey
     from app.api.routes import rag as rag_routes
 
     release = asyncio.Event()
-    started, closed = [], []
+    started, closed, embedded = [], [], []
 
     async def slow_preload(self):
+        assert embedded, "the embedding model loads before the generation model"
         started.append(1)
         await release.wait()
 
     async def aclose(self):
         closed.append(1)
 
+    class Embeddings:
+        async def embed_text(self, text):
+            embedded.append(text)
+            return [0.0]
+
     monkeypatch.setattr(OllamaProvider, "preload", slow_preload)
     monkeypatch.setattr(httpx.AsyncClient, "aclose", aclose)
+    monkeypatch.setattr(rag_routes, "get_embedding_service", lambda: Embeddings())
     monkeypatch.setitem(rag_routes._warmup, "last", float("-inf"))
     monkeypatch.setitem(rag_routes._warmup, "task", None)
 
@@ -265,3 +277,4 @@ async def test_warmup_never_overlaps_a_running_load_and_closes_its_client(monkey
     release.set()
     await rag_routes._warmup["task"]
     assert started == [1] and closed == [1]
+    assert len(embedded) == 1  # the embedding model is loaded as well, with a fixed text

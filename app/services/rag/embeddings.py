@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
@@ -55,45 +56,54 @@ class EmbeddingService:
     def __init__(self, model=None, *, allow_download: bool | None = None):
         self._model = model
         self._allow_download = allow_download
+        self._load_lock = threading.Lock()
 
     def _get_model(self):
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
-
-            settings = get_settings()
-            model_name = settings.embedding_model
-            is_local_path = _is_local_model_path(model_name)
-            local_path = Path(model_name).expanduser()
-            if is_local_path and not local_path.is_dir():
-                message = f"Configured local embedding model directory is unavailable: {local_path}"
-                logger.error(message)
-                raise EmbeddingModelUnavailableError(message)
-
-            allow_download = (
-                settings.embedding_allow_download
-                if self._allow_download is None
-                else self._allow_download
-            )
-            try:
-                self._model = SentenceTransformer(
-                    str(local_path) if is_local_path else model_name,
-                    cache_folder=settings.embedding_cache_dir,
-                    local_files_only=is_local_path or not allow_download,
-                )
-            except Exception as exc:
-                if is_local_path:
-                    message = f"Configured local embedding model directory could not be loaded: {local_path}"
-                elif allow_download:
-                    message = f"Configured embedding model could not be loaded: {model_name}"
-                else:
-                    message = (
-                        f"Configured embedding model is not available in the local cache: {model_name}. "
-                        "Run `python -m app.tools.prefetch_embedding_model` while connected "
-                        "or configure a local model directory."
-                    )
-                logger.error(message, extra={"exception_type": type(exc).__name__})
-                raise EmbeddingModelUnavailableError(message) from exc
+            # Concurrent first calls (a warm-up and a question, or two questions after a restart)
+            # must not construct the model twice: parallel construction is slow and can fail
+            # ("Cannot copy out of meta tensor").
+            with self._load_lock:
+                if self._model is None:
+                    self._model = self._load_model()
         return self._model
+
+    def _load_model(self):
+        from sentence_transformers import SentenceTransformer
+
+        settings = get_settings()
+        model_name = settings.embedding_model
+        is_local_path = _is_local_model_path(model_name)
+        local_path = Path(model_name).expanduser()
+        if is_local_path and not local_path.is_dir():
+            message = f"Configured local embedding model directory is unavailable: {local_path}"
+            logger.error(message)
+            raise EmbeddingModelUnavailableError(message)
+
+        allow_download = (
+            settings.embedding_allow_download
+            if self._allow_download is None
+            else self._allow_download
+        )
+        try:
+            return SentenceTransformer(
+                str(local_path) if is_local_path else model_name,
+                cache_folder=settings.embedding_cache_dir,
+                local_files_only=is_local_path or not allow_download,
+            )
+        except Exception as exc:
+            if is_local_path:
+                message = f"Configured local embedding model directory could not be loaded: {local_path}"
+            elif allow_download:
+                message = f"Configured embedding model could not be loaded: {model_name}"
+            else:
+                message = (
+                    f"Configured embedding model is not available in the local cache: {model_name}. "
+                    "Run `python -m app.tools.prefetch_embedding_model` while connected "
+                    "or configure a local model directory."
+                )
+            logger.error(message, extra={"exception_type": type(exc).__name__})
+            raise EmbeddingModelUnavailableError(message) from exc
 
     def _encode(self, texts: Sequence[str]) -> list[list[float]]:
         vectors = self._get_model().encode(
