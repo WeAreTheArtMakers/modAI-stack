@@ -5,8 +5,8 @@ import { streamRag } from "../api/websocket";
 import type { AssistantConversationDetail, AssistantConversationList, AssistantConversationSummary, RagTimings, Source } from "../types";
 import { WebAudioPlayer, type Player } from "./audioPlayback";
 import {
-  DEFAULT_SPEECH_SPEED, SPEECH_SPEEDS, VOICE_LANGUAGE_STORAGE_KEY, VOICE_READY_STORAGE_KEY, VOICE_REVIEW_STORAGE_KEY,
-  VOICE_SPEED_STORAGE_KEY, VOICE_TITLE_PREFIX,
+  DEFAULT_SPEECH_SPEED, DEFAULT_STT_MODEL, isSttModel, SPEECH_SPEEDS, VOICE_LANGUAGE_STORAGE_KEY, VOICE_READY_STORAGE_KEY,
+  VOICE_REVIEW_STORAGE_KEY, VOICE_SPEED_STORAGE_KEY, VOICE_STT_MODEL_STORAGE_KEY, VOICE_TITLE_PREFIX, WHISPER_MODELS, type SttModelId,
 } from "./config";
 import { classifyIntent, LOCAL_REPLIES, sentenceLanguage } from "./intent";
 import { MicrophoneError, MicrophoneRecorder, trimSilence, type AudioDiagnostics, type Recorder } from "./microphone";
@@ -15,7 +15,7 @@ import { ReplayRecorder } from "./replayRecorder";
 import { SentenceBuffer, speakable } from "./sentenceBuffer";
 import { BrowserSystemVoice, type SystemVoice } from "./systemVoice";
 import { clock, recordDebugTiming, stageDurations, type Timeline } from "./timeline";
-import { IDLE_LOAD, sharedVoiceEngine, type LoadState, type VoiceEngine } from "./voiceEngine";
+import { IDLE_LOAD, LoadSuperseded, sharedVoiceEngine, type LoadState, type VoiceEngine } from "./voiceEngine";
 
 export type VoicePhase = "idle" | "listening" | "transcribing" | "reviewing" | "searching" | "answering" | "speaking" | "error";
 export type SpeechMode = "neural" | "system" | "off";
@@ -61,7 +61,7 @@ export interface TurnMetrics {
   stages?: Record<string, number>; // see timeline.ts
   server?: RagTimings; // numeric server stage timings
   audio?: AudioDiagnostics & { trimmedLeadingMs: number; trimmedTrailingMs: number; trimmedDurationMs: number };
-  stt?: { warm?: boolean; backend?: InferenceBackend };
+  stt?: { warm?: boolean; backend?: InferenceBackend; model?: SttModelId };
 }
 
 export interface VoiceTurn {
@@ -132,6 +132,34 @@ export function turnsFromConversation(detail: AssistantConversationDetail): Voic
   return turns;
 }
 
+/**
+ * The visible session for an acceptance test (copied by the user with the debug flag on): questions,
+ * answers, source document names and numeric timings. Nothing here is sent anywhere.
+ */
+export function acceptanceReport(turns: VoiceTurn[]) {
+  return turns.filter((turn) => !turn.restored).map((turn, index) => ({
+    turn: index + 1,
+    origin: turn.origin,
+    question: turn.question,
+    corrected: turn.corrected ?? false,
+    local: turn.local ?? false,
+    stopped: turn.stopped ?? false,
+    saved: turn.saved ?? false,
+    error: turn.error ?? null,
+    answer: turn.answer,
+    sources: turn.sources.map((source) => source.document),
+    unspokenForeign: turn.unspokenForeign,
+    stt: turn.metrics.stt ?? null,
+    sttMs: turn.metrics.sttMs ?? null,
+    firstTokenMs: turn.metrics.firstTokenMs ?? null,
+    firstAudioMs: turn.metrics.firstAudioMs ?? null,
+    completeMs: turn.metrics.completeMs ?? null,
+    stages: turn.metrics.stages ?? {},
+    server: turn.metrics.server ?? {},
+    audio: turn.metrics.audio ?? null,
+  }));
+}
+
 export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: number | null, dependencies?: VoiceDependencies) {
   const depsRef = useRef<VoiceDependencies | null>(null);
   if (!depsRef.current) depsRef.current = dependencies ?? createBrowserVoiceDependencies();
@@ -148,6 +176,7 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
   // Reviewing the transcript is on by default: Whisper tiny often mishears Turkish.
   const [review, setReviewState] = useState(() => stored(VOICE_REVIEW_STORAGE_KEY) !== "0");
   const [answerLanguage, setAnswerLanguageState] = useState<AnswerLanguage>(() => (stored(VOICE_LANGUAGE_STORAGE_KEY) === "auto" ? "auto" : "tr"));
+  const [sttModel, setSttModelState] = useState<SttModelId>(() => { const value = stored(VOICE_STT_MODEL_STORAGE_KEY); return isSttModel(value) ? value : DEFAULT_STT_MODEL; });
   const [pending, setPending] = useState<PendingTranscript | null>(null);
   const [conversations, setConversations] = useState<AssistantConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
@@ -161,6 +190,9 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
   const speedRef = useRef(speed);
   const reviewRef = useRef(review);
   const languageRef = useRef(answerLanguage);
+  const sttModelRef = useRef(sttModel);
+  const sttStatusRef = useRef(stt.status);
+  sttStatusRef.current = stt.status;
   const kbRef = useRef(knowledgeBaseIds);
   const workspaceRef = useRef(workspaceId);
   const conversationRef = useRef<number | null>(null);
@@ -190,8 +222,24 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
     void deps.warmup().catch(() => undefined);
   }, [deps]);
 
+  const chooseSttModel = useCallback((model: SttModelId) => {
+    sttModelRef.current = model;
+    setSttModelState(model);
+    store(VOICE_STT_MODEL_STORAGE_KEY, model);
+  }, []);
+
+  /** Loads the selected recognition model; if an optional model cannot load, falls back to the default. */
+  const loadRecognizer = useCallback((model: SttModelId) => {
+    void deps.engine.load("stt", setStt, model).catch((reason: unknown) => {
+      if (reason instanceof LoadSuperseded || sttModelRef.current !== model || model === DEFAULT_STT_MODEL) return;
+      setError(`${WHISPER_MODELS[model].label} yüklenemedi; ${WHISPER_MODELS[DEFAULT_STT_MODEL].label} kullanılıyor.`);
+      chooseSttModel(DEFAULT_STT_MODEL);
+      void deps.engine.load("stt", setStt, DEFAULT_STT_MODEL).catch(() => undefined);
+    });
+  }, [chooseSttModel, deps]);
+
   const prepare = useCallback(() => {
-    void deps.engine.load("stt", setStt).catch(() => undefined);
+    loadRecognizer(sttModelRef.current);
     void deps.engine.load("tts", setTts).then(() => {
       speechModeRef.current = "neural";
       setSpeechMode("neural");
@@ -201,7 +249,7 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
       speechModeRef.current = fallback;
       setSpeechMode(fallback);
     });
-  }, [deps]);
+  }, [deps, loadRecognizer]);
 
   /** Stops audio and generation for the current answer; nothing stale may play afterwards. */
   const stopCurrent = useCallback((reason: "stopped" | "superseded") => {
@@ -521,7 +569,7 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
           trimmedTrailingMs: trimmed.trailingMs,
           trimmedDurationMs: (trimmed.samples.length / 16_000) * 1000,
         },
-        stt: { warm: result.warm, backend: result.backend },
+        stt: { warm: result.warm, backend: result.backend, model: result.model },
       };
       if (!result.text) { fail(NOT_UNDERSTOOD); return; }
       warmGeneration();
@@ -636,6 +684,13 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
     store(VOICE_LANGUAGE_STORAGE_KEY, value);
   }, []);
 
+  /** Switches the recognition model; the previous one is released before the new one loads. */
+  const setSttModel = useCallback((model: SttModelId) => {
+    if (model === sttModelRef.current || recordingRef.current || phaseRef.current === "transcribing") return;
+    chooseSttModel(model);
+    if (sttStatusRef.current !== "idle") loadRecognizer(model); // otherwise loaded by "Modelleri hazırla"
+  }, [chooseSttModel, loadRecognizer]);
+
   const dismissError = useCallback(() => { setError(null); setPhase("idle"); }, [setPhase]);
 
   useEffect(() => {
@@ -660,10 +715,10 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
 
   const backend: InferenceBackend | undefined = tts.backend;
   return {
-    phase, error, turns, stt, tts, speechMode, voiceEnabled, backend, speed, review, answerLanguage, pending,
+    phase, error, turns, stt, tts, speechMode, voiceEnabled, backend, speed, review, answerLanguage, sttModel, pending,
     conversations, activeConversationId, conversationStatus,
     systemVoiceName: deps.systemVoice.voiceName(),
     prepare, startListening, stopListening, cancelListening, stop, askText, confirmTranscript, discardTranscript, correct,
-    selectConversation, newConversation, toggleVoice, setSpeed, setReview, setAnswerLanguage, dismissError, level,
+    selectConversation, newConversation, toggleVoice, setSpeed, setReview, setAnswerLanguage, setSttModel, dismissError, level,
   };
 }

@@ -53,13 +53,17 @@ export function stageDurations(timeline: Timeline): Record<string, number> {
 
 export const VOICE_DEBUG_STORAGE_KEY = "modai.voice.debug";
 
+export function voiceDebugEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(VOICE_DEBUG_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Opt-in (localStorage "modai.voice.debug" = "1"): keep numeric stage timings on window for diagnosis. */
 export function recordDebugTiming(entry: Record<string, unknown>) {
-  try {
-    if (window.localStorage.getItem(VOICE_DEBUG_STORAGE_KEY) !== "1") return;
-  } catch {
-    return;
-  }
+  if (!voiceDebugEnabled()) return;
   const target = window as unknown as { __modaiVoiceTimings?: Record<string, unknown>[] };
   (target.__modaiVoiceTimings ??= []).push(entry);
 }

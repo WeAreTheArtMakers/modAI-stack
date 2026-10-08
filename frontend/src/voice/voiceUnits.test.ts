@@ -7,7 +7,7 @@ import { classifyIntent, sentenceLanguage } from "./intent";
 import { stageDurations } from "./timeline";
 import { turnsFromConversation } from "./useVoiceAssistant";
 import { turkishOrdinal } from "./speechText";
-import { WorkerVoiceEngine, type LoadState } from "./voiceEngine";
+import { LoadSuperseded, WorkerVoiceEngine, type LoadState } from "./voiceEngine";
 
 function stream(tokens: string[]) {
   const buffer = new SentenceBuffer();
@@ -127,13 +127,41 @@ describe("WorkerVoiceEngine", () => {
     expect(states[1].loaded).toBe(50);
   });
 
+  it("loads one recognition model at a time and ignores messages of a replaced model", async () => {
+    const { worker, voice } = engine();
+    const tiny = voice.load("stt", () => undefined);
+    expect(worker.sent[0].message).toEqual({ type: "load", component: "stt", model: "tiny" });
+    worker.emit({ type: "ready", component: "stt", backend: "webgpu", ms: 500, model: "tiny" });
+    await expect(tiny).resolves.toBe("webgpu");
+
+    const baseStates: LoadState[] = [];
+    const base = voice.load("stt", (state) => baseStates.push(state), "base");
+    expect(worker.sent[1].message).toEqual({ type: "load", component: "stt", model: "base" });
+    expect(baseStates[0]).toEqual(expect.objectContaining({ status: "loading", model: "base" }));
+
+    // Switching back before Base is ready supersedes its load; its late messages are ignored.
+    const tinyStates: LoadState[] = [];
+    const tinyAgain = voice.load("stt", (state) => tinyStates.push(state), "tiny");
+    await expect(base).rejects.toBeInstanceOf(LoadSuperseded);
+    worker.emit({ type: "progress", component: "stt", loaded: 10, total: 100, stage: "encoder", model: "base" });
+    worker.emit({ type: "ready", component: "stt", backend: "webgpu", ms: 900, model: "base" });
+    worker.emit({ type: "ready", component: "stt", backend: "wasm", ms: 300, model: "tiny" });
+    await expect(tinyAgain).resolves.toBe("wasm");
+    expect(baseStates.map((state) => state.status)).toEqual(["loading"]);
+    expect(tinyStates.at(-1)).toEqual(expect.objectContaining({ status: "ready", model: "tiny", backend: "wasm" }));
+
+    // The current model again: no new load request.
+    void voice.load("stt", () => undefined);
+    expect(worker.sent).toHaveLength(3);
+  });
+
   it("transfers audio to the worker and resolves the transcript", async () => {
     const { worker, voice } = engine();
     const audio = new Float32Array(16_000);
     const result = voice.transcribe(audio);
     expect(worker.sent[0].transfer).toEqual([audio.buffer]);
-    worker.emit({ type: "transcript", id: 1, text: "merhaba", ms: 300, receivedAt: 5, startedAt: 10, endedAt: 290, warm: true, backend: "webgpu", audioSeconds: 1 });
-    await expect(result).resolves.toEqual(expect.objectContaining({ text: "merhaba", ms: 300, receivedAt: 5, startedAt: 10, endedAt: 290, warm: true, backend: "webgpu" }));
+    worker.emit({ type: "transcript", id: 1, text: "merhaba", ms: 300, receivedAt: 5, startedAt: 10, endedAt: 290, warm: true, backend: "webgpu", audioSeconds: 1, model: "base" });
+    await expect(result).resolves.toEqual(expect.objectContaining({ text: "merhaba", ms: 300, receivedAt: 5, startedAt: 10, endedAt: 290, warm: true, backend: "webgpu", model: "base" }));
     expect((await result).postedAt).toEqual(expect.any(Number));
   });
 

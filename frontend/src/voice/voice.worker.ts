@@ -1,11 +1,11 @@
 /// <reference lib="webworker" />
-// Speech recognition (Whisper tiny via Transformers.js) and Turkish speech synthesis
+// Speech recognition (Whisper tiny or base via Transformers.js) and Turkish speech synthesis
 // (EMA Lightning) off the React main thread. Both share one onnxruntime-web instance.
 import { env, pipeline, type AutomaticSpeechRecognitionPipeline, type ProgressInfo } from "@huggingface/transformers";
 import * as ort from "onnxruntime-web/webgpu";
 // The WebGPU build of the runtime (it also runs the WASM backend), emitted by Vite as a hashed asset.
 import ortWasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
-import { EMA_LIGHTNING, VOICE_MODELS_BASE, WHISPER, WHISPER_SAMPLE_RATE } from "./config";
+import { DEFAULT_STT_MODEL, EMA_LIGHTNING, VOICE_MODELS_BASE, WHISPER_LANGUAGE, WHISPER_MODELS, WHISPER_SAMPLE_RATE, type SttModelId } from "./config";
 import type { InferenceBackend, VoiceComponent, WorkerRequest, WorkerResponse } from "./protocol";
 import { EmaLightning, RATE } from "./vendor/emaLightning";
 
@@ -39,8 +39,6 @@ ort.env.wasm.proxy = false;
 const post = (message: WorkerResponse, transfer: ArrayBuffer[] = []) => scope.postMessage(message, transfer);
 const clock = () => performance.timeOrigin + performance.now();
 
-let recognizer: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
-let recognizerReady = false;
 let synthesizer: Promise<EmaLightning> | null = null;
 let cancelledUpTo = 0;
 
@@ -99,34 +97,59 @@ function webgpuAdapter(): Promise<GpuAdapter | null> {
   return adapterProbe;
 }
 
-const TRANSCRIBE = { language: WHISPER.language, task: "transcribe" } as const;
-let recognizerBackend: InferenceBackend = "wasm";
+const TRANSCRIBE = { language: WHISPER_LANGUAGE, task: "transcribe" } as const;
 
-function loadRecognizer(requested?: InferenceBackend): Promise<AutomaticSpeechRecognitionPipeline> {
-  if (recognizer) return recognizer;
+// One Whisper model in memory at a time: selecting another model releases the current one (its
+// ONNX sessions, WebGPU buffers and WASM allocations) before the new one is created.
+interface Recognizer {
+  model: SttModelId;
+  promise: Promise<AutomaticSpeechRecognitionPipeline>;
+  backend: InferenceBackend;
+  ready: boolean;
+  released: boolean;
+}
+class Superseded extends Error {}
+let recognizer: Recognizer | null = null;
+let requestedModel: SttModelId = DEFAULT_STT_MODEL;
+
+/** Frees a recognizer after any inference already queued for it. */
+async function releaseRecognizer(previous: Recognizer) {
+  previous.released = true;
+  const asr = await previous.promise.catch(() => null);
+  if (asr) await schedule("input", () => asr.dispose());
+}
+
+function loadRecognizer(model: SttModelId, requested?: InferenceBackend): Recognizer {
+  requestedModel = model;
+  if (recognizer?.model === model) return recognizer;
+  const previous = recognizer;
+  const config = WHISPER_MODELS[model];
   const started = performance.now();
   const files = new Map<string, { loaded: number; total: number }>();
-  let expectedBytes: number = WHISPER.downloadBytes;
+  let expectedBytes = config.downloadBytes;
   const onProgress = (info: ProgressInfo) => {
-    if (info.status !== "progress") return;
+    if (info.status !== "progress" || entry.released) return;
     files.set(info.file, { loaded: info.loaded, total: info.total });
     let loaded = 0;
     for (const file of files.values()) loaded += file.loaded;
-    post({ type: "progress", component: "stt", loaded, total: expectedBytes, stage: info.file });
+    post({ type: "progress", component: "stt", loaded, total: expectedBytes, stage: info.file, model });
   };
-  // Measured on Apple M1 Pro (Chrome 152): the fixed 30-second Whisper encoder pass takes
+  // Measured on Apple M1 Pro (Chrome 152): the fixed 30-second Whisper tiny encoder pass takes
   // ~1.45 s on single-threaded WASM (q8) but ~0.5 s on WebGPU (fp16), with no accuracy loss.
   // The q8 decoder stays on WASM: its integer kernels are not WebGPU kernels.
-  const create = (backend: InferenceBackend) => pipeline("automatic-speech-recognition", WHISPER.directory, {
+  const create = (backend: InferenceBackend) => pipeline("automatic-speech-recognition", config.directory, {
     ...(backend === "webgpu"
-      ? { device: { encoder_model: "webgpu", decoder_model_merged: "wasm" } as const, dtype: { encoder_model: "fp16", decoder_model_merged: WHISPER.dtype } as const }
-      : { device: "wasm" as const, dtype: WHISPER.dtype }),
+      ? { device: { encoder_model: "webgpu", decoder_model_merged: "wasm" } as const, dtype: { encoder_model: "fp16", decoder_model_merged: config.dtype } as const }
+      : { device: "wasm" as const, dtype: config.dtype }),
     local_files_only: true,
     progress_callback: onProgress,
   }) as Promise<AutomaticSpeechRecognitionPipeline>;
-  recognizer = (async () => {
+  const entry: Recognizer = { model, backend: "wasm", ready: false, released: false, promise: null as unknown as Promise<AutomaticSpeechRecognitionPipeline> };
+  entry.promise = (async () => {
+    if (previous) await releaseRecognizer(previous);
+    if (entry.released) throw new Superseded(); // another model was selected meanwhile
     let backend: InferenceBackend = requested ?? ((await webgpuAdapter())?.features.has("shader-f16") ? "webgpu" : "wasm");
-    expectedBytes = backend === "webgpu" ? WHISPER.webgpuDownloadBytes : WHISPER.downloadBytes;
+    expectedBytes = backend === "webgpu" ? config.webgpuDownloadBytes : config.downloadBytes;
     const asr = await schedule("input", async () => {
       let created: AutomaticSpeechRecognitionPipeline;
       try {
@@ -134,24 +157,25 @@ function loadRecognizer(requested?: InferenceBackend): Promise<AutomaticSpeechRe
       } catch (error) {
         if (backend === "wasm") throw error;
         backend = "wasm";
-        expectedBytes = WHISPER.downloadBytes;
+        expectedBytes = config.downloadBytes;
         created = await create("wasm");
       }
-      // The first inference compiles kernels (7.2 s on WASM, 1.0 s on WebGPU, then 1.45 s / 0.5 s):
-      // pay for it now, before the user's first question.
+      // The first inference compiles kernels (tiny: 7.2 s on WASM, 1.0 s on WebGPU, then 1.45 s /
+      // 0.5 s): pay for it now, before the user's first question.
       await created(new Float32Array(WHISPER_SAMPLE_RATE), TRANSCRIBE).catch(() => undefined);
       return created;
     });
-    recognizerBackend = backend;
-    recognizerReady = true;
-    post({ type: "ready", component: "stt", backend, ms: performance.now() - started });
+    entry.backend = backend;
+    entry.ready = true;
+    if (!entry.released) post({ type: "ready", component: "stt", backend, ms: performance.now() - started, model });
     return asr;
   })();
-  recognizer.catch((error) => {
-    recognizer = null;
-    post({ type: "load-error", component: "stt", message: describe(error) });
+  entry.promise.catch((error) => {
+    if (recognizer === entry) recognizer = null; // allow a retry
+    if (!(error instanceof Superseded) && !entry.released) post({ type: "load-error", component: "stt", message: describe(error), model });
   });
-  return recognizer;
+  recognizer = entry;
+  return entry;
 }
 
 function loadSynthesizer(requested?: InferenceBackend): Promise<EmaLightning> {
@@ -185,18 +209,25 @@ function loadSynthesizer(requested?: InferenceBackend): Promise<EmaLightning> {
 
 async function transcribe(id: number, audio: Float32Array, receivedAt: number, warm: boolean) {
   try {
-    const asr = await loadRecognizer();
-    const output = await schedule("input", async () => {
-      const startedAt = clock();
-      const result = await asr(audio, TRANSCRIBE);
-      return { result, startedAt, endedAt: clock() };
-    });
-    const text = (Array.isArray(output.result) ? output.result.map((item) => item.text).join(" ") : output.result.text).trim();
-    post({
-      type: "transcript", id, text, ms: output.endedAt - receivedAt,
-      receivedAt, startedAt: output.startedAt, endedAt: output.endedAt,
-      warm, backend: recognizerBackend, audioSeconds: audio.length / WHISPER_SAMPLE_RATE,
-    });
+    for (;;) {
+      const entry = recognizer ?? loadRecognizer(requestedModel);
+      const asr = await entry.promise.catch((error: unknown) => { if (error instanceof Superseded) return null; throw error; });
+      if (!asr) continue;
+      const output = await schedule("input", async () => {
+        if (entry.released) return null; // the model was switched while this waited: use the new one
+        const startedAt = clock();
+        const result = await asr(audio, TRANSCRIBE);
+        return { result, startedAt, endedAt: clock() };
+      });
+      if (!output) continue;
+      const text = (Array.isArray(output.result) ? output.result.map((item) => item.text).join(" ") : output.result.text).trim();
+      post({
+        type: "transcript", id, text, ms: output.endedAt - receivedAt,
+        receivedAt, startedAt: output.startedAt, endedAt: output.endedAt,
+        warm, backend: entry.backend, audioSeconds: audio.length / WHISPER_SAMPLE_RATE, model: entry.model,
+      });
+      return;
+    }
   } catch (error) {
     post({ type: "transcribe-error", id, message: describe(error) });
   }
@@ -220,9 +251,10 @@ scope.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
   if (request.type === "load") {
     const component: VoiceComponent = request.component;
-    void (component === "stt" ? loadRecognizer(request.backend) : loadSynthesizer(request.backend)).catch(() => undefined);
+    if (component === "stt") void loadRecognizer(request.model ?? DEFAULT_STT_MODEL, request.backend).promise.catch(() => undefined);
+    else void loadSynthesizer(request.backend).catch(() => undefined);
   } else if (request.type === "transcribe") {
-    void transcribe(request.id, request.audio, clock(), recognizerReady);
+    void transcribe(request.id, request.audio, clock(), recognizer?.ready ?? false);
   } else if (request.type === "speak") {
     if (request.id <= cancelledUpTo) return;
     // Queue the sentence only once the model is ready: a sentence must never hold the queue

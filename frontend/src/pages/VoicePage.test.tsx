@@ -45,11 +45,11 @@ function createFakes() {
     dispose: vi.fn(),
   };
   const engine = {
-    load: vi.fn((_component: "stt" | "tts", onState: (state: LoadState) => void) => {
+    load: vi.fn((_component: "stt" | "tts", onState: (state: LoadState) => void, _model?: "tiny" | "base") => {
       onState({ status: "ready", loaded: 1, total: 1, backend: "wasm" });
       return Promise.resolve("wasm" as const);
     }),
-    transcribe: vi.fn(async (): Promise<{ text: string; ms: number; postedAt?: number; receivedAt?: number; startedAt?: number; endedAt?: number; warm?: boolean; backend?: "wasm" | "webgpu" }> => ({ text: QUESTION, ms: 140 })),
+    transcribe: vi.fn(async (): Promise<{ text: string; ms: number; postedAt?: number; receivedAt?: number; startedAt?: number; endedAt?: number; warm?: boolean; backend?: "wasm" | "webgpu"; model?: "tiny" | "base" }> => ({ text: QUESTION, ms: 140 })),
     speak: vi.fn((_id: number, _seq: number, _text: string, onAudio: (samples: Float32Array, rate: number) => void, _speed?: number) => {
       onAudio(new Float32Array(480), 48_000);
       return Promise.resolve();
@@ -478,6 +478,75 @@ describe("modAI Voice", () => {
     expect(within(details).getByText("Whisper çıkarımı").nextSibling).toHaveTextContent("700 ms");
     expect(within(details).getByText("Konuşma modeli").nextSibling).toHaveTextContent("WebGPU · ilk yükleme sırasında");
     expect(within(details).getByText("Ses").nextSibling).toHaveTextContent("48000 Hz → 16000 Hz");
+  });
+
+  it("loads the selected Whisper model only, remembers the choice and shows it in the timings", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    const select = await screen.findByRole("combobox", { name: "Konuşma tanıma modeli" });
+    expect(select).toHaveValue("tiny"); // Tiny stays the default
+    fireEvent.change(select, { target: { value: "base" } });
+    expect(window.localStorage.getItem("modai.voice.stt-model")).toBe("base");
+    expect(fakes.engine.load).not.toHaveBeenCalled(); // nothing loads before the user prepares or speaks
+
+    fakes.engine.transcribe.mockResolvedValueOnce({ text: QUESTION, ms: 900, backend: "webgpu", model: "base" });
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    expect(fakes.engine.load).toHaveBeenCalledWith("stt", expect.any(Function), "base");
+    expect(fakes.engine.load).not.toHaveBeenCalledWith("stt", expect.any(Function), "tiny");
+    expect(screen.getByTestId("stt-engine")).toHaveTextContent("Whisper Base · WASM");
+    expect(within(screen.getByTestId("timing-details")).getByText("Konuşma modeli").nextSibling).toHaveTextContent("Whisper Base · WebGPU");
+
+    // Switching after the models are ready loads the new model right away.
+    fireEvent.change(screen.getByRole("combobox", { name: "Konuşma tanıma modeli" }), { target: { value: "tiny" } });
+    expect(fakes.engine.load).toHaveBeenLastCalledWith("stt", expect.any(Function), "tiny");
+  });
+
+  it("falls back to Whisper Tiny with a visible message when Base cannot load", async () => {
+    window.localStorage.setItem("modai.voice.stt-model", "base");
+    const fakes = createFakes();
+    fakes.engine.load.mockImplementation((component, onState, model) => {
+      if (component === "stt" && model === "base") {
+        onState({ status: "error", loaded: 0, total: 1, message: "404", model: "base" });
+        return Promise.reject(new Error("404"));
+      }
+      onState({ status: "ready", loaded: 1, total: 1, backend: "wasm", model });
+      return Promise.resolve("wasm" as const);
+    });
+    renderVoice(fakes);
+    fireEvent.click(await screen.findByRole("button", { name: /Modelleri hazırla/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Whisper Base yüklenemedi; Whisper Tiny kullanılıyor.");
+    expect(screen.getByRole("combobox", { name: "Konuşma tanıma modeli" })).toHaveValue("tiny");
+    expect(fakes.engine.load).toHaveBeenLastCalledWith("stt", expect.any(Function), "tiny");
+    expect(window.localStorage.getItem("modai.voice.stt-model")).toBe("tiny");
+  });
+
+  it("does not switch the recognition model while recording", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    fireEvent.pointerDown(await talkButton());
+    expect(screen.getByRole("combobox", { name: "Konuşma tanıma modeli" })).toBeDisabled();
+  });
+
+  it("copies the session's questions, sources and timings only when the debug flag is on", async () => {
+    const fakes = createFakes();
+    const view = renderVoice(fakes);
+    await talkButton();
+    expect(screen.queryByRole("button", { name: "Test ölçümlerini kopyala" })).not.toBeInTheDocument();
+    view.unmount();
+
+    window.localStorage.setItem("modai.voice.debug", "1");
+    const writeText = vi.fn(async (_text: string) => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    fireEvent.click(screen.getByRole("button", { name: "Test ölçümlerini kopyala" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const [report] = JSON.parse(writeText.mock.calls[0][0]);
+    expect(report).toEqual(expect.objectContaining({ turn: 1, origin: "voice", question: QUESTION, saved: true, sources: [SOURCE.document] }));
+    expect(report.firstTokenMs).toEqual(expect.any(Number));
+    expect(await screen.findByRole("button", { name: "Kopyalandı" })).toBeInTheDocument();
   });
 
   it("warms up the generation model when the page opens and when the user starts speaking", async () => {

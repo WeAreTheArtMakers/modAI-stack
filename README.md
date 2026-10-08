@@ -277,7 +277,7 @@ npm run test
 - **Görüşmeler:** sesli sorular RAG Chat'teki asistan görüşmeleri altyapısıyla sunucuda saklanır (başlık `Sesli görüşme: …`). `/voice`'a dönüldüğünde seçili Workspace'in son sesli görüşmesi soru, yanıt ve kaynak bilgileriyle sırasıyla geri yüklenir ve otomatik çalınmaz; önceki görüşmeler seçilebilir, **Yeni görüşme** yenisini başlatır. Yalnızca tamamlanan yanıtlar kaydedilir; durdurulan yanıtlar kaydedilmediği ekranda belirtilir. Ses kaydı ve kaynak alıntı metni saklanmaz; başka Workspace'e ait görüşme açılmaz.
 - **Gecikme ölçümü:** her yanıtın altındaki "Ayrıntılı süreler" bölümü kayıt sonlandırma, kuyrukta bekleme, Whisper çıkarımı, bilet/bağlantı, yetkilendirme, embedding, Qdrant, prompt, model yükleme, prompt işleme, ilk token ve ilk ses sürelerini ayrı gösterir. Sunucu süreleri yalnızca sayıdır (`diagnostics: true`). `localStorage["modai.voice.debug"] = "1"` ile aynı sayılar `window.__modaiVoiceTimings` dizisine de yazılır.
 - **Gizlilik:** ses kaydı tarayıcıdan çıkmaz, yüklenmez, loglanmaz. Modeller uygulamanın kendi origin'inden yüklenir; üçüncü taraf çıkarım servisi kullanılmaz. Workspace ve Knowledge Base yetki sınırları RAG Chat ile aynıdır.
-- **Modeller (Git'e girmez, revizyonu sabit):** `Xenova/whisper-tiny` @ `5332fcc3` (çok dilli, q8, Apache-2.0) ve `ozcancelik/ema-lightning-onnx` @ `13c431db` (Türkçe, 48 kHz, Apache-2.0; lisans ve NOTICE `frontend/public/third-party/` altında). Dosya listesi, boyutlar ve SHA-256 değerleri `frontend/voice-models.lock.json` içindedir. İlk kullanımda en fazla yaklaşık 86 MB model (WebGPU cihazlarında fp16 encoder dahil) ve 27 MB ONNX Runtime WebAssembly indirilir; sonraki açılışlar tarayıcı önbelleğinden yüklenir. Kurgusal demo belgeleri ve 36 örnek soru `demo/voice-knowledge-pack/` altındadır.
+- **Modeller (Git'e girmez, revizyonu sabit):** `Xenova/whisper-tiny` @ `5332fcc3` (çok dilli, q8, Apache-2.0) ve `ozcancelik/ema-lightning-onnx` @ `13c431db` (Türkçe, 48 kHz, Apache-2.0; lisans ve NOTICE `frontend/public/third-party/` altında). İsteğe bağlı olarak `Xenova/whisper-base` @ `64da5728` (çok dilli, q8, Apache-2.0) `/voice` sayfasındaki **Konuşma tanıma** seçimiyle denenebilir; varsayılan Tiny'dir. Base daha doğru ama daha yavaştır ve WebGPU yolunda yaklaşık 98 MB indirir; yalnızca `fetch_voice_models.py --include-optional` ile indirilir. Model değiştirildiğinde önceki model bellekten bırakılır; Base yüklenemezse sayfa bunu bildirip Tiny'ye döner. Dosya listesi, boyutlar ve SHA-256 değerleri `frontend/voice-models.lock.json` içindedir. İlk kullanımda en fazla yaklaşık 86 MB model (WebGPU cihazlarında fp16 encoder dahil) ve 27 MB ONNX Runtime WebAssembly indirilir; sonraki açılışlar tarayıcı önbelleğinden yüklenir. Kurgusal demo belgeleri ve 36 örnek soru `demo/voice-knowledge-pack/` altındadır.
 - **Yedek ses:** nöral ses başlatılamazsa tarayıcının Türkçe sistem sesi açıkça "Sistem sesi (yedek)" etiketiyle kullanılır; o da yoksa yanıt yalnızca yazılı gösterilir.
 - **Tarayıcı:** masaüstü Chrome/Edge (WebGPU ile ses üretimi; WebGPU yoksa WASM). Mikrofon yalnızca güvenli bağlamda çalışır: `https://` veya aynı cihazda `http://localhost`. LAN IP üzerinden düz HTTP ile mikrofon açılmaz.
 
@@ -292,6 +292,32 @@ cd frontend && npm install && npm run dev
 ```
 
 Ardından `http://localhost:5173/voice` adresini açın (Docker frontend'i 5173'ü kullanıyorsa Vite başka bir port seçer). `scripts/fetch_voice_models.py --check` dosyaları ağa çıkmadan doğrular. Docker imajı, build sırasında `frontend/public/voice-models/` içinde bulunan modelleri içerir.
+
+### Yerel kabul ortamı (staging)
+
+Yayınlanmamış bir dalı production'a dokunmadan denemek için `docker-compose.staging.yml` ayrı bir Compose projesi (`modai-staging`) başlatır. Bu projenin kendi PostgreSQL, Redis, Qdrant ve yükleme volume'ları vardır; portları yalnızca bu makinede açılır (web `http://localhost:5183`, API `http://localhost:8100`). Production `.env` dosyası okunmaz. Üretim modeli için ikinci bir Ollama örneği açılmaz; host'taki Ollama ve modeli değiştirilmeden kullanılır. Embedding modeli `./models` klasöründen salt-okunur bağlanır.
+
+```bash
+python3 scripts/fetch_voice_models.py --include-optional
+```
+
+```bash
+test -e .env.staging || (umask 077; python3 -c 'import secrets; print("STAGING_POSTGRES_PASSWORD=" + secrets.token_urlsafe(32)); print("STAGING_JWT_SECRET=" + secrets.token_urlsafe(48))' > .env.staging)
+```
+
+```bash
+docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
+```
+
+```bash
+docker compose -f docker-compose.staging.yml --env-file .env.staging exec api alembic upgrade head
+```
+
+`.env.staging` git ve Docker build bağlamı dışında tutulur; komut var olan dosyanın üzerine yazmaz. Ardından `http://localhost:5183` adresinde bir test hesabı açın (staging'de kayıt açıktır). "Atlasnova Demo" Knowledge Base'ini oluşturun ve `demo/voice-knowledge-pack/` belgelerini yükleyin. Mikrofon `localhost` üzerinden çalışır. İş bitince aşağıdaki komut yalnızca staging konteynerlerini ve volume'larını siler:
+
+```bash
+docker compose -f docker-compose.staging.yml --env-file .env.staging down -v
+```
 
 ### RAG kalite değerlendirmesi
 
