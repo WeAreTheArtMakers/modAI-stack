@@ -17,3 +17,6 @@ artifacts/
 data/
 /models/
 .DS_Store
+
+# Self-hosted voice models (scripts/fetch_voice_models.py); never commit weights
+frontend/public/voice-models/

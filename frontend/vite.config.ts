@@ -7,6 +7,10 @@ export default defineConfig(({ mode }) => {
   const wsTarget = env.VITE_DEV_WS_TARGET ?? apiTarget.replace(/^http/, "ws");
   return {
     plugins: [react()],
+    // The voice worker code-splits; ONNX Runtime and Transformers.js resolve their WebAssembly
+    // through import.meta.url, which pre-bundling would break.
+    worker: { format: "es" },
+    optimizeDeps: { exclude: ["onnxruntime-web", "@huggingface/transformers"] },
     server: {
       port: 5173,
       proxy: {

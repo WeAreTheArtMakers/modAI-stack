@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate } from "react-router";
-import { Activity, BookOpen, ChevronDown, CircleHelp, Cpu, FileText, LayoutDashboard, LogOut, MessageSquare, Menu, Server, ShieldCheck, Users, X } from "lucide-react";
+import { Activity, AudioLines, BookOpen, ChevronDown, CircleHelp, Cpu, FileText, LayoutDashboard, LogOut, MessageSquare, Menu, Server, ShieldCheck, Users, X } from "lucide-react";
 import { connectIndexing } from "../api/websocket";
 import { Logo } from "./Logo";
 import { MascotOverlay } from "./mascot/MascotOverlay";
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/knowledge-bases", label: "Knowledge Base'ler", icon: BookOpen },
   { to: "/documents", label: "Belgeler", icon: FileText },
   { to: "/chat", label: "RAG Chat", icon: MessageSquare },
+  { to: "/voice", label: "Sesli Asistan", icon: AudioLines },
   { to: "/models", label: "Modeller", icon: Cpu },
   { to: "/system", label: "Sistem", icon: Server },
   { to: "/help", label: "Kullanım Rehberi", icon: CircleHelp },

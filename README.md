@@ -266,6 +266,28 @@ npm run lint
 npm run test
 ```
 
+### modAI Voice — sesli asistan (MVP)
+
+**Your knowledge. Your infrastructure. Your voice assistant.** `/voice` sayfasında kullanıcı Türkçe sorusunu söyler; maskot dinler, yanıtı yetkili belgelerden üretir, kaynaklarını gösterir ve yanıtı sesli okur.
+
+- **Akış:** bas-konuş (basılı tut ya da dokun-dokun) → tarayıcıda Whisper tiny ile yazıya çevirme → yalnızca tanınan metin mevcut kimliği doğrulanmış `/ws/rag` akışına gider → yanıt token'ları cümlelere bölünür ve her cümle hazır olur olmaz EMA Lightning ile Türkçe seslendirilir. Mikrofon yanıt çalarken kapalıdır; yeni soru veya **Durdur** eski sesi ve üretimi hemen keser.
+- **Gizlilik:** ses kaydı tarayıcıdan çıkmaz, yüklenmez, loglanmaz. Modeller uygulamanın kendi origin'inden yüklenir; üçüncü taraf çıkarım servisi kullanılmaz. Workspace ve Knowledge Base yetki sınırları RAG Chat ile aynıdır.
+- **Modeller (Git'e girmez, revizyonu sabit):** `Xenova/whisper-tiny` @ `5332fcc3` (çok dilli, q8, Apache-2.0) ve `ozcancelik/ema-lightning-onnx` @ `13c431db` (Türkçe, 48 kHz, Apache-2.0; lisans ve NOTICE `frontend/public/third-party/` altında). Dosya listesi, boyutlar ve SHA-256 değerleri `frontend/voice-models.lock.json` içindedir. İlk kullanımda yaklaşık 80 MB model ve 27 MB ONNX Runtime WebAssembly indirilir; sonraki açılışlar tarayıcı önbelleğinden yüklenir.
+- **Yedek ses:** nöral ses başlatılamazsa tarayıcının Türkçe sistem sesi açıkça "Sistem sesi (yedek)" etiketiyle kullanılır; o da yoksa yanıt yalnızca yazılı gösterilir.
+- **Tarayıcı:** masaüstü Chrome/Edge (WebGPU ile ses üretimi; WebGPU yoksa WASM). Mikrofon yalnızca güvenli bağlamda çalışır: `https://` veya aynı cihazda `http://localhost`. LAN IP üzerinden düz HTTP ile mikrofon açılmaz.
+
+Modelleri indirip yerelde çalıştırmak için:
+
+```bash
+python3 scripts/fetch_voice_models.py
+```
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Ardından `http://localhost:5173/voice` adresini açın (Docker frontend'i 5173'ü kullanıyorsa Vite başka bir port seçer). `scripts/fetch_voice_models.py --check` dosyaları ağa çıkmadan doğrular. Docker imajı, build sırasında `frontend/public/voice-models/` içinde bulunan modelleri içerir.
+
 ### RAG kalite değerlendirmesi
 
 Önce kendi tenant’ınızdaki insan tarafından doğrulanmış soru, kaynak belge ve olgu beklentileriyle sürümlü bir dataset oluşturun. Local çalıştırma access JWT’yi yalnızca ortam değişkeninden alır ve normal Knowledge Base yetkilendirmesini uygular:
@@ -357,7 +379,7 @@ Her HTTP isteği güvenli gelen `X-Request-ID` değerini korur veya yeni bir kim
 
 Üretimde en az aşağıdaki değerleri açıkça ayarlayın: benzersiz `JWT_SECRET`, güçlü `POSTGRES_PASSWORD`, `ALLOW_REGISTRATION=false`, `REFRESH_COOKIE_SECURE=true`, uygun `REFRESH_COOKIE_SAMESITE`, rate-limit değerleri, `MODEL_DIR` ve embedding cache yolu. Bilinen JWT placeholder değeri veya güvenli olmayan refresh cookie ile `APP_ENV=production` başlangıcı bilerek başarısız olur.
 
-Önerilen dağıtım düzeni şudur: **TLS termination (Nginx/Caddy/Traefik) → frontend reverse proxy → API/worker ve iç servisler**. Frontend Nginx yapılandırması CSP, nosniff, referrer, permissions ve frame koruma başlıklarını uygular. CSP, React’in yalnızca dinamik progress style değeri için `style-src 'unsafe-inline'` içerir; script kaynağı yalnızca same-origin’dir. Local HTTP geliştirme akışı korunur, ancak Secure cookie gerçek üretimde yalnızca HTTPS altında çalışır.
+Önerilen dağıtım düzeni şudur: **TLS termination (Nginx/Caddy/Traefik) → frontend reverse proxy → API/worker ve iç servisler**. Frontend Nginx yapılandırması CSP, nosniff, referrer, permissions ve frame koruma başlıklarını uygular. CSP, React’in yalnızca dinamik progress style değeri için `style-src 'unsafe-inline'` içerir; script kaynağı yalnızca same-origin’dir. Sesli asistan için `script-src` yalnızca WebAssembly derlemesine izin veren `'wasm-unsafe-eval'` içerir (JavaScript `eval` kapalı kalır) ve `Permissions-Policy` mikrofonu yalnızca aynı origin için açar (`microphone=(self)`); kamera ve konum kapalıdır. Mikrofon ayrıca kullanıcı etkileşimi ve tarayıcı izni olmadan başlamaz. Local HTTP geliştirme akışı korunur, ancak Secure cookie gerçek üretimde yalnızca HTTPS altında çalışır.
 
 ### Yedekleme ve geri yükleme
 
