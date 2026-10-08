@@ -110,10 +110,16 @@ export class MicrophoneRecorder implements Recorder {
     } finally {
       void context.close().catch(() => undefined);
     }
-    const samples = new Float32Array(decoded.length);
-    for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
-      const data = decoded.getChannelData(channel);
-      for (let i = 0; i < data.length; i++) samples[i] += data[i] / decoded.numberOfChannels;
+    // Mono 16 kHz for Whisper: one copy for mono input, an average for multichannel input.
+    let samples: Float32Array;
+    if (decoded.numberOfChannels === 1) {
+      samples = decoded.getChannelData(0).slice();
+    } else {
+      samples = new Float32Array(decoded.length);
+      for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
+        const data = decoded.getChannelData(channel);
+        for (let i = 0; i < data.length; i++) samples[i] += data[i] / decoded.numberOfChannels;
+      }
     }
     if (samples.length < WHISPER_SAMPLE_RATE * 0.4) throw new MicrophoneError("too_short", MICROPHONE_MESSAGES.too_short);
     return samples;
@@ -128,4 +134,34 @@ export class MicrophoneRecorder implements Recorder {
     this.chunks = [];
     this.release();
   }
+}
+
+/**
+ * Trims leading and trailing silence (keeping 250 ms of margin) from 16 kHz mono audio. Whisper
+ * tends to invent words for long silences. Returns the input unchanged if no speech is found or
+ * the result would be shorter than 0.4 s.
+ */
+export function trimSilence(samples: Float32Array, sampleRate = WHISPER_SAMPLE_RATE): Float32Array {
+  const frame = Math.round(sampleRate * 0.02);
+  const frames = Math.floor(samples.length / frame);
+  if (frames < 10) return samples;
+  const energy = new Float32Array(frames);
+  for (let f = 0; f < frames; f++) {
+    let sum = 0;
+    for (let i = f * frame; i < (f + 1) * frame; i++) sum += samples[i] * samples[i];
+    energy[f] = Math.sqrt(sum / frame);
+  }
+  const sorted = Float32Array.from(energy).sort();
+  const noise = sorted[Math.floor(frames * 0.1)];
+  const threshold = Math.max(0.01, noise * 3);
+  let first = 0;
+  while (first < frames && energy[first] < threshold) first++;
+  let last = frames - 1;
+  while (last > first && energy[last] < threshold) last--;
+  if (first >= frames) return samples;
+  const margin = Math.round(0.25 * sampleRate);
+  const start = Math.max(0, first * frame - margin);
+  const end = Math.min(samples.length, (last + 1) * frame + margin);
+  if (end - start < sampleRate * 0.4 || (start === 0 && end === samples.length)) return samples;
+  return samples.subarray(start, end).slice();
 }

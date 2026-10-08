@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebAudioPlayer } from "./audioPlayback";
-import { MicrophoneError, MicrophoneRecorder } from "./microphone";
+import { MicrophoneError, MicrophoneRecorder, trimSilence } from "./microphone";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 import { SentenceBuffer, speakable } from "./sentenceBuffer";
+import { turkishOrdinal } from "./speechText";
 import { WorkerVoiceEngine, type LoadState } from "./voiceEngine";
 
 function stream(tokens: string[]) {
@@ -19,9 +20,9 @@ describe("SentenceBuffer", () => {
   });
 
   it("does not split decimals, versions, abbreviations or ordinals", () => {
-    const { emitted, rest } = stream(["Dr. Ayşe ", "3.5 gün ve v1.2 için ", "örn. 10. madde ", "geçerlidir. ", "Sonra."]);
-    expect(emitted.flat()).toEqual(["Dr. Ayşe 3.5 gün ve v1.2 için örn. 10. madde geçerlidir."]);
-    expect(rest).toEqual(["Sonra."]);
+    const { emitted, rest } = stream(["Dr. Ayşe ", "3.5 gün ve v1.2 için ", "örn. 10. madde ", "geçerlidir. ", "Sonra geldi."]);
+    expect(emitted.flat()).toEqual(["Dr. Ayşe 3.5 gün ve sürüm 1.2 için örneğin onuncu madde geçerlidir."]);
+    expect(rest).toEqual(["Sonra geldi."]);
   });
 
   it("ends a sentence after a number when a capitalized sentence follows", () => {
@@ -30,15 +31,68 @@ describe("SentenceBuffer", () => {
     expect(rest).toEqual(["Kalan izin 12 gündür."]);
   });
 
-  it("splits overlong text without punctuation at a clause boundary", () => {
-    const long = `${"kelime ".repeat(30)}ara, ${"devam ".repeat(30)}`;
-    const { emitted } = stream([long]);
-    expect(emitted[0][0].endsWith("ara,")).toBe(true);
+  it("starts speaking at the first comma once the opening phrase is long enough", () => {
+    const words = "Güncel izin politikasına göre, başvurular en az 15 gün önce, sistem üzerinden yapılır. ".split(/(?<= )/);
+    const { emitted } = stream(words);
+    expect(emitted.flat()).toEqual(["Güncel izin politikasına göre,", "başvurular en az 15 gün önce, sistem üzerinden yapılır."]);
+    // the phrase is ready with the token that brings the comma and its following space
+    expect(emitted.findIndex((batch) => batch.length > 0)).toBe(words.indexOf("göre, "));
   });
 
-  it("strips markdown, citation markers and links before speaking", () => {
-    expect(speakable("**Önemli:** [1] Bkz. https://intra.example/izin #politika")).toBe("Önemli: Bkz. bağlantı politika");
+  it("keeps a short opening clause together with the rest of the sentence", () => {
+    const { emitted } = stream(["Evet, ", "izin ", "alınır. "]);
+    expect(emitted.flat()).toEqual(["Evet, izin alınır."]);
+  });
+
+  it("cuts a long first sentence without punctuation at a word boundary", () => {
+    const long = `${"uzun kelime ".repeat(10)}devam ediyor `;
+    const { emitted } = stream([long]);
+    expect(emitted[0]).toHaveLength(1);
+    expect(emitted[0][0].length).toBeLessThanOrEqual(90);
+    expect(long.startsWith(emitted[0][0])).toBe(true);
+  });
+
+  it("splits later overlong sentences at a clause boundary", () => {
+    const long = `İlk cümle burada bitiyor. ${"kelime ".repeat(20)}ara, ${"devam ".repeat(30)}`;
+    const { emitted } = stream([long]);
+    expect(emitted[0]).toEqual(["İlk cümle burada bitiyor.", `${"kelime ".repeat(20)}ara,`.trim()]);
+  });
+
+  it("joins one-word fragments to the next phrase", () => {
+    const { emitted, rest } = stream(["Evet. ", "Başvuru 15 gün önce yapılır. ", "Tamam."]);
+    expect(emitted.flat()).toEqual(["Evet. Başvuru 15 gün önce yapılır."]);
+    expect(rest).toEqual(["Tamam."]);
+  });
+});
+
+describe("speakable", () => {
+  it("strips markdown, citation markers, links and source identifiers", () => {
+    expect(speakable("**Önemli:** [1] Bkz. https://intra.example/izin #politika")).toBe("Önemli: bakınız bağlantı politika");
     expect(speakable("- madde bir\n- madde iki")).toBe("madde bir madde iki");
+    expect(speakable("Bkz. izin-politikasi-v3.md [2] (Kaynak: belge.md) ve doc-12.")).toBe("bakınız izin politikasi sürüm 3 ve belge 12.");
+    expect(speakable("[Portal](https://intra.example/portal) üzerinden")).toBe("Portal üzerinden");
+  });
+
+  it("rewrites times, ranges and currency suffixes the normalizer misreads", () => {
+    expect(speakable("Destek 08.00-17.00 arası, saat 9.30'da toplantı; 09:30'a kadar.")).toBe("Destek 8:00 ile 17:00 arası, saat 9:30'da toplantı; 9:30'a kadar.");
+    expect(speakable("3-5 iş günü, 2025-2026 dönemi, 2026-10-07 tarihli")).toBe("3 ile 5 iş günü, 2025 ile 2026 dönemi, 2026-10-07 tarihli");
+    expect(speakable("10.000 TL'lik bütçe")).toBe("10.000 liralık bütçe");
+  });
+
+  it("reads ordinals, acronyms and common abbreviations", () => {
+    expect(speakable("3. kat ve 12. madde")).toBe("üçüncü kat ve on ikinci madde");
+    expect(speakable("Toplam 40. Kalan")).toBe("Toplam 40. Kalan");
+    expect(speakable("IT ekibi SLA'ya göre VPN ve 2FA kullanır.")).toBe("ay ti ekibi es el ey ya göre vi pi en ve iki adımlı doğrulama kullanır.");
+    expect(speakable("24/7 destek, Q3 hedefi, v2.1 ve/veya maks. 5 gün")).toBe("yedi gün yirmi dört saat destek, üçüncü çeyrek hedefi, sürüm 2.1 ve veya en fazla 5 gün");
+  });
+
+  it("preserves every fact-bearing number", () => {
+    expect(speakable("Limit 25.000 TL, %15 indirim, 14:30, 15.03.2026, 0850 123 45 67.")).toBe("Limit 25.000 TL, %15 indirim, 14:30, 15.03.2026, 0850 123 45 67.");
+  });
+
+  it("names Turkish ordinals", () => {
+    expect([1, 9, 10, 12, 40, 99].map(turkishOrdinal)).toEqual(["birinci", "dokuzuncu", "onuncu", "on ikinci", "kırkıncı", "doksan dokuzuncu"]);
+    expect([0, 100, 2.5].map(turkishOrdinal)).toEqual([null, null, null]);
   });
 });
 
@@ -167,6 +221,7 @@ describe("WebAudioPlayer", () => {
     expect(sources.map((source) => source.started)).toEqual([0.03, 1.03]);
     expect(player.level()).toBeGreaterThan(0);
 
+    expect(player.bufferedSeconds()).toBeCloseTo(1.53);
     player.reset(2); // stop: the old answer must not continue
     expect(sources.every((source) => source.stopped)).toBe(true);
     expect(player.enqueue(new Float32Array(48_000), 48_000, 1)).toBeNull();
@@ -186,5 +241,28 @@ describe("WebAudioPlayer", () => {
     sources[0].onended?.();
     await drained;
     expect(done).toBe(true);
+  });
+});
+
+describe("trimSilence", () => {
+  function signal(parts: [seconds: number, amplitude: number][]) {
+    const out: number[] = [];
+    for (const [seconds, amplitude] of parts) {
+      for (let i = 0; i < seconds * 16_000; i++) out.push(amplitude * Math.sin(i / 3) + 0.001 * Math.sin(i * 7.1));
+    }
+    return Float32Array.from(out);
+  }
+
+  it("keeps the speech plus a 250 ms margin on each side", () => {
+    const trimmed = trimSilence(signal([[1, 0], [0.6, 0.3], [1.5, 0]]));
+    expect(trimmed.length / 16_000).toBeGreaterThan(1.05);
+    expect(trimmed.length / 16_000).toBeLessThan(1.15);
+  });
+
+  it("leaves audio alone when there is nothing to trim or no speech at all", () => {
+    const speech = signal([[0.8, 0.3]]);
+    expect(trimSilence(speech)).toBe(speech);
+    const silence = signal([[2, 0]]);
+    expect(trimSilence(silence)).toBe(silence);
   });
 });

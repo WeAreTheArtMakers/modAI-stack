@@ -21,7 +21,7 @@ export interface VoiceEngine {
   load(component: VoiceComponent, onState: (state: LoadState) => void): Promise<InferenceBackend>;
   transcribe(audio: Float32Array): Promise<Transcript>;
   /** Resolves when the sentence is fully synthesized, or immediately once it is cancelled. */
-  speak(requestId: number, seq: number, text: string, onAudio: AudioSink): Promise<void>;
+  speak(requestId: number, seq: number, text: string, onAudio: AudioSink, speed?: number): Promise<void>;
   /** Drops queued and in-progress synthesis for every request id <= upTo. */
   cancel(upTo: number): void;
   dispose(): void;
@@ -65,6 +65,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
       case "ready": {
         this.updateLoad(message.component, { status: "ready", backend: message.backend, ms: message.ms, loaded: this.loads.get(message.component)?.state.total ?? 0 });
         this.loads.get(message.component)?.deferred.resolve(message.backend);
+        this.loads.get(message.component)?.listeners.clear();
         break;
       }
       case "load-error": {
@@ -120,7 +121,8 @@ export class WorkerVoiceEngine implements VoiceEngine {
       this.loads.set(component, entry);
       this.send({ type: "load", component });
     }
-    entry.listeners.add(onState);
+    // Once loaded, later callers (e.g. a remounted page) only need the current state.
+    if (entry.state.status !== "ready") entry.listeners.add(onState);
     onState(entry.state);
     return entry.promise;
   }
@@ -133,10 +135,10 @@ export class WorkerVoiceEngine implements VoiceEngine {
     });
   }
 
-  speak(requestId: number, seq: number, text: string, onAudio: AudioSink): Promise<void> {
+  speak(requestId: number, seq: number, text: string, onAudio: AudioSink, speed = 1): Promise<void> {
     return new Promise((resolve, reject) => {
       this.speeches.set(`${requestId}:${seq}`, { deferred: { resolve, reject }, onAudio, id: requestId });
-      this.send({ type: "speak", id: requestId, seq, text });
+      this.send({ type: "speak", id: requestId, seq, text, speed });
     });
   }
 
@@ -156,4 +158,12 @@ export class WorkerVoiceEngine implements VoiceEngine {
     this.worker = null;
     this.loads.clear();
   }
+}
+
+let shared: WorkerVoiceEngine | null = null;
+
+/** One voice worker per tab: warmed models survive leaving and reopening the voice page. */
+export function sharedVoiceEngine(): WorkerVoiceEngine {
+  shared ??= new WorkerVoiceEngine();
+  return shared;
 }

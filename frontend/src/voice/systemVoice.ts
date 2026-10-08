@@ -2,7 +2,7 @@
 export interface SystemVoice {
   available(): boolean;
   voiceName(): string | null;
-  speak(text: string, onStart: () => void): Promise<void>;
+  speak(text: string, onStart: () => void, rate?: number): Promise<void>;
   cancel(): void;
 }
 
@@ -21,13 +21,14 @@ export class BrowserSystemVoice implements SystemVoice {
     return this.turkishVoice()?.name ?? null;
   }
 
-  speak(text: string, onStart: () => void): Promise<void> {
+  speak(text: string, onStart: () => void, rate = 1): Promise<void> {
     const voice = this.turkishVoice();
     if (!voice) return Promise.reject(new Error("Türkçe sistem sesi bulunamadı."));
     return new Promise((resolve) => {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.voice = voice;
       utterance.lang = voice.lang;
+      utterance.rate = rate;
       utterance.onstart = () => onStart();
       utterance.onend = () => resolve();
       utterance.onerror = () => resolve(); // cancellation also lands here

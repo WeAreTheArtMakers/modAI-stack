@@ -7,6 +7,8 @@ export interface Player {
   reset(generation: number): void;
   /** Resolves when every queued buffer of the current generation has finished playing. */
   drained(): Promise<void>;
+  /** Seconds of audio scheduled but not yet played (for synthesis backpressure). */
+  bufferedSeconds(): number;
   level(): number;
   dispose(): void;
 }
@@ -75,6 +77,11 @@ export class WebAudioPlayer implements Player {
   drained(): Promise<void> {
     if (!this.sources.size) return Promise.resolve();
     return new Promise((resolve) => this.waiters.push(resolve));
+  }
+
+  bufferedSeconds(): number {
+    if (!this.context || !this.sources.size) return 0;
+    return Math.max(0, this.nextStart - this.context.currentTime);
   }
 
   level(): number {
