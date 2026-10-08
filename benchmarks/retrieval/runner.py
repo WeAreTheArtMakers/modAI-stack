@@ -16,6 +16,7 @@ from qdrant_client import QdrantClient, models
 from app.services.rag.chunker import chunk_text
 from app.services.rag.embeddings import EmbeddingService
 from benchmarks.retrieval.metrics import QueryOutcome, aggregate_metrics
+from benchmarks.retrieval.provenance import validate_source_provenance
 from benchmarks.retrieval.safety import (
     BenchmarkSafetyError,
     assert_endpoint_isolated,
@@ -69,8 +70,13 @@ class RunConfiguration:
     top_k: int
     execution_mode: str
     device: str
-    git_sha: str | None
+    source_sha: str | None
+    source_sha_origin: str
     model_load_ms: float | None = None
+    runtime_build_sha: str | None = None
+
+    def __post_init__(self) -> None:
+        validate_source_provenance(self.source_sha, self.source_sha_origin)
 
 
 def _build_chunks(dataset: BenchmarkDataset, *, chunk_size: int, chunk_overlap: int) -> list[BenchmarkChunk]:
@@ -259,7 +265,7 @@ async def run_benchmark(config: RunConfiguration, embedder) -> dict:
             )
         }
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "classification": (
                 "Fixture / engineering validation baseline"
                 if config.dataset.classification == "fixture"
@@ -279,7 +285,9 @@ async def run_benchmark(config: RunConfiguration, embedder) -> dict:
                 "dataset_sha256": dataset_fingerprint(config.dataset),
                 "dataset_classification": config.dataset.classification,
                 "authoritative_corpus_operator_confirmed": config.dataset.classification == "authoritative",
-                "git_sha": config.git_sha,
+                "source_sha": config.source_sha,
+                "source_sha_origin": config.source_sha_origin,
+                "runtime_build_sha": config.runtime_build_sha,
                 "embedding_model": config.embedding_model,
                 "embedding_revision": config.embedding_revision,
                 "embedding_dimension": embedding_dimension,

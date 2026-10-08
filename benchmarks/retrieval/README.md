@@ -32,6 +32,16 @@ The fixture covers Turkish, English, mixed-language, single/multi-document, a lo
 
 Reports include only aggregate metrics and stable fixture IDs; they omit questions, source text, prompts, answers, user identifiers, credentials, and local model paths. Outputs go under ignored `artifacts/` unless a different local path is supplied.
 
+## Provenance
+
+Report schema 2 records benchmark source provenance as `source_sha` plus `source_sha_origin` (schema 1 had a single `git_sha` field):
+
+- `explicit`: the operator passed `--source-sha` (exactly 40 hex characters, normalized to lowercase). It takes precedence over git discovery and is an operator assertion that the benchmark source matches that commit.
+- `git`: `git rev-parse HEAD` succeeded in the repository containing the benchmark source. This identifies HEAD only, not uncommitted changes.
+- `unavailable`: neither was available; `source_sha` is `null`.
+
+Isolated container runs have no git tooling or `.git` metadata (and `.git` should not be mounted), so pass the SHA from the host, for example `--source-sha "$(git rev-parse HEAD)"`. `runtime_build_sha` separately records the dependency image's `BUILD_SHA` when it is a full SHA. It describes the deployed runtime image, which may intentionally differ from the benchmark source, and is never used as a substitute for `source_sha`.
+
 ## Run
 
 Framework/dataset/metrics/reporting dry-run (no model download):

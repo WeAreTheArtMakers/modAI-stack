@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 import time
 from pathlib import Path
 
 from app.core.config import get_settings
 from app.services.evaluation.embedding_profiles import MINILM_BASELINE, MULTILINGUAL_E5_SMALL
 from app.services.rag.embeddings import EmbeddingService
+from benchmarks.retrieval.provenance import (
+    discover_git_sha,
+    normalize_runtime_build_sha,
+    resolve_source_sha,
+)
 from benchmarks.retrieval.reporting import write_reports
 from benchmarks.retrieval.runner import DeterministicFixtureEmbedder, RunConfiguration, run_benchmark_sync
 from benchmarks.retrieval.schema import load_dataset
@@ -35,6 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--chunk-size", type=int, default=None)
     parser.add_argument("--chunk-overlap", type=int, default=None)
     parser.add_argument(
+        "--source-sha",
+        default=None,
+        help="Exact 40-hex commit SHA of the benchmark source; takes precedence over git discovery",
+    )
+    parser.add_argument(
         "--confirm-authoritative-corpus",
         action="store_true",
         help="Confirm the private corpus is human-labeled and representative before reporting real-world status",
@@ -57,19 +66,6 @@ def resolve_embedding_options(
     resolved_query_prefix = query_prefix if query_prefix is not None else (profile.query_prefix if profile else "")
     resolved_passage_prefix = passage_prefix if passage_prefix is not None else (profile.passage_prefix if profile else "")
     return model_id, resolved_revision, resolved_query_prefix, resolved_passage_prefix
-
-
-def _git_sha() -> str | None:
-    try:
-        return subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=3,
-        ).stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        return None
 
 
 def _load_offline_model(model_id: str, revision: str):
@@ -120,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        source_sha, source_sha_origin = resolve_source_sha(args.source_sha, discover_git_sha)
         dataset = load_dataset(args.dataset)
         if dataset.classification == "authoritative" and not args.confirm_authoritative_corpus:
             raise ValueError(
@@ -165,7 +162,9 @@ def main(argv: list[str] | None = None) -> int:
                 top_k=args.top_k,
                 execution_mode=execution_mode,
                 device=device,
-                git_sha=_git_sha(),
+                source_sha=source_sha,
+                source_sha_origin=source_sha_origin,
+                runtime_build_sha=normalize_runtime_build_sha(settings.build_sha),
                 model_load_ms=model_load_ms,
             ),
             embedder,
@@ -175,6 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(exc))
     print(f"JSON report: {json_path}")
     print(f"Markdown report: {markdown_path}")
+    print(f"Benchmark source SHA: {source_sha or 'unavailable'} ({source_sha_origin})")
     print(f"Classification: {report['classification']}")
     print(f"Real-world benchmark status: {report['real_world_benchmark_status']}")
     return 0
