@@ -1,3 +1,4 @@
+import { DEFAULT_STT_MODEL, type SttModelId } from "./config";
 import type { InferenceBackend, VoiceComponent, WorkerRequest, WorkerResponse } from "./protocol";
 
 export type LoadStatus = "idle" | "loading" | "ready" | "error";
@@ -9,6 +10,7 @@ export interface LoadState {
   backend?: InferenceBackend;
   ms?: number;
   message?: string;
+  model?: SttModelId; // speech recognition only
 }
 
 export const IDLE_LOAD: LoadState = { status: "idle", loaded: 0, total: 0 };
@@ -24,10 +26,15 @@ export interface Transcript {
   endedAt?: number;
   warm?: boolean;
   backend?: InferenceBackend;
+  model?: SttModelId;
 }
 
+/** A speech-recognition load that was replaced by a load of another model. */
+export class LoadSuperseded extends Error {}
+
 export interface VoiceEngine {
-  load(component: VoiceComponent, onState: (state: LoadState) => void): Promise<InferenceBackend>;
+  /** For "stt", `model` selects the Whisper model (default: the current one, else tiny); another model replaces the loaded one. */
+  load(component: VoiceComponent, onState: (state: LoadState) => void, model?: SttModelId): Promise<InferenceBackend>;
   transcribe(audio: Float32Array): Promise<Transcript>;
   /** Resolves when the sentence is fully synthesized, or immediately once it is cancelled. */
   speak(requestId: number, seq: number, text: string, onAudio: AudioSink, speed?: number): Promise<void>;
@@ -48,6 +55,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
   private readonly transcriptions = new Map<number, Deferred<Transcript>>();
   private readonly transcriptPosted = new Map<number, number>();
   private readonly speeches = new Map<string, { deferred: Deferred<void>; onAudio: AudioSink; id: number }>();
+  private sttModel: SttModelId | null = null;
 
   constructor(private readonly createWorker: () => Worker = () => new Worker(new URL("./voice.worker.ts", import.meta.url), { type: "module" })) {}
 
@@ -68,12 +76,14 @@ export class WorkerVoiceEngine implements VoiceEngine {
   }
 
   private receive(message: WorkerResponse) {
+    // Progress and results of a recognition model that was since replaced are stale.
+    if ((message.type === "progress" || message.type === "ready" || message.type === "load-error") && message.component === "stt" && message.model !== undefined && message.model !== this.sttModel) return;
     switch (message.type) {
       case "progress":
         this.updateLoad(message.component, { status: "loading", loaded: message.loaded, total: message.total });
         break;
       case "ready": {
-        this.updateLoad(message.component, { status: "ready", backend: message.backend, ms: message.ms, loaded: this.loads.get(message.component)?.state.total ?? 0 });
+        this.updateLoad(message.component, { status: "ready", backend: message.backend, ms: message.ms, model: message.model, loaded: this.loads.get(message.component)?.state.total ?? 0 });
         this.loads.get(message.component)?.deferred.resolve(message.backend);
         this.loads.get(message.component)?.listeners.clear();
         break;
@@ -88,7 +98,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
       case "transcript":
         this.transcriptions.get(message.id)?.resolve({
           text: message.text, ms: message.ms, postedAt: this.transcriptPosted.get(message.id), receivedAt: message.receivedAt,
-          startedAt: message.startedAt, endedAt: message.endedAt, warm: message.warm, backend: message.backend,
+          startedAt: message.startedAt, endedAt: message.endedAt, warm: message.warm, backend: message.backend, model: message.model,
         });
         this.transcriptPosted.delete(message.id);
         this.transcriptions.delete(message.id);
@@ -126,14 +136,27 @@ export class WorkerVoiceEngine implements VoiceEngine {
     this.speeches.clear();
   }
 
-  load(component: VoiceComponent, onState: (state: LoadState) => void): Promise<InferenceBackend> {
+  load(component: VoiceComponent, onState: (state: LoadState) => void, model?: SttModelId): Promise<InferenceBackend> {
     let entry = this.loads.get(component);
+    if (component === "stt") {
+      const wanted = model ?? this.sttModel ?? DEFAULT_STT_MODEL;
+      if (entry && this.sttModel !== wanted) {
+        // The worker releases the current model before it loads the new one.
+        entry.listeners.clear();
+        if (entry.state.status !== "ready") entry.deferred.reject(new LoadSuperseded(`${this.sttModel} replaced by ${wanted}`));
+        this.loads.delete(component);
+        entry = undefined;
+      }
+      this.sttModel = wanted;
+    }
     if (!entry) {
       let deferred!: Deferred<InferenceBackend>;
       const promise = new Promise<InferenceBackend>((resolve, reject) => { deferred = { resolve, reject }; });
-      entry = { promise, deferred, listeners: new Set(), state: { status: "loading", loaded: 0, total: 0 } };
+      promise.catch(() => undefined); // a superseded load may have no listener left
+      const sttModel = component === "stt" ? this.sttModel ?? DEFAULT_STT_MODEL : undefined;
+      entry = { promise, deferred, listeners: new Set(), state: { status: "loading", loaded: 0, total: 0, model: sttModel } };
       this.loads.set(component, entry);
-      this.send({ type: "load", component });
+      this.send(sttModel ? { type: "load", component, model: sttModel } : { type: "load", component });
     }
     // Once loaded, later callers (e.g. a remounted page) only need the current state.
     if (entry.state.status !== "ready") entry.listeners.add(onState);
@@ -172,6 +195,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
     this.worker?.terminate();
     this.worker = null;
     this.loads.clear();
+    this.sttModel = null;
   }
 }
 

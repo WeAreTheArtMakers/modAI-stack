@@ -33,20 +33,25 @@ _warmup = {"last": float("-inf"), "task": None}
 async def warm_up_generation_model(user=Depends(current_user)):
     """Ask Ollama to load the generation model before the user's next question.
 
-    Authenticated, at most one load request per minute per API process, and Ollama's own
+    Authenticated, at most one load request per minute per API process and never while the
+    previous one is still loading (a cold load can outlast the interval); Ollama's own
     keep-alive and memory settings are unchanged. Returns immediately.
     """
     del user
     now = time.monotonic()
-    if now - _warmup["last"] < WARMUP_INTERVAL_SECONDS:
+    running = _warmup["task"] is not None and not _warmup["task"].done()
+    if running or now - _warmup["last"] < WARMUP_INTERVAL_SECONDS:
         return {"status": "recent"}
     _warmup["last"] = now
 
     async def load() -> None:
+        provider = OllamaProvider()
         try:
-            await OllamaProvider().preload()
+            await provider.preload()
         except Exception:
             logger.warning("Generation model warm-up failed", extra={"component": "rag"})
+        finally:
+            await provider.client.aclose()
 
     _warmup["task"] = asyncio.create_task(load())
     return {"status": "warming"}

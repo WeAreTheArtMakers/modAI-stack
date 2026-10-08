@@ -1,0 +1,116 @@
+# Local acceptance environment for an unreleased branch, next to (never instead of) the
+# production stack in docker-compose.yml:
+# - its own Compose project, network, database, Redis, Qdrant and upload volumes;
+# - its own secrets (.env.staging, git- and docker-ignored); the production .env is not read;
+# - ports bound to 127.0.0.1 only: web console http://localhost:5183, API http://localhost:8100;
+# - generation reuses the host's Ollama (no second model instance, no model or setting change);
+# - the embedding model is mounted read-only from ./models.
+# See README "Yerel kabul ortamı (staging)" for the commands.
+name: modai-staging
+
+x-backend-environment: &backend-environment
+  APP_ENV: staging
+  DATABASE_URL: postgresql+asyncpg://modai_staging:${STAGING_POSTGRES_PASSWORD:?set in .env.staging}@postgres:5432/modai_staging
+  REDIS_URL: "redis://redis:6379/0"
+  QDRANT_URL: "http://qdrant:6333"
+  DATA_DIR: "/data/modai"
+  JWT_SECRET: ${STAGING_JWT_SECRET:?set in .env.staging}
+  ALLOW_REGISTRATION: "true"
+  OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+  OLLAMA_MODEL: ${STAGING_OLLAMA_MODEL:-gemma3:4b}
+  EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+  EMBEDDING_ALLOW_DOWNLOAD: "false"
+  EMBEDDING_CACHE_DIR: "/models/cache"
+  HF_HOME: "/models/cache"
+  SENTENCE_TRANSFORMERS_HOME: "/models/cache"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BUILD_SHA: ${BUILD_SHA:-staging}
+    ports:
+      - "127.0.0.1:5183:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      args:
+        BUILD_SHA: ${BUILD_SHA:-staging}
+    ports:
+      - "127.0.0.1:8100:8000"
+    environment: *backend-environment
+    volumes:
+      - uploads:/data/modai
+      - ${MODEL_DIR:-./models}:/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      args:
+        BUILD_SHA: ${BUILD_SHA:-staging}
+    command: ["python", "-m", "app.worker"]
+    environment: *backend-environment
+    volumes:
+      - uploads:/data/modai
+      - ${MODEL_DIR:-./models}:/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: modai_staging
+      POSTGRES_USER: modai_staging
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?set in .env.staging}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U modai_staging -d modai_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    volumes:
+      - qdrantdata:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/6333'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  qdrantdata:
+  uploads:

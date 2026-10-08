@@ -6,9 +6,13 @@ frontend/public/voice-models/<directory>/ only after their size and SHA-256 matc
 that folder in development and copies it into the production build, so the browser loads
 every model from the application origin. The folder is git-ignored; never commit weights.
 
+Models marked "optional" in the lock file (Whisper base, a selectable recognition model for
+evaluation) are fetched only with --include-optional.
+
 Usage:
-  python3 scripts/fetch_voice_models.py            # download missing or changed files
-  python3 scripts/fetch_voice_models.py --check    # verify only, no network
+  python3 scripts/fetch_voice_models.py                      # download missing or changed files
+  python3 scripts/fetch_voice_models.py --include-optional   # also the optional models
+  python3 scripts/fetch_voice_models.py --check              # verify only, no network
 """
 
 from __future__ import annotations
@@ -60,6 +64,7 @@ def _download(url: str, target: Path, expected_size: int, expected_sha: str) -> 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="verify existing files without downloading")
+    parser.add_argument("--include-optional", action="store_true", help="also fetch or verify optional models")
     parser.add_argument("--dest", type=Path, default=DEFAULT_DEST)
     args = parser.parse_args(argv)
 
@@ -70,6 +75,9 @@ def main(argv: list[str] | None = None) -> int:
     total = 0
     for model in lock["models"]:
         directory = args.dest / _safe_relative(model["directory"])
+        if model.get("optional") and not args.include_optional:
+            print(f"{model['id']}: optional, skipped (use --include-optional)")
+            continue
         print(f"{model['id']}: {model['repository']} @ {model['revision']} ({model['license']})")
         for entry in model["files"]:
             relative = _safe_relative(entry["path"])

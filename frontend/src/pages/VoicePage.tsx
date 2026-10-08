@@ -7,14 +7,16 @@ import { useAuth } from "../auth/AuthContext";
 import { canManage } from "../lib";
 import { useKnowledgeBaseSelection } from "../workspace/useKnowledgeBaseSelection";
 import { SourceCard } from "./ChatPage";
-import { EMA_LIGHTNING, ORT_RUNTIME_BYTES, SPEECH_SPEEDS, VOICE_TITLE_PREFIX, WHISPER } from "../voice/config";
+import { EMA_LIGHTNING, ORT_RUNTIME_BYTES, SPEECH_SPEEDS, VOICE_TITLE_PREFIX, WHISPER_MODELS, type SttModelId } from "../voice/config";
 import { VoiceMascot, phaseLabel } from "../voice/VoiceMascot";
 import { VoiceWave } from "../voice/VoiceWave";
-import { useVoiceAssistant, type TurnMetrics, type VoiceDependencies, type VoicePhase, type VoiceTurn } from "../voice/useVoiceAssistant";
+import { acceptanceReport, useVoiceAssistant, type TurnMetrics, type VoiceDependencies, type VoicePhase, type VoiceTurn } from "../voice/useVoiceAssistant";
+import { voiceDebugEnabled } from "../voice/timeline";
 import type { LoadState } from "../voice/voiceEngine";
 
 const HOLD_MS = 400;
-const FIRST_USE_MB = Math.round((WHISPER.webgpuDownloadBytes + EMA_LIGHTNING.downloadBytes + ORT_RUNTIME_BYTES) / 1e6);
+const firstUseMb = (model: SttModelId) => Math.round((WHISPER_MODELS[model].webgpuDownloadBytes + EMA_LIGHTNING.downloadBytes + ORT_RUNTIME_BYTES) / 1e6);
+const backendLabel = (backend?: string) => (backend === "webgpu" ? "WebGPU" : "WASM");
 
 const HINTS: Record<VoicePhase, string> = {
   idle: "Basılı tutup konuşun, bırakınca yanıtlarım. Ya da bir kez dokunun, bitince tekrar dokunun.",
@@ -90,7 +92,7 @@ function TimingDetails({ metrics }: { metrics: TurnMetrics }) {
     <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5">
       {stages.map(([name, value]) => <div key={name} className="contents"><dt>{STAGE_LABELS[name] ?? name}</dt><dd className="text-right tabular-nums">{value} ms</dd></div>)}
       {server.map(([name, value]) => <div key={name} className="contents"><dt>Sunucu · {SERVER_LABELS[name]}</dt><dd className="text-right tabular-nums">{value}{name.endsWith("_ms") ? " ms" : ""}</dd></div>)}
-      {metrics.stt && <div className="contents"><dt>Konuşma modeli</dt><dd className="text-right">{metrics.stt.backend === "webgpu" ? "WebGPU" : "WASM"}{metrics.stt.warm === false ? " · ilk yükleme sırasında" : ""}</dd></div>}
+      {metrics.stt && <div className="contents"><dt>Konuşma modeli</dt><dd className="text-right">{metrics.stt.model ? `${WHISPER_MODELS[metrics.stt.model].label} · ` : ""}{backendLabel(metrics.stt.backend)}{metrics.stt.warm === false ? " · ilk yükleme sırasında" : ""}</dd></div>}
       {audio && <div className="contents"><dt>Ses</dt><dd className="text-right tabular-nums">{audio.inputSampleRate ? `${audio.inputSampleRate} Hz → ` : ""}16000 Hz · {(audio.durationMs / 1000).toFixed(1)} sn → {(audio.trimmedDurationMs / 1000).toFixed(1)} sn (baş {Math.round(audio.trimmedLeadingMs)} / son {Math.round(audio.trimmedTrailingMs)} ms kırpıldı) · RMS {audio.rms.toFixed(3)} · tepe {audio.peak.toFixed(2)}{audio.clippedPercent > 0.1 ? ` · kırpılma %${audio.clippedPercent.toFixed(1)}` : ""}</dd></div>}
     </dl>
   </details>;
@@ -99,6 +101,15 @@ function TimingDetails({ metrics }: { metrics: TurnMetrics }) {
 function conversationLabel(title: string | null, id: number): string {
   if (!title) return `Adsız görüşme #${id}`;
   return title.startsWith(VOICE_TITLE_PREFIX) ? `Sesli · ${title.slice(VOICE_TITLE_PREFIX.length)}` : title;
+}
+
+/** Shown only with localStorage "modai.voice.debug" = "1": copies this session's results for an acceptance test. */
+function CopyReportButton({ turns }: { turns: VoiceTurn[] }) {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const copy = () => {
+    void navigator.clipboard.writeText(JSON.stringify(acceptanceReport(turns), null, 1)).then(() => setStatus("copied"), () => setStatus("failed"));
+  };
+  return <button type="button" className="button-secondary h-9 px-3 text-xs" onClick={copy} disabled={!turns.length}>{status === "copied" ? "Kopyalandı" : status === "failed" ? "Kopyalanamadı" : "Test ölçümlerini kopyala"}</button>;
 }
 
 function SpokenLine({ turn }: { turn: VoiceTurn }) {
@@ -148,6 +159,7 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
   const { current, kbs, available, selected, toggle } = useKnowledgeBaseSelection();
   const voice = useVoiceAssistant(selected, current?.id ?? null, dependencies);
   const [typed, setTyped] = useState("");
+  const [debug] = useState(voiceDebugEnabled);
   const pressRef = useRef<number | null>(null);
 
   if (kbs.isLoading) return <LoadingState />;
@@ -190,7 +202,10 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
 
   const engineBadge = voice.tts.status === "error"
     ? voice.speechMode === "system" ? `Sistem sesi (yedek)${voice.systemVoiceName ? ` · ${voice.systemVoiceName}` : ""}` : "Sesli yanıt kullanılamıyor"
-    : voice.tts.status === "ready" ? `Nöral Türkçe ses · ${voice.backend === "webgpu" ? "WebGPU" : "WASM"}` : "Ses modeli yüklenmedi";
+    : voice.tts.status === "ready" ? `Nöral Türkçe ses · ${backendLabel(voice.backend)}` : "Ses modeli yüklenmedi";
+  const sttLabel = WHISPER_MODELS[voice.sttModel].label;
+  const sttBadge = voice.stt.status === "ready" ? `${sttLabel} · ${backendLabel(voice.stt.backend)}`
+    : voice.stt.status === "loading" ? `${sttLabel} yükleniyor` : voice.stt.status === "error" ? `${sttLabel} başlatılamadı` : `${sttLabel} yüklenmedi`;
 
   return <>
     <PageHeader eyebrow="modAI Voice" title="Konuşun · Dinleyin · Belgelerden yanıt alın" description="Your knowledge. Your infrastructure. Your voice assistant. Sorunuzu Türkçe sorun; yanıt yalnızca erişim yetkiniz olan belgelerden üretilir ve kaynaklarıyla gösterilir." />
@@ -201,6 +216,7 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold" aria-live="polite"><span className={`h-2 w-2 rounded-full ${listening ? "bg-emerald-400 pulse-soft" : voice.phase === "error" ? "bg-red-400" : busy || voice.phase === "transcribing" ? "bg-amber-300 pulse-soft" : voice.phase === "reviewing" ? "bg-violet-300" : "bg-cyan"}`} />{phaseLabel(voice.phase)}</span>
             <div className="flex items-center gap-2">
+              <span className="rounded-full bg-white/5 px-3 py-1.5 text-[11px] text-slate-300" data-testid="stt-engine">{sttBadge}</span>
               <span className="rounded-full bg-white/5 px-3 py-1.5 text-[11px] text-slate-300" data-testid="speech-engine">{engineBadge}</span>
               <button type="button" className="rounded-full bg-white/10 p-2 text-slate-200 hover:bg-white/20" onClick={voice.toggleVoice} aria-pressed={!voice.voiceEnabled} title={voice.voiceEnabled ? "Sesli yanıtı kapat" : "Sesli yanıtı aç"} aria-label={voice.voiceEnabled ? "Sesli yanıtı kapat" : "Sesli yanıtı aç"}>{voice.voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
             </div>
@@ -212,10 +228,10 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
             {!modelsReady && <div className="mt-5 w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-4 text-left">
               {voice.stt.status === "idle" && voice.tts.status === "idle" ? <>
                 <p className="text-sm font-semibold text-white">Sesli asistanı hazırlayın</p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">İlk kullanımda en fazla yaklaşık {FIRST_USE_MB} MB konuşma ve ses modeli bu sunucudan indirilir ve tarayıcınızda saklanır. Sonraki açılışlar önbellekten yüklenir.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">İlk kullanımda en fazla yaklaşık {firstUseMb(voice.sttModel)} MB konuşma ve ses modeli bu sunucudan indirilir ve tarayıcınızda saklanır. Sonraki açılışlar önbellekten yüklenir.</p>
                 <button type="button" className="button-primary mt-3 w-full bg-cyan hover:bg-cyan/90" onClick={voice.prepare}><Download size={16} /> Modelleri hazırla</button>
               </> : <div className="space-y-3" aria-busy={modelsLoading}>
-                <ProgressRow label="Konuşma tanıma · Whisper tiny" state={voice.stt} />
+                <ProgressRow label={`Konuşma tanıma · ${WHISPER_MODELS[voice.sttModel].label}`} state={voice.stt} />
                 <ProgressRow label="Türkçe ses · EMA Lightning" state={voice.tts} />
                 {voice.stt.status === "error" && <button type="button" className="button-secondary w-full" onClick={voice.prepare}>Tekrar dene</button>}
               </div>}
@@ -234,6 +250,7 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
                 <div className="flex overflow-hidden rounded-full border border-white/15">{SPEECH_SPEEDS.map((value) => <label key={value} className={`cursor-pointer px-2.5 py-1 transition focus-within:ring-2 focus-within:ring-cyan ${voice.speed === value ? "bg-cyan text-white" : "hover:bg-white/10"}`}><input type="radio" name="voice-speed" className="sr-only" value={value} checked={voice.speed === value} onChange={() => voice.setSpeed(value)} aria-label={`Konuşma hızı ${formatSpeed(value)}`} />{formatSpeed(value)}</label>)}</div>
               </fieldset>
               <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" className="accent-cyan" checked={voice.review} onChange={(event) => voice.setReview(event.target.checked)} />Göndermeden önce soruyu göster</label>
+              <label className="flex items-center gap-2">Konuşma tanıma<select aria-label="Konuşma tanıma modeli" className="rounded-full border border-white/15 bg-transparent px-2 py-1 text-xs text-slate-200" value={voice.sttModel} disabled={listening || voice.phase === "transcribing"} onChange={(event) => voice.setSttModel(event.target.value === "base" ? "base" : "tiny")}><option value="tiny" className="text-ink">Tiny · hızlı</option><option value="base" className="text-ink">Base · daha doğru (deneme)</option></select></label>
               <label className="flex items-center gap-2">Yanıt dili<select className="rounded-full border border-white/15 bg-transparent px-2 py-1 text-xs text-slate-200" value={voice.answerLanguage} onChange={(event) => voice.setAnswerLanguage(event.target.value === "auto" ? "auto" : "tr")}><option value="tr" className="text-ink">Türkçe</option><option value="auto" className="text-ink">Soru diline göre</option></select></label>
             </div>
             <p className="mt-5 flex items-center gap-1.5 text-[11px] text-slate-500"><Lock size={12} /> Ses kaydınız bu cihazdan çıkmaz; yalnızca tanınan metin yetkili RAG servisine gönderilir.</p>
@@ -249,6 +266,7 @@ export function VoicePage({ dependencies }: { dependencies?: VoiceDependencies }
                 {voice.conversations.map((item) => <option key={item.id} value={item.id}>{conversationLabel(item.title, item.id)}</option>)}
               </select>
               <button type="button" className="button-secondary h-9 px-3 text-xs" onClick={voice.newConversation}><Plus size={14} /> Yeni görüşme</button>
+              {debug && <CopyReportButton turns={voice.turns} />}
             </div>
           </div>
           {voice.conversationStatus === "loading" && <p className="mt-3 text-xs text-slate-400" role="status">Kayıtlı görüşme yükleniyor…</p>}

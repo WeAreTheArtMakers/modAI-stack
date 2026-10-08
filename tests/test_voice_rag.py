@@ -221,6 +221,7 @@ def test_warmup_requires_authentication_and_is_throttled(monkeypatch):
 
     monkeypatch.setattr(OllamaProvider, "preload", preload)
     monkeypatch.setitem(rag_routes._warmup, "last", float("-inf"))
+    monkeypatch.setitem(rag_routes._warmup, "task", None)
     with TestClient(main.app) as client:
         assert client.post("/rag/warmup").status_code == 401
     try:
@@ -233,3 +234,34 @@ def test_warmup_requires_authentication_and_is_throttled(monkeypatch):
     assert (first.status_code, first.json()) == (202, {"status": "warming"})
     assert (second.status_code, second.json()) == (202, {"status": "recent"})
     assert calls == [1]
+
+
+@pytest.mark.asyncio
+async def test_warmup_never_overlaps_a_running_load_and_closes_its_client(monkeypatch):
+    import asyncio
+
+    from app.api.routes import rag as rag_routes
+
+    release = asyncio.Event()
+    started, closed = [], []
+
+    async def slow_preload(self):
+        started.append(1)
+        await release.wait()
+
+    async def aclose(self):
+        closed.append(1)
+
+    monkeypatch.setattr(OllamaProvider, "preload", slow_preload)
+    monkeypatch.setattr(httpx.AsyncClient, "aclose", aclose)
+    monkeypatch.setitem(rag_routes._warmup, "last", float("-inf"))
+    monkeypatch.setitem(rag_routes._warmup, "task", None)
+
+    assert await rag_routes.warm_up_generation_model(user={"sub": "1"}) == {"status": "warming"}
+    await asyncio.sleep(0)
+    # The interval has passed but the cold load is still running: no second load request.
+    rag_routes._warmup["last"] = float("-inf")
+    assert await rag_routes.warm_up_generation_model(user={"sub": "1"}) == {"status": "recent"}
+    release.set()
+    await rag_routes._warmup["task"]
+    assert started == [1] and closed == [1]
