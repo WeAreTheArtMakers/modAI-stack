@@ -322,7 +322,8 @@ def test_fixture_dry_run_uses_in_memory_qdrant_and_safe_aggregate_report(monkeyp
         top_k=5,
         execution_mode="dry-run; synthetic hash vectors; not embedding-model quality",
         device="deterministic-stub",
-        git_sha="test-sha",
+        source_sha=None,
+        source_sha_origin="unavailable",
     )
     report = run_benchmark_sync(config, DeterministicFixtureEmbedder())
     serialized = serialize_json(report)
@@ -352,7 +353,8 @@ def test_authoritative_corpus_dry_run_does_not_establish_real_world_quality():
             top_k=5,
             execution_mode="dry-run; synthetic hash vectors; not embedding-model quality",
             device="deterministic-stub",
-            git_sha="test-sha",
+            source_sha=None,
+            source_sha_origin="unavailable",
         ),
         DeterministicFixtureEmbedder(),
     )

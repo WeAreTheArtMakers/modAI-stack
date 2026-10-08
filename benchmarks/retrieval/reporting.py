@@ -17,6 +17,9 @@ def render_markdown(report: dict) -> str:
         dry_run_notice.append(
             "This run used deterministic hash-stub vectors; its retrieval scores are not embedding-model quality results."
         )
+    metadata = report["metadata"]
+    source_sha = metadata["source_sha"]
+    runtime_build_sha = metadata["runtime_build_sha"]
     rows = [("Global", metrics["global"])]
     rows.extend((language, summary) for language, summary in metrics["by_language"].items())
     rows.extend((category, summary) for category, summary in metrics["by_category"].items())
@@ -29,6 +32,11 @@ def render_markdown(report: dict) -> str:
         f"- Embedding model: `{report['metadata']['embedding_model']}`",
         f"- Embedding dimension: {report['metadata']['embedding_dimension']}",
         f"- Vector store: `{report['metadata']['qdrant_isolation_mode']}`",
+        f"- Benchmark source SHA: {f'`{source_sha}`' if source_sha else 'unavailable'} ({metadata['source_sha_origin']})",
+        (
+            f"- Runtime build SHA (dependency image, not the benchmark source): "
+            f"{f'`{runtime_build_sha}`' if runtime_build_sha else 'not recorded'}"
+        ),
         f"- Real-world benchmark status: **{report['real_world_benchmark_status']}**",
         "",
         *dry_run_notice,
