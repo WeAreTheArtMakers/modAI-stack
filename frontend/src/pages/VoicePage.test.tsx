@@ -34,7 +34,7 @@ function createFakes() {
   const player = {
     generation: 0,
     unlock: vi.fn(),
-    enqueue: vi.fn((_samples: Float32Array, _rate: number, generation: number) => (generation === player.generation ? performance.now() : null)),
+    enqueue: vi.fn((_samples: Float32Array, _rate: number, generation: number) => (generation === player.generation ? performance.timeOrigin + performance.now() : null)),
     reset: vi.fn((generation: number) => { player.generation = generation; }),
     drained: vi.fn(async () => undefined),
     level: () => 0.5,
@@ -102,7 +102,7 @@ describe("modAI Voice", () => {
     await waitFor(() => expect(fakes.streamRag).toHaveBeenCalledTimes(1));
     expect(fakes.recorder.start).toHaveBeenCalledTimes(1);
     expect(fakes.engine.transcribe).toHaveBeenCalledWith(expect.any(Float32Array));
-    expect(fakes.streamRag).toHaveBeenCalledWith([7], QUESTION, expect.any(Function), expect.any(AbortSignal));
+    expect(fakes.streamRag).toHaveBeenCalledWith([7], QUESTION, expect.any(Function), expect.any(AbortSignal), expect.objectContaining({ onSent: expect.any(Function) }));
     // Raw audio goes to the local engine only; RAG receives plain text.
     expect(fakes.streamRag.mock.calls[0].some((argument) => argument instanceof Float32Array)).toBe(false);
 

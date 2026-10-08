@@ -4,6 +4,8 @@ import type { Source } from "../types";
 import { WebAudioPlayer, type Player } from "./audioPlayback";
 import { VOICE_READY_STORAGE_KEY } from "./config";
 import { MicrophoneError, MicrophoneRecorder, type Recorder } from "./microphone";
+import { ReplayRecorder } from "./replayRecorder";
+import { clock, recordDebugTiming, stageDurations, type Timeline } from "./timeline";
 import type { InferenceBackend } from "./protocol";
 import { SentenceBuffer } from "./sentenceBuffer";
 import { BrowserSystemVoice, type SystemVoice } from "./systemVoice";
@@ -21,7 +23,8 @@ export interface VoiceDependencies {
 }
 
 export function createBrowserVoiceDependencies(): VoiceDependencies {
-  return { engine: new WorkerVoiceEngine(), recorder: new MicrophoneRecorder(), player: new WebAudioPlayer(), systemVoice: new BrowserSystemVoice(), streamRag };
+  const recorder = import.meta.env.VITE_VOICE_REPLAY === "1" ? new ReplayRecorder() : new MicrophoneRecorder();
+  return { engine: new WorkerVoiceEngine(), recorder, player: new WebAudioPlayer(), systemVoice: new BrowserSystemVoice(), streamRag };
 }
 
 export interface TurnMetrics {
@@ -31,6 +34,7 @@ export interface TurnMetrics {
   firstAudioMs?: number; // end of user speech (or question sent) -> first audible answer
   completeMs?: number; // end of user speech (or question sent) -> answer fully spoken
   speech?: SpeechMode;
+  stages?: Record<string, number>; // see timeline.ts
 }
 
 export interface VoiceTurn {
@@ -112,7 +116,7 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], dependencies?: Voi
     if (reason === "stopped" && id) updateTurn(id, (turn) => (turn.streaming || phaseRef.current === "speaking" ? { streaming: false, stopped: true } : {}));
   }, [deps, updateTurn]);
 
-  const ask = useCallback(async (question: string, origin: "voice" | "text", startedAt = performance.now(), metrics: TurnMetrics = {}) => {
+  const ask = useCallback(async (question: string, origin: "voice" | "text", startedAt = performance.now(), metrics: TurnMetrics = {}, timeline: Timeline = {}) => {
     const knowledgeBases = kbRef.current;
     if (!knowledgeBases.length) { fail(NO_SOURCE); return; }
     stopCurrent("superseded");
@@ -126,28 +130,37 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], dependencies?: Voi
     setPhase("thinking");
 
     const sentAt = performance.now();
+    timeline.ragStart = clock();
     const buffer = new SentenceBuffer();
     const speeches: Promise<void>[] = [];
     let seq = 0;
     let firstToken = true;
     let firstAudio = true;
+    let answerLength = 0;
     let systemChain = Promise.resolve();
     const current = () => requestRef.current === id && !controller.signal.aborted;
 
-    const audible = (at: number) => {
+    const audible = (absoluteAt: number) => {
       if (!firstAudio || !current()) return;
       firstAudio = false;
-      updateMetrics(id, { firstAudioMs: at - startedAt });
+      timeline.firstAudible = absoluteAt;
+      updateMetrics(id, { firstAudioMs: absoluteAt - performance.timeOrigin - startedAt });
       setPhase("speaking");
     };
     const say = (sentence: string) => {
+      timeline.firstPhrase ??= clock();
       if (mode === "neural") {
-        speeches.push(deps.engine.speak(id, seq++, sentence, (samples, rate) => {
+        speeches.push(deps.engine.speak(id, seq++, sentence, (samples, rate, timing) => {
+          if (timeline.firstBufferReceived === undefined && timing) {
+            timeline.ttsStart = timing.synthStartedAt;
+            timeline.firstBufferPosted = timing.postedAt;
+            timeline.firstBufferReceived = clock();
+          }
           const at = deps.player.enqueue(samples, rate, id);
           if (at !== null) audible(at);
         }));
       } else if (mode === "system") {
-        systemChain = systemChain.then(() => (current() ? deps.systemVoice.speak(sentence, () => audible(performance.now())) : undefined));
+        systemChain = systemChain.then(() => (current() ? deps.systemVoice.speak(sentence, () => audible(clock())) : undefined));
         speeches.push(systemChain);
       }
     };
@@ -156,22 +169,28 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], dependencies?: Voi
       await deps.streamRag(knowledgeBases, question, (event) => {
         if (!current()) return;
         if (event.type === "sources") {
+          timeline.sources ??= clock();
           updateTurn(id, () => ({ sources: event.data }));
         } else if (event.type === "token") {
-          if (firstToken) { firstToken = false; updateMetrics(id, { firstTokenMs: performance.now() - sentAt }); }
+          if (firstToken) { firstToken = false; timeline.firstToken = clock(); updateMetrics(id, { firstTokenMs: performance.now() - sentAt }); }
+          answerLength += event.data.length;
           updateTurn(id, (turn) => ({ answer: turn.answer + event.data }));
           buffer.push(event.data).forEach(say);
         } else if (event.type === "complete") {
+          timeline.ragComplete = clock();
           buffer.flush().forEach(say);
           updateTurn(id, () => ({ streaming: false }));
         } else if (event.type === "error") {
           updateTurn(id, () => ({ streaming: false, error: event.data }));
         }
-      }, controller.signal);
+      }, controller.signal, { onSent: () => { timeline.ragSent = clock(); } });
       await Promise.all(speeches);
       if (mode === "neural") await deps.player.drained();
       if (!current()) return;
-      updateMetrics(id, { completeMs: performance.now() - startedAt });
+      timeline.speechEnd = clock();
+      const stages = stageDurations(timeline);
+      updateMetrics(id, { completeMs: performance.now() - startedAt, stages });
+      recordDebugTiming({ id, origin, speech: mode, sentences: seq, answerChars: answerLength, stages });
       setPhase("idle");
     } catch (reason) {
       if (!current()) return; // superseded or stopped by the user
@@ -189,13 +208,18 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], dependencies?: Voi
     if (!deps.recorder.recording) { recording.stopRequested = true; return; } // permission prompt still open
     recordingRef.current = null;
     const stoppedAt = performance.now();
+    const timeline: Timeline = { recordStart: recording.startedAt + performance.timeOrigin, recordStop: stoppedAt + performance.timeOrigin };
     setPhase("transcribing");
     try {
       const audio = await deps.recorder.stop();
+      timeline.audioReady = clock();
       const result = await deps.engine.transcribe(audio);
+      timeline.sttStart = result.startedAt;
+      timeline.sttEnd = result.endedAt;
+      timeline.transcriptReceived = clock();
       const sttMs = performance.now() - stoppedAt;
       if (!result.text) { fail(NOT_UNDERSTOOD); return; }
-      await ask(result.text, "voice", stoppedAt, { recordingMs: stoppedAt - recording.startedAt, sttMs });
+      await ask(result.text, "voice", stoppedAt, { recordingMs: stoppedAt - recording.startedAt, sttMs }, timeline);
     } catch (reason) {
       fail(reason instanceof MicrophoneError ? reason.message : `Konuşma yazıya çevrilemedi: ${reason instanceof Error ? reason.message : "bilinmeyen hata"}`);
     }

@@ -13,11 +13,13 @@ export interface LoadState {
 
 export const IDLE_LOAD: LoadState = { status: "idle", loaded: 0, total: 0 };
 
-export type AudioSink = (samples: Float32Array, sampleRate: number) => void;
+export interface AudioTiming { synthStartedAt: number; postedAt: number }
+export type AudioSink = (samples: Float32Array, sampleRate: number, timing?: AudioTiming) => void;
+export interface Transcript { text: string; ms: number; startedAt?: number; endedAt?: number }
 
 export interface VoiceEngine {
   load(component: VoiceComponent, onState: (state: LoadState) => void): Promise<InferenceBackend>;
-  transcribe(audio: Float32Array): Promise<{ text: string; ms: number }>;
+  transcribe(audio: Float32Array): Promise<Transcript>;
   /** Resolves when the sentence is fully synthesized, or immediately once it is cancelled. */
   speak(requestId: number, seq: number, text: string, onAudio: AudioSink): Promise<void>;
   /** Drops queued and in-progress synthesis for every request id <= upTo. */
@@ -34,7 +36,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
   private worker: Worker | null = null;
   private nextTranscription = 0;
   private readonly loads = new Map<VoiceComponent, { promise: Promise<InferenceBackend>; deferred: Deferred<InferenceBackend>; listeners: Set<(state: LoadState) => void>; state: LoadState }>();
-  private readonly transcriptions = new Map<number, Deferred<{ text: string; ms: number }>>();
+  private readonly transcriptions = new Map<number, Deferred<Transcript>>();
   private readonly speeches = new Map<string, { deferred: Deferred<void>; onAudio: AudioSink; id: number }>();
 
   constructor(private readonly createWorker: () => Worker = () => new Worker(new URL("./voice.worker.ts", import.meta.url), { type: "module" })) {}
@@ -73,7 +75,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
         break;
       }
       case "transcript":
-        this.transcriptions.get(message.id)?.resolve({ text: message.text, ms: message.ms });
+        this.transcriptions.get(message.id)?.resolve({ text: message.text, ms: message.ms, startedAt: message.startedAt, endedAt: message.endedAt });
         this.transcriptions.delete(message.id);
         break;
       case "transcribe-error":
@@ -81,7 +83,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
         this.transcriptions.delete(message.id);
         break;
       case "audio":
-        this.speeches.get(`${message.id}:${message.seq}`)?.onAudio(message.samples, message.sampleRate);
+        this.speeches.get(`${message.id}:${message.seq}`)?.onAudio(message.samples, message.sampleRate, { synthStartedAt: message.synthStartedAt, postedAt: message.postedAt });
         break;
       case "spoken":
         this.speeches.get(`${message.id}:${message.seq}`)?.deferred.resolve();
@@ -123,7 +125,7 @@ export class WorkerVoiceEngine implements VoiceEngine {
     return entry.promise;
   }
 
-  transcribe(audio: Float32Array): Promise<{ text: string; ms: number }> {
+  transcribe(audio: Float32Array): Promise<Transcript> {
     const id = ++this.nextTranscription;
     return new Promise((resolve, reject) => {
       this.transcriptions.set(id, { resolve, reject });

@@ -52,7 +52,7 @@ export class WebAudioPlayer implements Player {
       this.sources.delete(source);
       if (!this.sources.size) this.flushWaiters();
     };
-    return performance.now() + (start - context.currentTime) * 1000; // when it becomes audible
+    return performance.timeOrigin + performance.now() + (start - context.currentTime) * 1000; // absolute time it becomes audible
   }
 
   private flushWaiters() {
