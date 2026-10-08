@@ -30,7 +30,12 @@ from benchmarks.retrieval.schema import (
 V1_FIXTURE = Path("benchmarks/retrieval/datasets/v1/fixture.json")
 V2_EXAMPLE = Path("benchmarks/retrieval/datasets/v2/example.json")
 V1_FIXTURE_SHA256 = "1a0001149f5ff8aea35e48a94eb9de3dce4bbb23286b6cd22654c1d109c79c84"
-V1_DRY_RUN_REPORT_SHA256 = "81af036336847f8b20226da1ee3a880a49566574ba29059b9f04cd456552eaf4"
+# Floats are rounded to 12 decimals before hashing: Qdrant's local scoring uses
+# numpy kernels whose SIMD dispatch differs by CPU (observed: 1-ULP top_score
+# differences between arm64, x86-64 AVX2 and the CI runner). The closest value
+# sits 5e-14 from a rounding boundary, so the hash is stable yet still detects
+# any score change above 1e-12; ordering, IDs and metrics are compared exactly.
+V1_DRY_RUN_REPORT_SHA256 = "6ae1cac3b5a99e6effc97447caf382d45f11dee98ac5af39abef480c3734b641"
 EXAMPLE_FINGERPRINTS = {
     "corpus_sha256": "001900bac066a490b0cf2d40aff7efec1175d051e4d8e933a5f322a3993269ad",
     "document_metadata_sha256": "815bfab653f43bd0d69b405f876ece8fccde8c47bc784a1586f90d43e87fce2f",
@@ -142,6 +147,8 @@ def test_v1_dry_run_report_is_unchanged():
             return {key: strip(item) for key, item in value.items() if key not in TIMING_KEYS}
         if isinstance(value, list):
             return [strip(item) for item in value]
+        if isinstance(value, float):
+            return round(value, 12)
         return value
 
     payload = {
