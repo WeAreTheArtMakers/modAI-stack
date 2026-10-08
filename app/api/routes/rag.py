@@ -10,7 +10,7 @@ from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.llm.ollama import OllamaProvider
 from app.services.rag.pipeline import retrieve_rag_context
-from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail
+from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail, get_embedding_service
 from app.services.security import RedisRateLimiter
 from app.core.config import get_settings
 from app.services.observability import metrics
@@ -31,7 +31,8 @@ _warmup = {"last": float("-inf"), "task": None}
 
 @router.post("/rag/warmup", status_code=202)
 async def warm_up_generation_model(user=Depends(current_user)):
-    """Ask Ollama to load the generation model before the user's next question.
+    """Load the generation model (Ollama) and this process's embedding model before the user's
+    next question, so neither load is paid inside it.
 
     Authenticated, at most one load request per minute per API process and never while the
     previous one is still loading (a cold load can outlast the interval); Ollama's own
@@ -46,6 +47,13 @@ async def warm_up_generation_model(user=Depends(current_user)):
 
     async def load() -> None:
         provider = OllamaProvider()
+        # One after the other: loading both at once (torch in this process, 3+ GB in Ollama) was
+        # measured several times slower on a 16 GB machine. The embedding model loads once per
+        # process and is kept, so after the first warm-up this step returns at once.
+        try:
+            await get_embedding_service().embed_text("ısınma")
+        except Exception:
+            logger.warning("Embedding model warm-up failed", extra={"component": "rag"})
         try:
             await provider.preload()
         except Exception:
