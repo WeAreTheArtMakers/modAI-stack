@@ -29,6 +29,10 @@ class QdrantService:
             trust_env=False,
         )
 
+    async def _collection_exists(self) -> bool:
+        collections = await self.client.get_collections()
+        return self.collection_name in {item.name for item in collections.collections}
+
     async def ensure_collection(self, vector_size: int) -> None:
         collections = await self.client.get_collections()
 
@@ -69,36 +73,59 @@ class QdrantService:
         if len(chunks) != len(vectors):
             raise ValueError("chunk and vector counts must match")
 
-        if not vectors:
+        if vectors:
+            await self.ensure_collection(len(vectors[0]))
+
+            points = [
+                models.PointStruct(
+                    id=self.point_id(document_id, index, document_version),
+                    vector=vector,
+                    payload={
+                        "user_id": user_id,
+                        "organization_id": organization_id,
+                        "workspace_id": workspace_id,
+                        "knowledge_base_id": knowledge_base_id,
+                        "document_id": document_id,
+                        "document_version": document_version,
+                        "is_active": is_active,
+                        "filename": filename,
+                        "chunk_index": index,
+                        "text": chunk,
+                    },
+                )
+                for index, (chunk, vector) in enumerate(
+                    zip(chunks, vectors)
+                )
+            ]
+
+            await self.client.upsert(
+                collection_name=self.collection_name,
+                points=points,
+                wait=True,
+            )
+        elif not await self._collection_exists():
             return
 
-        await self.ensure_collection(len(vectors[0]))
-
-        points = [
-            models.PointStruct(
-                id=self.point_id(document_id, index, document_version),
-                vector=vector,
-                payload={
-                    "user_id": user_id,
-                    "organization_id": organization_id,
-                    "workspace_id": workspace_id,
-                    "knowledge_base_id": knowledge_base_id,
-                    "document_id": document_id,
-                    "document_version": document_version,
-                    "is_active": is_active,
-                    "filename": filename,
-                    "chunk_index": index,
-                    "text": chunk,
-                },
-            )
-            for index, (chunk, vector) in enumerate(
-                zip(chunks, vectors)
-            )
-        ]
-
-        await self.client.upsert(
+        # Re-materializing the same version can yield fewer chunks (for example
+        # after a chunking or extraction change). Deterministic IDs replace the
+        # current chunks above; remove trailing chunks the new materialization
+        # no longer contains so they cannot keep serving stale text.
+        await self.client.delete(
             collection_name=self.collection_name,
-            points=points,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(must=[
+                    *self._user_filter(
+                        user_id,
+                        document_id=document_id,
+                        document_version=document_version,
+                        active_only=False,
+                    ).must,
+                    models.FieldCondition(
+                        key="chunk_index",
+                        range=models.Range(gte=len(chunks)),
+                    ),
+                ])
+            ),
             wait=True,
         )
 
@@ -190,12 +217,8 @@ class QdrantService:
         document_id: int,
         document_version: int | None = None,
     ) -> None:
-        collections = await self.client.get_collections()
-
-        names = {item.name for item in collections.collections}
-
         # Old PostgreSQL documents may exist without Qdrant vectors.
-        if self.collection_name not in names:
+        if not await self._collection_exists():
             return
 
         await self.client.delete(
