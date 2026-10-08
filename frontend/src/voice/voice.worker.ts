@@ -40,17 +40,41 @@ const post = (message: WorkerResponse, transfer: ArrayBuffer[] = []) => scope.po
 const clock = () => performance.timeOrigin + performance.now();
 
 let recognizer: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
+let recognizerReady = false;
 let synthesizer: Promise<EmaLightning> | null = null;
 let cancelledUpTo = 0;
-// Every model load, warm-up and inference runs strictly one after another: both engines share
-// one onnxruntime-web instance, which fails on concurrent initialization ("multiple calls to
-// 'initWasm()'") and must not interleave runs. FIFO order also keeps sentences in order.
-let chain: Promise<unknown> = Promise.resolve();
 
-function serial<T>(task: () => Promise<T>): Promise<T> {
-  const run = chain.then(task, task);
-  chain = run.catch(() => undefined);
-  return run;
+// Both engines share one onnxruntime-web instance, which fails on concurrent initialization
+// ("multiple calls to 'initWasm()'") and must not interleave runs, so every load step, warm-up
+// and inference runs one at a time. Speech input (recognition) goes before speech output
+// (synthesis), so a question never waits for a whole voice-model load or a long answer; each
+// queue is FIFO, which keeps sentences in order.
+type Lane = "input" | "output";
+interface Job { run: () => Promise<unknown>; resolve: (value: unknown) => void; reject: (reason: unknown) => void }
+const lanes: Record<Lane, Job[]> = { input: [], output: [] };
+let draining = false;
+
+function schedule<T>(lane: Lane, run: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    lanes[lane].push({ run, resolve: resolve as (value: unknown) => void, reject });
+    void drain();
+  });
+}
+
+async function drain() {
+  if (draining) return;
+  draining = true;
+  try {
+    for (let job = lanes.input.shift() ?? lanes.output.shift(); job; job = lanes.input.shift() ?? lanes.output.shift()) {
+      try {
+        job.resolve(await job.run());
+      } catch (error) {
+        job.reject(error);
+      }
+    }
+  } finally {
+    draining = false;
+  }
 }
 
 function describe(error: unknown): string {
@@ -76,6 +100,7 @@ function webgpuAdapter(): Promise<GpuAdapter | null> {
 }
 
 const TRANSCRIBE = { language: WHISPER.language, task: "transcribe" } as const;
+let recognizerBackend: InferenceBackend = "wasm";
 
 function loadRecognizer(requested?: InferenceBackend): Promise<AutomaticSpeechRecognitionPipeline> {
   if (recognizer) return recognizer;
@@ -99,24 +124,29 @@ function loadRecognizer(requested?: InferenceBackend): Promise<AutomaticSpeechRe
     local_files_only: true,
     progress_callback: onProgress,
   }) as Promise<AutomaticSpeechRecognitionPipeline>;
-  recognizer = serial(async () => {
+  recognizer = (async () => {
     let backend: InferenceBackend = requested ?? ((await webgpuAdapter())?.features.has("shader-f16") ? "webgpu" : "wasm");
-    let asr: AutomaticSpeechRecognitionPipeline;
     expectedBytes = backend === "webgpu" ? WHISPER.webgpuDownloadBytes : WHISPER.downloadBytes;
-    try {
-      asr = await create(backend);
-    } catch (error) {
-      if (backend === "wasm") throw error;
-      backend = "wasm";
-      expectedBytes = WHISPER.downloadBytes;
-      asr = await create("wasm");
-    }
-    // The first inference compiles kernels (7.2 s on WASM, 1.0 s on WebGPU, then 1.45 s / 0.5 s):
-    // pay for it now, before the user's first question.
-    await asr(new Float32Array(WHISPER_SAMPLE_RATE), TRANSCRIBE).catch(() => undefined);
+    const asr = await schedule("input", async () => {
+      let created: AutomaticSpeechRecognitionPipeline;
+      try {
+        created = await create(backend);
+      } catch (error) {
+        if (backend === "wasm") throw error;
+        backend = "wasm";
+        expectedBytes = WHISPER.downloadBytes;
+        created = await create("wasm");
+      }
+      // The first inference compiles kernels (7.2 s on WASM, 1.0 s on WebGPU, then 1.45 s / 0.5 s):
+      // pay for it now, before the user's first question.
+      await created(new Float32Array(WHISPER_SAMPLE_RATE), TRANSCRIBE).catch(() => undefined);
+      return created;
+    });
+    recognizerBackend = backend;
+    recognizerReady = true;
     post({ type: "ready", component: "stt", backend, ms: performance.now() - started });
     return asr;
-  });
+  })();
   recognizer.catch((error) => {
     recognizer = null;
     post({ type: "load-error", component: "stt", message: describe(error) });
@@ -131,20 +161,21 @@ function loadSynthesizer(requested?: InferenceBackend): Promise<EmaLightning> {
   const cacheName = `modai-voice-ema-${EMA_LIGHTNING.revision.slice(0, 8)}`;
   const progress = (stage: string, fraction: number) =>
     post({ type: "progress", component: "tts", loaded: Math.round(fraction * EMA_LIGHTNING.downloadBytes), total: EMA_LIGHTNING.downloadBytes, stage });
-  synthesizer = serial(async () => {
+  const step = <T,>(run: () => Promise<T>) => schedule("output", run);
+  synthesizer = (async () => {
     const backend: InferenceBackend = requested ?? ((await webgpuAdapter()) ? "webgpu" : "wasm");
     let engine: EmaLightning;
     try {
-      engine = await EmaLightning.load(backend, base, cacheName, progress);
+      engine = await EmaLightning.load(backend, base, cacheName, progress, step);
     } catch (error) {
       if (backend === "wasm") throw error;
-      engine = await EmaLightning.load("wasm", base, cacheName, progress); // WebGPU adapter present but unusable
+      engine = await EmaLightning.load("wasm", base, cacheName, progress, step); // WebGPU adapter present but unusable
     }
     // Warm up once so the first answer does not pay for shader compilation.
-    for await (const samples of engine.stream("Merhaba.")) void samples;
+    await step(async () => { for await (const samples of engine.stream("Merhaba.")) void samples; });
     post({ type: "ready", component: "tts", backend: engine.backend, ms: performance.now() - started });
     return engine;
-  });
+  })();
   synthesizer.catch((error) => {
     synthesizer = null;
     post({ type: "load-error", component: "tts", message: describe(error) });
@@ -152,30 +183,34 @@ function loadSynthesizer(requested?: InferenceBackend): Promise<EmaLightning> {
   return synthesizer;
 }
 
-async function transcribe(id: number, audio: Float32Array, recognizerReady: Promise<AutomaticSpeechRecognitionPipeline>) {
+async function transcribe(id: number, audio: Float32Array, receivedAt: number, warm: boolean) {
   try {
-    const started = performance.now();
-    const asr = await recognizerReady;
-    const startedAt = clock();
-    const output = await asr(audio, TRANSCRIBE);
-    const text = (Array.isArray(output) ? output.map((item) => item.text).join(" ") : output.text).trim();
-    post({ type: "transcript", id, text, ms: performance.now() - started, startedAt, endedAt: clock() });
+    const asr = await loadRecognizer();
+    const output = await schedule("input", async () => {
+      const startedAt = clock();
+      const result = await asr(audio, TRANSCRIBE);
+      return { result, startedAt, endedAt: clock() };
+    });
+    const text = (Array.isArray(output.result) ? output.result.map((item) => item.text).join(" ") : output.result.text).trim();
+    post({
+      type: "transcript", id, text, ms: output.endedAt - receivedAt,
+      receivedAt, startedAt: output.startedAt, endedAt: output.endedAt,
+      warm, backend: recognizerBackend, audioSeconds: audio.length / WHISPER_SAMPLE_RATE,
+    });
   } catch (error) {
     post({ type: "transcribe-error", id, message: describe(error) });
   }
 }
 
-async function speak(id: number, seq: number, text: string, speed: number, synthesizerReady: Promise<EmaLightning>) {
+async function speak(engine: EmaLightning, id: number, seq: number, text: string, speed: number) {
   if (id <= cancelledUpTo) return;
   try {
-    const started = performance.now();
-    const engine = await synthesizerReady;
     const synthStartedAt = clock();
     for await (const samples of engine.stream(text, { speed })) {
       if (id <= cancelledUpTo) return; // a newer request or stop: drop the rest of this sentence
       post({ type: "audio", id, seq, samples, sampleRate: RATE, synthStartedAt, postedAt: clock() }, [samples.buffer as ArrayBuffer]);
     }
-    if (id > cancelledUpTo) post({ type: "spoken", id, seq, ms: performance.now() - started });
+    if (id > cancelledUpTo) post({ type: "spoken", id, seq, ms: clock() - synthStartedAt });
   } catch (error) {
     post({ type: "speak-error", id, seq, message: describe(error) });
   }
@@ -187,13 +222,15 @@ scope.onmessage = (event: MessageEvent<WorkerRequest>) => {
     const component: VoiceComponent = request.component;
     void (component === "stt" ? loadRecognizer(request.backend) : loadSynthesizer(request.backend)).catch(() => undefined);
   } else if (request.type === "transcribe") {
-    // The load (if still needed) is queued first, so it has finished when this task runs.
-    const ready = loadRecognizer();
-    void serial(() => transcribe(request.id, request.audio, ready));
+    void transcribe(request.id, request.audio, clock(), recognizerReady);
   } else if (request.type === "speak") {
     if (request.id <= cancelledUpTo) return;
-    const ready = loadSynthesizer();
-    void serial(() => speak(request.id, request.seq, request.text, request.speed ?? 1, ready));
+    // Queue the sentence only once the model is ready: a sentence must never hold the queue
+    // while it waits for a load step queued behind it.
+    void loadSynthesizer().then(
+      (engine) => schedule("output", () => speak(engine, request.id, request.seq, request.text, request.speed ?? 1)),
+      (error: unknown) => post({ type: "speak-error", id: request.id, seq: request.seq, message: describe(error) }),
+    );
   } else if (request.type === "cancel") {
     cancelledUpTo = Math.max(cancelledUpTo, request.upTo);
   }

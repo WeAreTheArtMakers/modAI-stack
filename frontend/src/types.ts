@@ -117,10 +117,13 @@ export interface IndexingEvent {
   stage: string;
 }
 
+/** Numeric server stage timings, sent only when a request asks for diagnostics. */
+export type RagTimings = Record<string, number | null>;
+
 export type RagEvent =
-  | { type: "sources"; data: Source[] }
+  | { type: "sources"; data: Source[]; timings?: RagTimings }
   | { type: "token"; data: string }
-  | { type: "complete" }
+  | { type: "complete"; timings?: RagTimings }
   | { type: "error"; data: string };
 
 export interface HealthState {

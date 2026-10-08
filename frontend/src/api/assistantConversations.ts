@@ -21,12 +21,13 @@ export function listAssistantConversations(
 
 export function createAssistantConversation(
   workspaceId: number,
+  title?: string,
 ): Promise<AssistantConversationSummary> {
   return request<AssistantConversationSummary>(
     "/assistant/conversations",
     {
       method: "POST",
-      body: JSON.stringify({ workspace_id: workspaceId }),
+      body: JSON.stringify(title ? { workspace_id: workspaceId, title } : { workspace_id: workspaceId }),
     },
   );
 }

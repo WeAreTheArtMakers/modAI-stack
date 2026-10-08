@@ -6,7 +6,7 @@ import { VoicePage } from "./VoicePage";
 import { MicrophoneError, MICROPHONE_MESSAGES } from "../voice/microphone";
 import type { VoiceDependencies } from "../voice/useVoiceAssistant";
 import type { LoadState } from "../voice/voiceEngine";
-import type { RagEvent, Source } from "../types";
+import type { AssistantConversationDetail, AssistantConversationSummary, RagEvent, Source } from "../types";
 
 const mocks = vi.hoisted(() => ({
   listKnowledgeBases: vi.fn(),
@@ -27,7 +27,10 @@ function createFakes() {
   const recorder = {
     recording: false,
     start: vi.fn(async () => { recorder.recording = true; }),
-    stop: vi.fn(async () => { recorder.recording = false; return new Float32Array(16_000); }),
+    stop: vi.fn(async () => {
+      recorder.recording = false;
+      return { samples: new Float32Array(16_000), diagnostics: { durationMs: 1000, rms: 0.05, peak: 0.4, clippedPercent: 0, finalizeMs: 30, decodeMs: 12, inputSampleRate: 48_000 } };
+    }),
     cancel: vi.fn(() => { recorder.recording = false; }),
     level: () => 0.4,
   };
@@ -46,7 +49,7 @@ function createFakes() {
       onState({ status: "ready", loaded: 1, total: 1, backend: "wasm" });
       return Promise.resolve("wasm" as const);
     }),
-    transcribe: vi.fn(async () => ({ text: QUESTION, ms: 140 })),
+    transcribe: vi.fn(async (): Promise<{ text: string; ms: number; postedAt?: number; receivedAt?: number; startedAt?: number; endedAt?: number; warm?: boolean; backend?: "wasm" | "webgpu" }> => ({ text: QUESTION, ms: 140 })),
     speak: vi.fn((_id: number, _seq: number, _text: string, onAudio: (samples: Float32Array, rate: number) => void, _speed?: number) => {
       onAudio(new Float32Array(480), 48_000);
       return Promise.resolve();
@@ -60,12 +63,19 @@ function createFakes() {
     speak: vi.fn(async (_text: string, onStart: () => void) => { onStart(); }),
     cancel: vi.fn(),
   };
-  const streamRag = vi.fn(async (_kbs: number[], _question: string, onEvent: (event: RagEvent) => void) => {
+  const streamRag = vi.fn(async (_kbs: number[], _question: string, onEvent: (event: RagEvent) => void, _signal?: AbortSignal, _options?: Record<string, unknown>) => {
     onEvent({ type: "sources", data: [SOURCE] });
     for (const token of TOKENS) onEvent({ type: "token", data: token });
     onEvent({ type: "complete" });
   });
-  return { recorder, player, engine, systemVoice, streamRag };
+  let nextConversation = 50;
+  const conversations = {
+    list: vi.fn(async (_workspaceId: number) => ({ items: [] as AssistantConversationSummary[], total: 0, limit: 100, offset: 0 })),
+    create: vi.fn(async (workspaceId: number, title: string) => ({ id: nextConversation++, workspace_id: workspaceId, title, created_at: null, updated_at: null, archived_at: null })),
+    get: vi.fn(async (_id: number): Promise<AssistantConversationDetail> => { throw new Error("not found"); }),
+  };
+  const warmup = vi.fn(async () => undefined);
+  return { recorder, player, engine, systemVoice, streamRag, conversations, warmup };
 }
 
 function renderVoice(fakes: Fakes) {
@@ -91,6 +101,7 @@ beforeEach(() => {
   mocks.current = { id: 3, name: "Destek", slug: "destek", organization_id: 2, membership_role: "user" };
   mocks.listKnowledgeBases.mockResolvedValue([kb]);
   window.localStorage.clear();
+  window.localStorage.setItem("modai.voice.review", "0"); // review-by-default is covered by its own test
 });
 
 describe("modAI Voice", () => {
@@ -182,7 +193,7 @@ describe("modAI Voice", () => {
     expect(fakes.player.reset).toHaveBeenLastCalledWith(-1);
     expect(signal?.aborted).toBe(true);
     await waitFor(() => expect(phase()).toBe("idle"));
-    expect(await screen.findByText("Durduruldu")).toBeInTheDocument();
+    expect(await screen.findByText(/Durduruldu · tamamlanmayan yanıt görüşme geçmişine kaydedilmez/)).toBeInTheDocument();
 
     const enqueued = fakes.player.enqueue.mock.calls.length;
     act(() => lateAudio?.(new Float32Array(480), 48_000));
@@ -333,6 +344,150 @@ describe("modAI Voice", () => {
     act(() => pendingSpeech.splice(0).forEach((resolve) => resolve()));
     await waitFor(() => expect(phase()).toBe("idle"));
     expect(screen.getByTestId("spoken-status")).toHaveTextContent("Seslendirilen: 3/3 bölüm");
+  });
+
+  it("asks for a Turkish answer and never speaks an English sentence with the Turkish voice", async () => {
+    const fakes = createFakes();
+    fakes.streamRag.mockImplementationOnce(async (_kbs, _question, onEvent) => {
+      onEvent({ type: "sources", data: [{ ...SOURCE, document: "vpn-guide-en.md" }] });
+      onEvent({ type: "token", data: "VPN rehberine göre en fazla 2 cihazdan bağlanabilirsiniz. " });
+      onEvent({ type: "token", data: "Every session ends after 12 hours and you must sign in again with the app. " });
+      onEvent({ type: "complete" });
+    });
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    expect(fakes.streamRag.mock.calls[0][4]).toEqual(expect.objectContaining({ responseLanguage: "tr", diagnostics: true }));
+    expect(fakes.engine.speak.mock.calls.map(([, , text]) => text)).toEqual(["vi pi en rehberine göre en fazla 2 cihazdan bağlanabilirsiniz."]);
+    expect(screen.getByText(/1 bölüm Türkçe olmadığı için Türkçe sesle okunmadı/)).toBeInTheDocument();
+    expect(screen.getByText(/Every session ends after 12 hours/)).toBeInTheDocument(); // still shown as text
+  });
+
+  it("answers a plain greeting locally in Turkish without searching documents", async () => {
+    const fakes = createFakes();
+    fakes.engine.transcribe.mockResolvedValueOnce({ text: "Merhaba, bana nasıl yardımcı olabilirsin?", ms: 90 });
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    expect(fakes.streamRag).not.toHaveBeenCalled();
+    expect(fakes.conversations.create).not.toHaveBeenCalled();
+    expect(screen.getByText(/Seçtiğiniz Knowledge Base'lerdeki belgelerden yanıt verebilirim/)).toBeInTheDocument();
+    expect(screen.getByText("Belgelerde arama yapılmadı · görüşme geçmişine kaydedilmez")).toBeInTheDocument();
+    expect(fakes.engine.speak).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the recognized question for review by default for new users", async () => {
+    window.localStorage.removeItem("modai.voice.review");
+    const fakes = createFakes();
+    fakes.engine.transcribe.mockResolvedValueOnce({ text: "Biberist neyar var?", ms: 90 });
+    renderVoice(fakes);
+    expect(await screen.findByLabelText("Göndermeden önce soruyu göster")).toBeChecked();
+    await askBySpeaking();
+    const field = await screen.findByLabelText("Anladığım soru");
+    expect(field).toHaveValue("Biberist neyar var?"); // shown exactly as heard, never silently "fixed"
+    expect(fakes.streamRag).not.toHaveBeenCalled();
+    fireEvent.change(field, { target: { value: "Bugün hangi belgelerden bilgi verebilirsin?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Soruyu gönder" }));
+    await waitFor(() => expect(fakes.streamRag).toHaveBeenCalledTimes(1));
+    expect(fakes.streamRag.mock.calls[0][1]).toBe("Bugün hangi belgelerden bilgi verebilirsin?");
+  });
+
+  it("creates one voice conversation on the first question and reuses it for the next", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(fakes.streamRag).toHaveBeenCalledTimes(1));
+    expect(fakes.conversations.list).toHaveBeenCalledWith(3);
+    expect(fakes.conversations.create).toHaveBeenCalledWith(3, `Sesli görüşme: ${QUESTION}`);
+    expect(fakes.streamRag.mock.calls[0][4]).toEqual(expect.objectContaining({ conversationId: 50 }));
+    await waitFor(() => expect(phase()).toBe("idle"));
+    fireEvent.change(screen.getByLabelText("Yazılı soru"), { target: { value: "Masraf onayını kim veriyor?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gönder" }));
+    await waitFor(() => expect(fakes.streamRag).toHaveBeenCalledTimes(2));
+    expect(fakes.streamRag.mock.calls[1][4]).toEqual(expect.objectContaining({ conversationId: 50 }));
+    expect(fakes.conversations.create).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Görüşme seç")).toHaveValue("50");
+  });
+
+  it("starts a new conversation on request", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    fireEvent.click(screen.getByRole("button", { name: /Yeni görüşme/ }));
+    expect(screen.queryAllByTestId("voice-turn")).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Yazılı soru"), { target: { value: "Masraf onayını kim veriyor?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gönder" }));
+    await waitFor(() => expect(fakes.streamRag).toHaveBeenCalledTimes(2));
+    expect(fakes.conversations.create).toHaveBeenCalledTimes(2);
+    expect(fakes.streamRag.mock.calls[1][4]).toEqual(expect.objectContaining({ conversationId: 51 }));
+  });
+
+  it("restores the latest voice conversation after a remount without playing it", async () => {
+    const fakes = createFakes();
+    const saved: AssistantConversationSummary = { id: 77, workspace_id: 3, title: `Sesli görüşme: ${QUESTION}`, created_at: null, updated_at: null, archived_at: null };
+    fakes.conversations.list.mockResolvedValue({ items: [{ ...saved, id: 76, title: null }, saved], total: 2, limit: 100, offset: 0 });
+    fakes.conversations.get.mockResolvedValue({
+      ...saved, message_total: 4, message_limit: 100, message_offset: 0,
+      messages: [
+        { id: 1, role: "user", content: QUESTION, sources: [], created_at: null },
+        { id: 2, role: "assistant", content: "16 iş günü.", sources: [{ document: "izin.md", score: 0.7, document_id: 41, chunk_index: 0 }], created_at: null },
+        { id: 3, role: "user", content: "Peki devir?", sources: [], created_at: null },
+        { id: 4, role: "assistant", content: "En fazla 5 gün devreder.", sources: [], created_at: null },
+      ],
+    });
+    const first = renderVoice(fakes);
+    expect(await screen.findByText("En fazla 5 gün devreder.")).toBeInTheDocument();
+    first.unmount();
+    renderVoice(fakes);
+    expect(await screen.findByText("16 iş günü.")).toBeInTheDocument();
+    const turns = screen.getAllByTestId("voice-turn");
+    expect(turns).toHaveLength(2);
+    expect(turns[0]).toHaveTextContent(QUESTION);
+    expect(turns[0]).toHaveTextContent("16 iş günü.");
+    expect(turns[1]).toHaveTextContent("Peki devir?");
+    expect(turns[1]).toHaveTextContent("En fazla 5 gün devreder.");
+    expect(screen.getAllByText("Kayıtlı soru")).toHaveLength(2);
+    expect(fakes.conversations.get).toHaveBeenLastCalledWith(77);
+    expect(screen.getByLabelText("Görüşme seç")).toHaveValue("77");
+    expect(within(screen.getByTestId("voice-sources")).getByText("Alıntı kayıtlı değil")).toBeInTheDocument();
+    expect(fakes.engine.speak).not.toHaveBeenCalled();
+    expect(fakes.streamRag).not.toHaveBeenCalled();
+    expect(phase()).toBe("idle");
+  });
+
+  it("never shows a conversation that belongs to another workspace", async () => {
+    const fakes = createFakes();
+    const foreign: AssistantConversationSummary = { id: 90, workspace_id: 3, title: "Sesli görüşme: x", created_at: null, updated_at: null, archived_at: null };
+    fakes.conversations.list.mockResolvedValue({ items: [foreign], total: 1, limit: 100, offset: 0 });
+    fakes.conversations.get.mockResolvedValue({ ...foreign, workspace_id: 99, message_total: 1, message_limit: 100, message_offset: 0, messages: [{ id: 1, role: "user", content: "başka alan", sources: [], created_at: null }] });
+    renderVoice(fakes);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Bu görüşme seçili Workspace'e ait değil.");
+    expect(screen.queryByText("başka alan")).not.toBeInTheDocument();
+  });
+
+  it("separates speech-model queue wait from Whisper inference in the timings", async () => {
+    const fakes = createFakes();
+    const base = performance.timeOrigin + performance.now();
+    fakes.engine.transcribe.mockResolvedValueOnce({ text: QUESTION, ms: 4200, postedAt: base, receivedAt: base + 5, startedAt: base + 3505, endedAt: base + 4205, warm: false, backend: "webgpu" });
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    const details = screen.getByTestId("timing-details");
+    expect(within(details).getByText("Model sırası / model hazırlığı").nextSibling).toHaveTextContent("3500 ms");
+    expect(within(details).getByText("Whisper çıkarımı").nextSibling).toHaveTextContent("700 ms");
+    expect(within(details).getByText("Konuşma modeli").nextSibling).toHaveTextContent("WebGPU · ilk yükleme sırasında");
+    expect(within(details).getByText("Ses").nextSibling).toHaveTextContent("48000 Hz → 16000 Hz");
+  });
+
+  it("warms up the generation model when the page opens and when the user starts speaking", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    await talkButton();
+    expect(fakes.warmup).toHaveBeenCalledTimes(1); // throttled to once a minute
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    expect(fakes.warmup).toHaveBeenCalledTimes(1);
   });
 
   it("requires an authorized Knowledge Base before listening", async () => {

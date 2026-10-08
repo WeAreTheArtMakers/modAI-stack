@@ -27,11 +27,27 @@ function classify(error: unknown): MicrophoneError {
   return new MicrophoneError("unsupported", MICROPHONE_MESSAGES.unsupported);
 }
 
+/** Numbers only, for latency and audio-quality diagnosis; the audio itself is never kept. */
+export interface AudioDiagnostics {
+  inputSampleRate?: number; // microphone track rate
+  finalizeMs?: number; // MediaRecorder stop -> data available
+  decodeMs?: number; // decode + resample to 16 kHz mono
+  durationMs: number;
+  rms: number;
+  peak: number;
+  clippedPercent: number;
+}
+
+export interface RecordedAudio {
+  samples: Float32Array; // 16 kHz mono
+  diagnostics: AudioDiagnostics;
+}
+
 export interface Recorder {
   /** Starts recording after an explicit user gesture; the browser asks for permission. */
   start(onLimit: () => void): Promise<void>;
   /** Stops recording and returns 16 kHz mono samples for Whisper. Audio never leaves the browser. */
-  stop(): Promise<Float32Array>;
+  stop(): Promise<RecordedAudio>;
   cancel(): void;
   level(): number;
   readonly recording: boolean;
@@ -90,12 +106,16 @@ export class MicrophoneRecorder implements Recorder {
     this.analyser = null;
   }
 
-  async stop(): Promise<Float32Array> {
+  async stop(): Promise<RecordedAudio> {
     const recorder = this.recorder;
     if (!recorder) throw new MicrophoneError("too_short", MICROPHONE_MESSAGES.too_short);
+    const inputSampleRate = this.stream?.getAudioTracks()[0]?.getSettings().sampleRate;
+    const stopRequested = performance.now();
     const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
     if (recorder.state !== "inactive") recorder.stop();
     await stopped;
+    const finalizeMs = performance.now() - stopRequested;
+    const decodeStarted = performance.now();
     this.recorder = null;
     this.release();
     const blob = new Blob(this.chunks, { type: recorder.mimeType });
@@ -122,7 +142,7 @@ export class MicrophoneRecorder implements Recorder {
       }
     }
     if (samples.length < WHISPER_SAMPLE_RATE * 0.4) throw new MicrophoneError("too_short", MICROPHONE_MESSAGES.too_short);
-    return samples;
+    return { samples, diagnostics: { ...measureAudio(samples), inputSampleRate, finalizeMs, decodeMs: performance.now() - decodeStarted } };
   }
 
   cancel() {
@@ -136,15 +156,41 @@ export class MicrophoneRecorder implements Recorder {
   }
 }
 
+/** Duration, RMS, peak and the share of clipped samples of 16 kHz mono audio. */
+export function measureAudio(samples: Float32Array, sampleRate = WHISPER_SAMPLE_RATE): Omit<AudioDiagnostics, "inputSampleRate" | "finalizeMs" | "decodeMs"> {
+  let sum = 0;
+  let peak = 0;
+  let clipped = 0;
+  for (const value of samples) {
+    const magnitude = Math.abs(value);
+    sum += value * value;
+    if (magnitude > peak) peak = magnitude;
+    if (magnitude >= 0.99) clipped += 1;
+  }
+  return {
+    durationMs: (samples.length / sampleRate) * 1000,
+    rms: samples.length ? Math.sqrt(sum / samples.length) : 0,
+    peak,
+    clippedPercent: samples.length ? (clipped / samples.length) * 100 : 0,
+  };
+}
+
+export interface TrimResult {
+  samples: Float32Array;
+  leadingMs: number;
+  trailingMs: number;
+}
+
 /**
- * Trims leading and trailing silence (keeping 250 ms of margin) from 16 kHz mono audio. Whisper
- * tends to invent words for long silences. Returns the input unchanged if no speech is found or
- * the result would be shorter than 0.4 s.
+ * Trims leading and trailing silence from 16 kHz mono audio, keeping 300 ms of margin so soft
+ * first and last syllables survive. Whisper tends to invent words for long silences. Nothing is
+ * trimmed when no speech is found or the result would be shorter than 0.4 s.
  */
-export function trimSilence(samples: Float32Array, sampleRate = WHISPER_SAMPLE_RATE): Float32Array {
+export function trimSilence(samples: Float32Array, sampleRate = WHISPER_SAMPLE_RATE): TrimResult {
+  const untouched = { samples, leadingMs: 0, trailingMs: 0 };
   const frame = Math.round(sampleRate * 0.02);
   const frames = Math.floor(samples.length / frame);
-  if (frames < 10) return samples;
+  if (frames < 10) return untouched;
   const energy = new Float32Array(frames);
   for (let f = 0; f < frames; f++) {
     let sum = 0;
@@ -153,15 +199,19 @@ export function trimSilence(samples: Float32Array, sampleRate = WHISPER_SAMPLE_R
   }
   const sorted = Float32Array.from(energy).sort();
   const noise = sorted[Math.floor(frames * 0.1)];
-  const threshold = Math.max(0.01, noise * 3);
+  const threshold = Math.max(0.006, noise * 3);
   let first = 0;
   while (first < frames && energy[first] < threshold) first++;
   let last = frames - 1;
   while (last > first && energy[last] < threshold) last--;
-  if (first >= frames) return samples;
-  const margin = Math.round(0.25 * sampleRate);
+  if (first >= frames) return untouched;
+  const margin = Math.round(0.3 * sampleRate);
   const start = Math.max(0, first * frame - margin);
   const end = Math.min(samples.length, (last + 1) * frame + margin);
-  if (end - start < sampleRate * 0.4 || (start === 0 && end === samples.length)) return samples;
-  return samples.subarray(start, end).slice();
+  if (end - start < sampleRate * 0.4 || (start === 0 && end === samples.length)) return untouched;
+  return {
+    samples: samples.subarray(start, end).slice(),
+    leadingMs: (start / sampleRate) * 1000,
+    trailingMs: ((samples.length - end) / sampleRate) * 1000,
+  };
 }

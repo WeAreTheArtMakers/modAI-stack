@@ -31,5 +31,8 @@ export const WHISPER_SAMPLE_RATE = 16_000;
 export const VOICE_READY_STORAGE_KEY = "modai.voice.models.v1";
 export const VOICE_SPEED_STORAGE_KEY = "modai.voice.speed";
 export const VOICE_REVIEW_STORAGE_KEY = "modai.voice.review";
+export const VOICE_LANGUAGE_STORAGE_KEY = "modai.voice.answer-language";
+// Voice conversations live in the assistant-conversation store; the prefix marks them for /voice.
+export const VOICE_TITLE_PREFIX = "Sesli görüşme: ";
 export const SPEECH_SPEEDS = [1, 1.05, 1.1, 1.15] as const;
 export const DEFAULT_SPEECH_SPEED = 1.05; // EMA at 1.00 already reads ~6.8 syllables/s; 1.10 and 1.15 stay selectable

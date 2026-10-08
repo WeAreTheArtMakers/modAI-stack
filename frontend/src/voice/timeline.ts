@@ -3,8 +3,10 @@
 // never audio, question text, answers or document content.
 
 export type TimelineMark =
-  | "recordStart" | "recordStop" | "audioReady" | "sttStart" | "sttEnd" | "transcriptReceived"
-  | "ragStart" | "ragSent" | "sources" | "firstToken" | "firstPhrase"
+  | "recordStart" | "recordStop" | "audioReady"
+  | "sttPosted" | "sttReceived" | "sttStart" | "sttEnd" | "transcriptReceived"
+  | "askStart" | "conversationStart" | "conversationReady"
+  | "ragStart" | "ragTicket" | "ragOpen" | "ragSent" | "sources" | "firstToken" | "firstPhrase"
   | "ttsStart" | "firstBufferPosted" | "firstBufferReceived" | "firstAudible"
   | "ragComplete" | "speechEnd";
 
@@ -12,12 +14,20 @@ export type Timeline = Partial<Record<TimelineMark, number>>;
 
 export const clock = () => performance.timeOrigin + performance.now();
 
-const STAGES: [name: string, from: TimelineMark | "userStop", to: TimelineMark][] = [
+/** [stage, from, to]; "userStop" is the end of speech, or the moment a typed question was sent. */
+export const STAGES: [name: string, from: TimelineMark | "userStop", to: TimelineMark][] = [
   ["recording", "recordStart", "recordStop"],
-  ["stopToSttStart", "recordStop", "sttStart"],
-  ["stt", "sttStart", "sttEnd"],
-  ["sttToRagStart", "sttEnd", "ragStart"],
-  ["ragConnect", "ragStart", "ragSent"],
+  ["sttCapture", "recordStop", "audioReady"], // MediaRecorder finalize + decode/resample
+  ["sttTransferIn", "sttPosted", "sttReceived"],
+  ["sttQueueWait", "sttReceived", "sttStart"], // waiting for the model or another inference
+  ["sttInference", "sttStart", "sttEnd"],
+  ["sttTransferBack", "sttEnd", "transcriptReceived"],
+  ["review", "transcriptReceived", "askStart"], // user reading/correcting the transcript
+  ["conversationCreate", "conversationStart", "conversationReady"],
+  ["ragTicket", "ragStart", "ragTicket"],
+  ["ragConnect", "ragTicket", "ragOpen"],
+  ["ragServerToSources", "ragSent", "sources"], // authorization, embedding, Qdrant, prompt
+  ["sourcesToFirstToken", "sources", "firstToken"], // model load (if cold) + prompt prefill
   ["ragToFirstToken", "ragStart", "firstToken"],
   ["firstTokenToPhrase", "firstToken", "firstPhrase"],
   ["phraseToTtsStart", "firstPhrase", "ttsStart"],
@@ -29,9 +39,9 @@ const STAGES: [name: string, from: TimelineMark | "userStop", to: TimelineMark][
   ["stopToSpeechEnd", "userStop", "speechEnd"],
 ];
 
-/** Stage durations in ms; "userStop" is the end of speech, or the moment a typed question was sent. */
+/** Stage durations in ms, for every stage whose two marks exist. */
 export function stageDurations(timeline: Timeline): Record<string, number> {
-  const userStop = timeline.recordStop ?? timeline.ragStart;
+  const userStop = timeline.recordStop ?? timeline.askStart;
   const out: Record<string, number> = {};
   for (const [name, from, to] of STAGES) {
     const start = from === "userStop" ? userStop : timeline[from];

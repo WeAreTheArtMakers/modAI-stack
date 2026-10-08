@@ -10,7 +10,8 @@
  * - onnxruntime-web is the bundled npm package served from the application origin instead of
  *   a CDN import; model files are fetched from self-hosted, revision-pinned URLs.
  * - Model bytes are cached under a revision-specific Cache Storage name.
- * - The per-word timing callback (onPiece) and wavBlob() are omitted; type annotations added.
+ * - A `step` hook wraps session creation; the per-word timing callback (onPiece) and wavBlob()
+ *   are omitted; type annotations added.
  *   The text frontend, chunker, frame planner, noise and windowed decoding are unchanged.
  */
 import * as ort from "onnxruntime-web/webgpu";
@@ -262,7 +263,15 @@ export class EmaLightning {
   }
 
   // fp32 graphs, as the upstream default: fp16 text/decoder graphs are wrong on WebGPU.
-  static async load(backend: EmaBackend, base: string, cacheName: string, onProgress: EmaProgress = () => {}): Promise<EmaLightning> {
+  // `step` runs each session creation; the voice worker uses it so speech recognition can go
+  // first between steps instead of waiting for the whole load.
+  static async load(
+    backend: EmaBackend,
+    base: string,
+    cacheName: string,
+    onProgress: EmaProgress = () => {},
+    step: <T>(run: () => Promise<T>) => Promise<T> = (run) => run(),
+  ): Promise<EmaLightning> {
     const meta = (await (await fetch(base + "meta.json")).json()) as EmaMeta;
     const options: ort.InferenceSession.SessionOptions = {
       executionProviders: backend === "webgpu" ? ["webgpu", "wasm"] : ["wasm"],
@@ -274,7 +283,8 @@ export class EmaLightning {
     const sessions: ort.InferenceSession[] = [];
     for (const [i, name] of names.entries()) {
       onProgress(name, (i + 1) / (names.length + 1));
-      sessions.push(await ort.InferenceSession.create(await bytes(base + name + ".onnx", cacheName), options));
+      const model = await bytes(base + name + ".onnx", cacheName);
+      sessions.push(await step(() => ort.InferenceSession.create(model, options)));
     }
     onProgress("ready", 1);
     return new EmaLightning(meta, sessions[0], sessions[1], sessions[2], normalize, backend);
