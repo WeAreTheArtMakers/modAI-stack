@@ -1,0 +1,545 @@
+{
+  "schema_version": 2,
+  "dataset_id": "schema-v2-example",
+  "dataset_version": "0.1.0",
+  "title": "Schema v2 validation example (fictional, not an evaluation corpus)",
+  "lane": "fixture",
+  "evidence_labels": "character_spans",
+  "labeling_guide": null,
+  "legacy_source": null,
+  "representativeness": null,
+  "documents": [
+    {
+      "document_id": "travel-policy-2025-tr",
+      "language": "tr",
+      "text": "Kurgusal Örnek A.Ş. Seyahat Politikası (2025). Yurt içi iş seyahatlerinde günlük yemek harcırahı 750 TL'dir. Bu sürüm 1 Ocak 2025 tarihinde yürürlüğe girmiştir ve 2024 sürümünün yerine geçer.",
+      "domain": "hr",
+      "source_family_id": "travel-policy",
+      "translation_group_id": "travel-policy-2025",
+      "version_label": "2025",
+      "effective_from": "2025-01-01",
+      "status": "current",
+      "supersedes": [
+        "travel-policy-2024-tr"
+      ],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:travel-policy-2025-tr",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    },
+    {
+      "document_id": "travel-policy-2025-en",
+      "language": "en",
+      "text": "Fictional Example Ltd. Travel Policy (2025). The daily meal allowance for domestic business travel is 750 TRY. This version took effect on 1 January 2025 and replaces the 2024 version.",
+      "domain": "hr",
+      "source_family_id": "travel-policy",
+      "translation_group_id": "travel-policy-2025",
+      "version_label": "2025",
+      "effective_from": "2025-01-01",
+      "status": "current",
+      "supersedes": [
+        "travel-policy-2024-tr"
+      ],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:travel-policy-2025-en",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    },
+    {
+      "document_id": "travel-policy-2024-tr",
+      "language": "tr",
+      "text": "Kurgusal Örnek A.Ş. Seyahat Politikası (2024). Yurt içi iş seyahatlerinde günlük yemek harcırahı 500 TL'dir.",
+      "domain": "hr",
+      "source_family_id": "travel-policy",
+      "translation_group_id": null,
+      "version_label": "2024",
+      "effective_from": "2024-01-01",
+      "status": "superseded",
+      "supersedes": [],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:travel-policy-2024-tr",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    },
+    {
+      "document_id": "expense-approval-en",
+      "language": "en",
+      "text": "Fictional Example Ltd. Expense Approval Rule. Any expense that exceeds a policy allowance must be approved by the department director before reimbursement.",
+      "domain": "procurement_finance",
+      "source_family_id": "expense-approval",
+      "translation_group_id": null,
+      "version_label": null,
+      "effective_from": null,
+      "status": "current",
+      "supersedes": [],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:expense-approval-en",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    },
+    {
+      "document_id": "finance-portal-guide-en",
+      "language": "en",
+      "text": "Finance Portal Guide. Approvals are recorded in the finance portal under Expense Reports.",
+      "domain": "procurement_finance",
+      "source_family_id": "finance-portal-guide",
+      "translation_group_id": null,
+      "version_label": null,
+      "effective_from": null,
+      "status": "current",
+      "supersedes": [],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:finance-portal-guide-en",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    },
+    {
+      "document_id": "incident-procedure-tr",
+      "language": "tr",
+      "text": "Kurgusal Güvenlik Olayı Prosedürü. Şüpheli bir olayı fark eden çalışan, olayı 1 saat içinde BT güvenlik ekibine bildirir. Bildirim, olay kaydı açılarak yapılır.",
+      "domain": "security_privacy",
+      "source_family_id": "incident-procedure",
+      "translation_group_id": null,
+      "version_label": null,
+      "effective_from": null,
+      "status": "current",
+      "supersedes": [],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:incident-procedure-tr",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    },
+    {
+      "document_id": "onboarding-guide-en",
+      "language": "en",
+      "text": "New employees receive a laptop on day one. The IT service desk shows them how to open an incident ticket.",
+      "domain": "it_access",
+      "source_family_id": "onboarding-guide",
+      "translation_group_id": null,
+      "version_label": null,
+      "effective_from": null,
+      "status": "current",
+      "supersedes": [],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:onboarding-guide-en",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    },
+    {
+      "document_id": "parking-rules-en",
+      "language": "en",
+      "text": "Visitor parking spaces must be reserved one day in advance through the facilities desk.",
+      "domain": "facilities_safety",
+      "source_family_id": "parking-rules",
+      "translation_group_id": null,
+      "version_label": null,
+      "effective_from": null,
+      "status": "current",
+      "supersedes": [],
+      "variant_key": null,
+      "provenance": {
+        "source_class": "synthetic_authored",
+        "source_ref": "modai-schema-v2-example:parking-rules-en",
+        "license": null,
+        "usage_authorization": null,
+        "access_policy": "public",
+        "original_sha256": null,
+        "extraction": null,
+        "pii_review": "not_required"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q-tr-meal-allowance",
+      "scenario_id": "meal-allowance",
+      "language": "tr",
+      "question": "Yurt içi iş seyahatinde günlük yemek harcırahı ne kadardır?",
+      "primary_category": "current_vs_obsolete",
+      "tags": [
+        "single_document_fact"
+      ],
+      "temporal_intent": "current",
+      "answerable": true,
+      "required_groups": [
+        {
+          "group_id": "a",
+          "members": [
+            "travel-policy-2025-en",
+            "travel-policy-2025-tr"
+          ]
+        }
+      ],
+      "judgments": [
+        {
+          "document_id": "travel-policy-2025-tr",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 47,
+              "end": 108,
+              "sha256": "d0c8c521ce034342dbd2b18e9eddcccfdd0e7a7560fb0c5bdea2cf9424f2866c",
+              "supports_group": "a"
+            }
+          ]
+        },
+        {
+          "document_id": "travel-policy-2025-en",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 45,
+              "end": 110,
+              "sha256": "1be1cf5528f2f8d9bec019f5594a7646701f597a8db5f96e1fdc36758c9faff6",
+              "supports_group": "a"
+            }
+          ]
+        },
+        {
+          "document_id": "travel-policy-2024-tr",
+          "grade": 0,
+          "basis": "fixture_authored",
+          "flags": [
+            "obsolete_version"
+          ],
+          "evidence": []
+        }
+      ],
+      "historical_relationships": [],
+      "review": {
+        "status": "unreviewed",
+        "guide_version": null,
+        "reviewer_ids": [],
+        "adjudicator_id": null,
+        "confidence": null,
+        "reviewed_on": null
+      }
+    },
+    {
+      "query_id": "q-en-expense-approver",
+      "scenario_id": "expense-approval",
+      "language": "en",
+      "question": "Who must approve an expense that exceeds a policy allowance?",
+      "primary_category": "single_document_fact",
+      "tags": [],
+      "temporal_intent": "current",
+      "answerable": true,
+      "required_groups": [
+        {
+          "group_id": "a",
+          "members": [
+            "expense-approval-en"
+          ]
+        }
+      ],
+      "judgments": [
+        {
+          "document_id": "expense-approval-en",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 46,
+              "end": 155,
+              "sha256": "6c4fd25368d01470b0c77c1ef829e7ad7941bebcfe7d787c47070a7fde235d12",
+              "supports_group": "a"
+            }
+          ]
+        },
+        {
+          "document_id": "parking-rules-en",
+          "grade": 0,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": []
+        }
+      ],
+      "historical_relationships": [],
+      "review": {
+        "status": "unreviewed",
+        "guide_version": null,
+        "reviewer_ids": [],
+        "adjudicator_id": null,
+        "confidence": null,
+        "reviewed_on": null
+      }
+    },
+    {
+      "query_id": "q-tr-expense-approver-cross",
+      "scenario_id": "expense-approval",
+      "language": "tr",
+      "question": "Politika limitini aşan bir masrafı kim onaylamalıdır?",
+      "primary_category": "cross_lingual",
+      "tags": [
+        "single_document_fact"
+      ],
+      "temporal_intent": "current",
+      "answerable": true,
+      "required_groups": [
+        {
+          "group_id": "a",
+          "members": [
+            "expense-approval-en"
+          ]
+        }
+      ],
+      "judgments": [
+        {
+          "document_id": "expense-approval-en",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 46,
+              "end": 155,
+              "sha256": "6c4fd25368d01470b0c77c1ef829e7ad7941bebcfe7d787c47070a7fde235d12",
+              "supports_group": "a"
+            }
+          ]
+        }
+      ],
+      "historical_relationships": [],
+      "review": {
+        "status": "unreviewed",
+        "guide_version": null,
+        "reviewer_ids": [],
+        "adjudicator_id": null,
+        "confidence": null,
+        "reviewed_on": null
+      }
+    },
+    {
+      "query_id": "q-en-meal-overrun",
+      "scenario_id": "meal-allowance-overrun",
+      "language": "en",
+      "question": "If meal costs on a domestic trip exceed the daily allowance, what is the allowance and who must approve the excess?",
+      "primary_category": "multi_document",
+      "tags": [],
+      "temporal_intent": "current",
+      "answerable": true,
+      "required_groups": [
+        {
+          "group_id": "a",
+          "members": [
+            "travel-policy-2025-en",
+            "travel-policy-2025-tr"
+          ]
+        },
+        {
+          "group_id": "b",
+          "members": [
+            "expense-approval-en"
+          ]
+        }
+      ],
+      "judgments": [
+        {
+          "document_id": "travel-policy-2025-en",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 45,
+              "end": 110,
+              "sha256": "1be1cf5528f2f8d9bec019f5594a7646701f597a8db5f96e1fdc36758c9faff6",
+              "supports_group": "a"
+            }
+          ]
+        },
+        {
+          "document_id": "travel-policy-2025-tr",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 47,
+              "end": 108,
+              "sha256": "d0c8c521ce034342dbd2b18e9eddcccfdd0e7a7560fb0c5bdea2cf9424f2866c",
+              "supports_group": "a"
+            }
+          ]
+        },
+        {
+          "document_id": "expense-approval-en",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 46,
+              "end": 155,
+              "sha256": "6c4fd25368d01470b0c77c1ef829e7ad7941bebcfe7d787c47070a7fde235d12",
+              "supports_group": "b"
+            }
+          ]
+        },
+        {
+          "document_id": "finance-portal-guide-en",
+          "grade": 1,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 22,
+              "end": 89,
+              "sha256": "71b57570796cb4b08092374bb8a5cfee7e96de70dfd0e09d96f9de6dc0a11c6c",
+              "supports_group": null
+            }
+          ]
+        }
+      ],
+      "historical_relationships": [],
+      "review": {
+        "status": "unreviewed",
+        "guide_version": null,
+        "reviewer_ids": [],
+        "adjudicator_id": null,
+        "confidence": null,
+        "reviewed_on": null
+      }
+    },
+    {
+      "query_id": "q-tr-incident-deadline",
+      "scenario_id": "incident-reporting",
+      "language": "tr",
+      "question": "Şüpheli bir güvenlik olayını ne kadar sürede bildirmem gerekir?",
+      "primary_category": "single_document_fact",
+      "tags": [],
+      "temporal_intent": "current",
+      "answerable": true,
+      "required_groups": [
+        {
+          "group_id": "a",
+          "members": [
+            "incident-procedure-tr"
+          ]
+        }
+      ],
+      "judgments": [
+        {
+          "document_id": "incident-procedure-tr",
+          "grade": 2,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 35,
+              "end": 121,
+              "sha256": "02ef3db525b3a948f52e1c2fa4a520e1333eaa843c86f2fbff233fe1d1ac7b1d",
+              "supports_group": "a"
+            }
+          ]
+        },
+        {
+          "document_id": "onboarding-guide-en",
+          "grade": 1,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": [
+            {
+              "start": 43,
+              "end": 105,
+              "sha256": "de16bbb1de28dd0249f958fb946fe506e04069ad2e8df9d8a4770241545e9745",
+              "supports_group": null
+            }
+          ]
+        }
+      ],
+      "historical_relationships": [],
+      "review": {
+        "status": "unreviewed",
+        "guide_version": null,
+        "reviewer_ids": [],
+        "adjudicator_id": null,
+        "confidence": null,
+        "reviewed_on": null
+      }
+    },
+    {
+      "query_id": "q-en-international-allowance",
+      "scenario_id": "international-allowance",
+      "language": "en",
+      "question": "What is the daily meal allowance for international business travel?",
+      "primary_category": "unanswerable",
+      "tags": [],
+      "temporal_intent": "current",
+      "answerable": false,
+      "required_groups": [],
+      "judgments": [
+        {
+          "document_id": "travel-policy-2025-en",
+          "grade": 1,
+          "basis": "fixture_authored",
+          "flags": [],
+          "evidence": []
+        }
+      ],
+      "historical_relationships": [],
+      "review": {
+        "status": "unreviewed",
+        "guide_version": null,
+        "reviewer_ids": [],
+        "adjudicator_id": null,
+        "confidence": null,
+        "reviewed_on": null
+      }
+    }
+  ]
+}

@@ -76,6 +76,8 @@ class RunConfiguration:
     runtime_build_sha: str | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.dataset, BenchmarkDataset):
+            raise TypeError("the retrieval runner only accepts schema v1 datasets; v2 support is deferred to P1-B")
         validate_source_provenance(self.source_sha, self.source_sha_origin)
 
 
