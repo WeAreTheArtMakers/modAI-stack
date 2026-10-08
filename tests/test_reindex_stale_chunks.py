@@ -1,10 +1,6 @@
-import os
 from types import SimpleNamespace
 
 import pytest
-
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
-
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
 
