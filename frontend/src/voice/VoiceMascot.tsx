@@ -5,8 +5,10 @@ const PHASE_LABELS: Record<VoicePhase, string> = {
   idle: "Hazır",
   listening: "Dinliyorum…",
   transcribing: "Yazıya çeviriyorum…",
-  thinking: "Belgelerde arıyorum…",
-  speaking: "Yanıtlıyorum",
+  reviewing: "Sorunuzu onaylayın",
+  searching: "Belgelerde arıyorum…",
+  answering: "Yanıtı hazırlıyorum…",
+  speaking: "Konuşuyorum",
   error: "Bir sorun oluştu",
 };
 

@@ -45,6 +45,12 @@
           "source": "lfs-metadata"
         },
         {
+          "path": "onnx/encoder_model_fp16.onnx",
+          "size": 16519776,
+          "sha256": "975ccfeb5cb2096ef3ca858cf4e62473aac515a2af115413910a87be4d3e3886",
+          "source": "lfs-metadata"
+        },
+        {
           "path": "onnx/decoder_model_merged_quantized.onnx",
           "size": 30727765,
           "sha256": "6c0c125986b007d2e3734bec84c18bda0152071b90b87fadac6d7764499927a0",

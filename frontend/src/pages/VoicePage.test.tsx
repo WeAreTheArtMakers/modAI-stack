@@ -37,6 +37,7 @@ function createFakes() {
     enqueue: vi.fn((_samples: Float32Array, _rate: number, generation: number) => (generation === player.generation ? performance.timeOrigin + performance.now() : null)),
     reset: vi.fn((generation: number) => { player.generation = generation; }),
     drained: vi.fn(async () => undefined),
+    bufferedSeconds: vi.fn(() => 0),
     level: () => 0.5,
     dispose: vi.fn(),
   };
@@ -46,7 +47,7 @@ function createFakes() {
       return Promise.resolve("wasm" as const);
     }),
     transcribe: vi.fn(async () => ({ text: QUESTION, ms: 140 })),
-    speak: vi.fn((_id: number, _seq: number, _text: string, onAudio: (samples: Float32Array, rate: number) => void) => {
+    speak: vi.fn((_id: number, _seq: number, _text: string, onAudio: (samples: Float32Array, rate: number) => void, _speed?: number) => {
       onAudio(new Float32Array(480), 48_000);
       return Promise.resolve();
     }),
@@ -247,6 +248,91 @@ describe("modAI Voice", () => {
     expect(await screen.findByText(TOKENS.join(""))).toBeInTheDocument();
     expect(fakes.systemVoice.speak).not.toHaveBeenCalled();
     expect(fakes.engine.speak).not.toHaveBeenCalled();
+  });
+
+  it("passes the selected speaking speed to synthesis and remembers it", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    fireEvent.click(await screen.findByLabelText("Konuşma hızı 1,15×"));
+    expect(window.localStorage.getItem("modai.voice.speed")).toBe("1.15");
+    await askBySpeaking();
+    await waitFor(() => expect(fakes.engine.speak).toHaveBeenCalledTimes(2));
+    expect(fakes.engine.speak.mock.calls.map((call) => call[4])).toEqual([1.15, 1.15]);
+  });
+
+  it("can show the recognized question for correction before sending it", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    fireEvent.click(await screen.findByLabelText("Göndermeden önce soruyu göster"));
+    await askBySpeaking();
+    const field = await screen.findByLabelText("Anladığım soru");
+    expect(field).toHaveValue(QUESTION);
+    expect(phase()).toBe("reviewing");
+    expect(fakes.streamRag).not.toHaveBeenCalled();
+    fireEvent.change(field, { target: { value: "Yıllık izin politikası ne?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Soruyu gönder" }));
+    await waitFor(() => expect(fakes.streamRag).toHaveBeenCalledWith([7], "Yıllık izin politikası ne?", expect.any(Function), expect.any(AbortSignal), expect.any(Object)));
+    expect(await screen.findByText(/Tanınan konuşma · düzeltildi/)).toBeInTheDocument();
+  });
+
+  it("re-asks a corrected transcript and stops the previous answer", async () => {
+    const fakes = createFakes();
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("idle"));
+    fireEvent.click(screen.getByRole("button", { name: "Düzelt" }));
+    fireEvent.change(screen.getByLabelText("Soruyu düzelt"), { target: { value: "Masraf onayını kim veriyor?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Düzeltilmiş soruyu sor" }));
+    await waitFor(() => expect(fakes.streamRag).toHaveBeenCalledTimes(2));
+    expect(fakes.streamRag.mock.calls[1][1]).toBe("Masraf onayını kim veriyor?");
+    expect(fakes.engine.cancel).toHaveBeenCalledWith(1);
+    expect(await screen.findByText(/düzeltildi/)).toBeInTheDocument();
+  });
+
+  it("shows searching, then answering, then speaking", async () => {
+    const fakes = createFakes();
+    let release!: () => void;
+    fakes.streamRag.mockImplementationOnce(async (_kbs, _question, onEvent) => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      onEvent({ type: "sources", data: [SOURCE] });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      onEvent({ type: "token", data: "Başvurular 15 gün önce yapılır. " });
+      onEvent({ type: "complete" });
+    });
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(phase()).toBe("searching"));
+    expect(screen.getByText("Belgelerde arıyorum…")).toBeInTheDocument();
+    act(() => release());
+    await waitFor(() => expect(phase()).toBe("answering"));
+    await waitFor(() => expect(phase()).toBe("idle"));
+    expect(screen.getByTestId("spoken-status")).toHaveTextContent("Seslendirilen: 1/1 bölüm");
+  });
+
+  it("keeps at most two phrases in the synthesizer and waits for buffered audio to play", async () => {
+    const fakes = createFakes();
+    const pendingSpeech: (() => void)[] = [];
+    fakes.engine.speak.mockImplementation((_id, _seq, _text, onAudio) => {
+      onAudio(new Float32Array(480), 48_000);
+      return new Promise<void>((resolve) => pendingSpeech.push(resolve));
+    });
+    fakes.streamRag.mockImplementationOnce(async (_kbs, _question, onEvent) => {
+      onEvent({ type: "token", data: "Bir iki üç dört. Beş altı yedi sekiz. Dokuz on on bir on iki. " });
+      onEvent({ type: "complete" });
+    });
+    renderVoice(fakes);
+    await askBySpeaking();
+    await waitFor(() => expect(fakes.engine.speak).toHaveBeenCalledTimes(2));
+    fakes.player.bufferedSeconds.mockReturnValue(20); // too much audio already waiting
+    act(() => pendingSpeech.shift()?.());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fakes.engine.speak).toHaveBeenCalledTimes(2);
+    fakes.player.bufferedSeconds.mockReturnValue(1);
+    await waitFor(() => expect(fakes.engine.speak).toHaveBeenCalledTimes(3), { timeout: 1000 });
+    expect(fakes.engine.speak.mock.calls.map(([, seq]) => seq)).toEqual([0, 1, 2]);
+    act(() => pendingSpeech.splice(0).forEach((resolve) => resolve()));
+    await waitFor(() => expect(phase()).toBe("idle"));
+    expect(screen.getByTestId("spoken-status")).toHaveTextContent("Seslendirilen: 3/3 bölüm");
   });
 
   it("requires an authorized Knowledge Base before listening", async () => {

@@ -11,7 +11,8 @@ export const WHISPER = {
   directory: "whisper-tiny-5332fcc3",
   language: "turkish",
   dtype: "q8",
-  downloadBytes: 43_622_127,
+  downloadBytes: 43_622_127, // WASM: q8 encoder and decoder
+  webgpuDownloadBytes: 50_016_993, // WebGPU: fp16 encoder, q8 decoder
 } as const;
 
 export const EMA_LIGHTNING = {
@@ -28,3 +29,7 @@ export const ORT_RUNTIME_BYTES = 26_781_914;
 export const RECORDING_LIMIT_MS = 30_000; // Whisper decodes one 30-second window
 export const WHISPER_SAMPLE_RATE = 16_000;
 export const VOICE_READY_STORAGE_KEY = "modai.voice.models.v1";
+export const VOICE_SPEED_STORAGE_KEY = "modai.voice.speed";
+export const VOICE_REVIEW_STORAGE_KEY = "modai.voice.review";
+export const SPEECH_SPEEDS = [1, 1.05, 1.1, 1.15] as const;
+export const DEFAULT_SPEECH_SPEED = 1.05; // EMA at 1.00 already reads ~6.8 syllables/s; 1.10 and 1.15 stay selectable

@@ -8,7 +8,7 @@ export type InferenceBackend = "webgpu" | "wasm";
 export type WorkerRequest =
   | { type: "load"; component: VoiceComponent; backend?: InferenceBackend }
   | { type: "transcribe"; id: number; audio: Float32Array }
-  | { type: "speak"; id: number; seq: number; text: string }
+  | { type: "speak"; id: number; seq: number; text: string; speed?: number }
   | { type: "cancel"; upTo: number };
 
 export type WorkerResponse =
