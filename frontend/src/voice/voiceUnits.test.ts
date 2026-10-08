@@ -75,8 +75,8 @@ describe("WorkerVoiceEngine", () => {
     const audio = new Float32Array(16_000);
     const result = voice.transcribe(audio);
     expect(worker.sent[0].transfer).toEqual([audio.buffer]);
-    worker.emit({ type: "transcript", id: 1, text: "merhaba", ms: 300 });
-    await expect(result).resolves.toEqual({ text: "merhaba", ms: 300 });
+    worker.emit({ type: "transcript", id: 1, text: "merhaba", ms: 300, startedAt: 10, endedAt: 290 });
+    await expect(result).resolves.toEqual({ text: "merhaba", ms: 300, startedAt: 10, endedAt: 290 });
   });
 
   it("routes audio chunks to their sentence and resolves cancelled sentences", async () => {
@@ -84,13 +84,13 @@ describe("WorkerVoiceEngine", () => {
     const chunks: number[] = [];
     const first = voice.speak(4, 0, "Bir.", (samples) => chunks.push(samples.length));
     const second = voice.speak(4, 1, "İki.", () => chunks.push(-1));
-    worker.emit({ type: "audio", id: 4, seq: 0, samples: new Float32Array(10), sampleRate: 48_000 });
+    worker.emit({ type: "audio", id: 4, seq: 0, samples: new Float32Array(10), sampleRate: 48_000, synthStartedAt: 1, postedAt: 2 });
     worker.emit({ type: "spoken", id: 4, seq: 0, ms: 20 });
     await first;
     voice.cancel(4);
     await second; // resolved by the cancellation, not left hanging
     expect(worker.sent.at(-1)?.message).toEqual({ type: "cancel", upTo: 4 });
-    worker.emit({ type: "audio", id: 4, seq: 1, samples: new Float32Array(10), sampleRate: 48_000 });
+    worker.emit({ type: "audio", id: 4, seq: 1, samples: new Float32Array(10), sampleRate: 48_000, synthStartedAt: 1, postedAt: 2 });
     expect(chunks).toEqual([10]);
   });
 

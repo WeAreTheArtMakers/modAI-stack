@@ -37,6 +37,7 @@ ort.env.wasm.wasmPaths = { wasm: ortWasmUrl };
 ort.env.wasm.proxy = false;
 
 const post = (message: WorkerResponse, transfer: ArrayBuffer[] = []) => scope.postMessage(message, transfer);
+const clock = () => performance.timeOrigin + performance.now();
 
 let recognizer: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 let synthesizer: Promise<EmaLightning> | null = null;
@@ -125,9 +126,10 @@ async function transcribe(id: number, audio: Float32Array) {
   try {
     const started = performance.now();
     const asr = await loadRecognizer();
+    const startedAt = clock();
     const output = await asr(audio, { language: WHISPER.language, task: "transcribe" });
     const text = (Array.isArray(output) ? output.map((item) => item.text).join(" ") : output.text).trim();
-    post({ type: "transcript", id, text, ms: performance.now() - started });
+    post({ type: "transcript", id, text, ms: performance.now() - started, startedAt, endedAt: clock() });
   } catch (error) {
     post({ type: "transcribe-error", id, message: describe(error) });
   }
@@ -138,9 +140,10 @@ async function speak(id: number, seq: number, text: string) {
   try {
     const started = performance.now();
     const engine = await loadSynthesizer();
+    const synthStartedAt = clock();
     for await (const samples of engine.stream(text)) {
       if (id <= cancelledUpTo) return; // a newer request or stop: drop the rest of this sentence
-      post({ type: "audio", id, seq, samples, sampleRate: RATE }, [samples.buffer as ArrayBuffer]);
+      post({ type: "audio", id, seq, samples, sampleRate: RATE, synthStartedAt, postedAt: clock() }, [samples.buffer as ArrayBuffer]);
     }
     if (id > cancelledUpTo) post({ type: "spoken", id, seq, ms: performance.now() - started });
   } catch (error) {
