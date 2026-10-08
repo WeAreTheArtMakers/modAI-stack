@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
 import { Bot, ChevronDown, MessageSquare, Send, UserRound } from "lucide-react";
-import { Link, useSearchParams } from "react-router";
-import { listKnowledgeBases } from "../api/knowledgeBases";
+import { Link } from "react-router";
 import { streamRag } from "../api/websocket";
 import { getErrorMessage } from "../api/client";
 import type { Source } from "../types";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "../components/State";
-import { useWorkspace } from "../workspace/WorkspaceContext";
+import { useKnowledgeBaseSelection } from "../workspace/useKnowledgeBaseSelection";
 import { useAuth } from "../auth/AuthContext";
 import { canManage } from "../lib";
 
@@ -21,20 +19,8 @@ export function SourceCard({ source }: { source: Source }) {
 
 export function ChatPage() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
-  const { current } = useWorkspace(); const kbs = useQuery({ queryKey: ["knowledge-bases"], queryFn: listKnowledgeBases }); const available = useMemo(() => kbs.data?.filter((kb) => kb.workspace_id === current?.id) ?? [], [kbs.data, current?.id]);
-  const [selected, setSelected] = useState<number[]>([]); const [question, setQuestion] = useState(""); const [messages, setMessages] = useState<ChatMessage[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  const requestedKb = searchParams.get("kb");
-  useEffect(() => {
-    const requestedId = requestedKb && /^\d+$/.test(requestedKb) ? Number(requestedKb) : null;
-    const authorizedRequest = requestedId !== null && Number.isSafeInteger(requestedId) && available.some((kb) => kb.id === requestedId);
-    setSelected((previous) => {
-      const next = authorizedRequest ? [requestedId] : previous.filter((id) => available.some((kb) => kb.id === id));
-      if (!next.length && available.length === 1) next.push(available[0].id);
-      return next.length === previous.length && next.every((id, index) => id === previous[index]) ? previous : next;
-    });
-  }, [available, requestedKb]);
-  function toggle(id: number) { setSelected((currentSelection) => currentSelection.includes(id) ? currentSelection.filter((item) => item !== id) : [...currentSelection, id]); }
+  const { current, kbs, available, selected, toggle } = useKnowledgeBaseSelection();
+  const [question, setQuestion] = useState(""); const [messages, setMessages] = useState<ChatMessage[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   async function ask(event: FormEvent) { event.preventDefault(); if (!question.trim() || !selected.length || busy) return; const content = question.trim(); const assistantId = crypto.randomUUID(); setQuestion(""); setError(null); setBusy(true); setMessages((items) => [...items, { id: crypto.randomUUID(), role: "user", content }, { id: assistantId, role: "assistant", content: "", sources: [], streaming: true }]); try { await streamRag(selected, content, (event) => { setMessages((items) => items.map((message) => message.id !== assistantId ? message : event.type === "sources" ? { ...message, sources: event.data } : event.type === "token" ? { ...message, content: message.content + event.data } : event.type === "complete" ? { ...message, streaming: false } : { ...message, streaming: false })); if (event.type === "error") setError(event.data); }); } catch (reason) { setMessages((items) => items.map((message) => message.id === assistantId ? { ...message, streaming: false } : message)); setError(getErrorMessage(reason)); } finally { setBusy(false); } }
   if (kbs.isLoading) return <LoadingState />; if (kbs.error) return <ErrorState error={kbs.error} />;
   if (!current) {

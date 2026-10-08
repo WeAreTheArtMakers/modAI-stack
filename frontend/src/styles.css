@@ -550,3 +550,82 @@ button { cursor: pointer; }
   background: rgba(47, 159, 181, 0.35);
   color: #ffffff;
 }
+
+/* modAI Voice */
+.voice-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(47, 159, 181, 0.28), transparent 55%),
+    linear-gradient(160deg, #111a2e 0%, #0b1120 70%);
+  color: #e2e8f0;
+  box-shadow: 0 24px 60px rgba(11, 17, 32, 0.28);
+}
+
+.voice-mascot {
+  --voice-accent: #22d3ee;
+  width: min(260px, 64vw);
+  aspect-ratio: 1;
+}
+
+.voice-mascot svg { width: 100%; height: 100%; overflow: visible; }
+.voice-mascot.is-listening { --voice-accent: #34d399; }
+.voice-mascot.is-thinking,
+.voice-mascot.is-transcribing { --voice-accent: #fbbf24; }
+.voice-mascot.is-error { --voice-accent: #f87171; }
+
+.voice-mascot-body { transform-origin: 120px 190px; animation: voice-float 3.6s ease-in-out infinite; }
+.voice-mascot.is-speaking .voice-mascot-body { animation: voice-bob 0.9s ease-in-out infinite; }
+.voice-mascot-glow { transition: opacity 300ms ease; opacity: 0.55; }
+.voice-mascot.is-listening .voice-mascot-glow,
+.voice-mascot.is-speaking .voice-mascot-glow { opacity: 1; }
+
+.voice-mascot-antenna { stroke: rgba(103, 232, 249, 0.6); stroke-width: 3; stroke-linecap: round; }
+.voice-mascot-antenna-dot { fill: var(--voice-accent); filter: drop-shadow(0 0 6px var(--voice-accent)); animation: voice-pulse 2.4s ease-in-out infinite; transform-origin: 120px 30px; }
+.voice-mascot-ear { fill: #1e293b; stroke: rgba(255, 255, 255, 0.12); }
+.voice-mascot.is-listening .voice-mascot-ear { fill: #0f766e; }
+
+.voice-mascot-eye { fill: #67e8f9; filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.8)); transform-box: fill-box; transform-origin: center; animation: voice-blink 5.2s infinite; transition: transform 250ms ease; }
+.voice-mascot.is-thinking .voice-mascot-eyes { transform: translate(6px, -6px); transition: transform 300ms ease; }
+.voice-mascot.is-transcribing .voice-mascot-eye { animation: none; transform: scaleY(0.45); }
+.voice-mascot.is-listening .voice-mascot-eye { transform: scale(1.12); }
+.voice-mascot-error-eyes { display: none; stroke: #f87171; stroke-width: 4; stroke-linecap: round; }
+.voice-mascot.is-error .voice-mascot-eyes { display: none; }
+.voice-mascot.is-error .voice-mascot-error-eyes { display: inline; }
+
+.voice-mascot-mouth { fill: #67e8f9; opacity: 0; filter: drop-shadow(0 0 5px rgba(103, 232, 249, 0.7)); }
+.voice-mascot.is-speaking .voice-mascot-mouth { opacity: 1; }
+.voice-mascot-smile { fill: none; stroke: #67e8f9; stroke-width: 3; stroke-linecap: round; transition: opacity 200ms ease; }
+.voice-mascot.is-speaking .voice-mascot-smile { opacity: 0; }
+.voice-mascot.is-error .voice-mascot-smile { transform: translateY(10px) scaleY(-1); transform-box: fill-box; transform-origin: center; stroke: #f87171; }
+
+.voice-mascot-rings circle { fill: none; stroke: #34d399; stroke-width: 2; opacity: 0; transform-origin: 120px 126px; transition: opacity 200ms ease; }
+.voice-mascot.is-listening .voice-mascot-rings circle { opacity: calc(0.25 + var(--voice-level, 0) * 0.75); transform: scale(calc(1 + var(--voice-level, 0) * 0.12)); }
+.voice-mascot.is-listening .voice-mascot-rings circle:last-child { opacity: calc(0.1 + var(--voice-level, 0) * 0.5); }
+
+.voice-mascot-thinking circle { fill: #fbbf24; opacity: 0; }
+.voice-mascot.is-thinking .voice-mascot-thinking circle,
+.voice-mascot.is-transcribing .voice-mascot-thinking circle { opacity: 1; animation: voice-dot 1.2s ease-in-out infinite; }
+.voice-mascot-thinking circle:nth-child(2) { animation-delay: 0.15s !important; }
+.voice-mascot-thinking circle:nth-child(3) { animation-delay: 0.3s !important; }
+
+.voice-talk-button { position: relative; display: inline-flex; height: 84px; width: 84px; align-items: center; justify-content: center; border-radius: 9999px; background: #2f9fb5; color: #fff; box-shadow: 0 12px 30px rgba(47, 159, 181, 0.45); transition: transform 150ms ease, background 150ms ease; touch-action: none; user-select: none; }
+.voice-talk-button:hover:not(:disabled) { transform: scale(1.04); }
+.voice-talk-button:disabled { cursor: not-allowed; opacity: 0.45; }
+.voice-talk-button.is-recording { background: #dc2626; box-shadow: 0 0 0 10px rgba(220, 38, 38, 0.18), 0 12px 30px rgba(220, 38, 38, 0.45); animation: voice-recording 1.4s ease-in-out infinite; }
+
+@keyframes voice-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes voice-bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-3px) rotate(-1deg); } }
+@keyframes voice-blink { 0%, 44%, 48%, 100% { transform: scaleY(1); } 46% { transform: scaleY(0.1); } }
+@keyframes voice-pulse { 0%, 100% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; } }
+@keyframes voice-dot { 0%, 100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-4px); opacity: 1; } }
+@keyframes voice-recording { 0%, 100% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.2), 0 12px 30px rgba(220, 38, 38, 0.45); } 50% { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0.08), 0 12px 30px rgba(220, 38, 38, 0.45); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-mascot-body,
+  .voice-mascot-eye,
+  .voice-mascot-antenna-dot,
+  .voice-mascot-thinking circle,
+  .voice-talk-button.is-recording { animation: none !important; }
+}

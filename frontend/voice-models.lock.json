@@ -1,0 +1,95 @@
+{
+  "lock_version": 1,
+  "models": [
+    {
+      "id": "whisper-tiny",
+      "repository": "Xenova/whisper-tiny",
+      "revision": "5332fcc35e32a33b86612b9a57a89be7906102b1",
+      "license": "Apache-2.0",
+      "directory": "whisper-tiny-5332fcc3",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 2248,
+          "sha256": "2b2e4e519084e0ea028b19b153f95202735a971870d6844aa26e559edd292e94",
+          "source": "downloaded"
+        },
+        {
+          "path": "generation_config.json",
+          "size": 3716,
+          "sha256": "68ac791fcb4999461a313472125042934656240ba1cba7d1c2627fcbb19ac24c",
+          "source": "downloaded"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 339,
+          "sha256": "a6a76d28c93edb273669eb9e0b0636a2bddbb1272c3261e47b7ca6dfdbac1b8d",
+          "source": "downloaded"
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 2480466,
+          "sha256": "27fc476bfe7f17299480be2273fc0608e4d5a99aba2ab5dec5374b4482d1a566",
+          "source": "downloaded"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 282683,
+          "sha256": "2a4c4281cf9f51ac6ccc406fdc711a087afe6530f671fa7b80953edc498275ce",
+          "source": "downloaded"
+        },
+        {
+          "path": "onnx/encoder_model_quantized.onnx",
+          "size": 10124910,
+          "sha256": "fd9d995b9dcb0520f0dbf6cf68651af639fc385f594d9d876e69ca2802dc438e",
+          "source": "lfs-metadata"
+        },
+        {
+          "path": "onnx/decoder_model_merged_quantized.onnx",
+          "size": 30727765,
+          "sha256": "6c0c125986b007d2e3734bec84c18bda0152071b90b87fadac6d7764499927a0",
+          "source": "lfs-metadata"
+        }
+      ]
+    },
+    {
+      "id": "ema-lightning",
+      "repository": "ozcancelik/ema-lightning-onnx",
+      "revision": "13c431db0356b2f7fafb1247cd823ec0d777c820",
+      "license": "Apache-2.0",
+      "directory": "ema-lightning-13c431db",
+      "files": [
+        {
+          "path": "meta.json",
+          "size": 357,
+          "sha256": "76627201405723633f5319a208ed7dea63c42acbf3ca997671bccdca9d9186b2",
+          "source": "downloaded"
+        },
+        {
+          "path": "text.onnx",
+          "size": 4806400,
+          "sha256": "ad5d4885b5d218f63d976a6e562334ea0194aec54847a6c6482d328e784089f0",
+          "source": "lfs-metadata"
+        },
+        {
+          "path": "sound.onnx",
+          "size": 18120655,
+          "sha256": "958364217360cecaa92dc5ff2170d19f3c9f6995fd5e61241ea4068971a46a59",
+          "source": "lfs-metadata"
+        },
+        {
+          "path": "decoder.onnx",
+          "size": 12031945,
+          "sha256": "396c06a8e5711fd40bfd2c3f4f33851feb2ad07a86485833844e0ae8ff637b17",
+          "source": "lfs-metadata"
+        },
+        {
+          "path": "normalizer.wasm",
+          "size": 1211738,
+          "sha256": "2614bcf15b4546249d49474c029420a4a611daf9e9a0c596cc852bd16cdecc89",
+          "source": "lfs-metadata"
+        }
+      ]
+    }
+  ]
+}

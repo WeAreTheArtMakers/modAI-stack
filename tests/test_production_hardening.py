@@ -127,6 +127,10 @@ def test_liveness_returns_request_id_and_backend_security_headers():
     assert response.headers["X-Request-ID"] == "valid-request-123"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+    # Voice assistant: microphone for this origin only; WebAssembly compilation but no JS eval.
+    assert response.headers["Permissions-Policy"] == "camera=(), microphone=(self), geolocation=()"
+    assert "script-src 'self' 'wasm-unsafe-eval';" in response.headers["Content-Security-Policy"]
+    assert "'unsafe-eval'" not in response.headers["Content-Security-Policy"].replace("'wasm-unsafe-eval'", "")
 
 
 def test_public_version_endpoint_returns_build_sha_without_caching(monkeypatch):
