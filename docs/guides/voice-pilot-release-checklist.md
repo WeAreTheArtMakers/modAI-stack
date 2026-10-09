@@ -40,6 +40,7 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
 ## 7. Bellek
 - **Ölçüm makinesi:** Apple M1 Pro, 16 GB. Docker VM 7,65 GiB sınırında; production yığını yaklaşık 1,2 GB, staging yığını yaklaşık 1,2 GB kullanıyor.
 - **Ollama:** gemma3:4b yüklüyken yaklaşık 4,6 GB.
+- **Çok dilli arama (BGE-M3):** etkin bir nesil varken API ve worker'ın her biri yaklaşık 2 GiB daha kullanır. Docker VM sınırı en az 8 GiB olmalıdır.
 - **Tarayıcı sekmesi:** Tiny ile yaklaşık 1,3 GB, Base ile yaklaşık 1,8 GB.
 - **Gözlem:** production, staging ve Chrome birlikte açıkken swap 16–25 GB'a çıktı ve ilk token 20–35 sn'ye uzadı.
 - [ ] Demo sırasında yalnızca bir yığın çalıştırılır: production ya da staging, ikisi birden değil. Ağır uygulamalar ve sekmeler kapatılır.
@@ -56,6 +57,11 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
   - Bu düzeltme olmadan production'da da refresh 403/401 döner ve oturum 30 dakikada düşer.
   - Dağıtım sonrası doğrulama: giriş yapılır, `POST /api/auth/refresh` 200 dönmeli; logout 204, ardından refresh 401 dönmeli.
 - [ ] Ses modelleri build makinesinde `frontend/public/voice-models/` altına indirilmiş ve `--check` ile doğrulanmıştır. Frontend imajı bu dosyaları içerir.
+- [ ] `python3 scripts/fetch_retrieval_models.py --check` başarılıdır (BGE-M3, `models/` altında).
+- [ ] `python3 scripts/preflight.py` çıktısında `FAIL` yoktur; `WARN` satırları teslim notuna yazılmıştır.
+- [ ] Production compose (`docker-compose.yml`) için sahip onaylı değişiklikler uygulanmıştır:
+  - API ve worker'a `RETRIEVAL_GENERATIONS_ENABLED: "true"` ve `RETRIEVAL_MODEL_ROOT: "/models"` eklenir.
+  - PostgreSQL, Redis ve Qdrant portları `127.0.0.1:` önekiyle yalnızca yerel makineye bağlanır. Bu, o üç konteynerin yeniden oluşturulmasını gerektirir; volume'lar korunur.
 - [ ] Kuyrukta bekleyen indeksleme işi yok (`LLEN modai:indexing:queued`).
 - [ ] Çalışan imajlar geri alma etiketiyle işaretlenir. Bkz. 9. bölüm.
 - [ ] `BUILD_SHA=<sha> docker compose build api worker frontend` çalıştırılır. Ardından imajlardaki BUILD_SHA, frontend bundle SHA ve `app/` dosya hash'leri git ağacıyla doğrulanır.
@@ -66,6 +72,7 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
   - üç doğrulanmış soru kaynaklarıyla yanıtlanır;
   - sayfadan çıkıp dönünce görüşme geri yüklenir;
   - `POST /rag/warmup` oturumla 202, oturumsuz 401 döner.
+- [ ] Çok dilli arama ayrı bir onayla açılır: `plan`, `build`, `validate`, `activate` (bkz. `bge-m3-staging-generation.md`, 7. bölüm). Ardından kabul soruları sorulur; sorun çıkarsa `rollback` çalıştırılır.
 
 ## 9. Geri alma
 - **Dağıtımdan önce:** çalışan imajlar `rollback-<eski-sha>` olarak etiketlenir:
