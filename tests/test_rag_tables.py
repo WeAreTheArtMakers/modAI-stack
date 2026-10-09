@@ -174,7 +174,7 @@ def test_prompts_without_tables_or_quantities_have_no_lookup_section():
     assert "TABLE LOOKUP" not in prompt and "Deneme süresi 2 aydır." in prompt
 
 
-def test_lookup_names_the_document_title_and_section_never_the_previous_paragraph():
+def test_lookup_names_the_source_file_from_the_index_never_text_from_the_chunk():
     old = " ".join("""# ESKİ — Ulaşım Kuralları (yürürlükten kalktı)
 > Bu sürüm yürürlükten kalkmıştır. Onay süresi 3 iş günüdür.
 ## 1. Ulaşım aracı
@@ -182,11 +182,12 @@ def test_lookup_names_the_document_title_and_section_never_the_previous_paragrap
 |---|---|
 | 0–300 km | Şirket aracı |
 | 300 km üzeri | Uçak |""".split())
+    [line] = table_lookup("400 kilometrelik yolculuk", [old], ["ESKI-ulasim-v1.md"])
+    assert line.startswith('- 400 kilometrelik: in document "ESKI-ulasim-v1.md", this value falls in the row')
+    assert "iş günüdür" not in line and "Ulaşım aracı" not in line
+    # Without index metadata no title is reconstructed from the text.
     [line] = table_lookup("400 kilometrelik yolculuk", [old])
-    assert line.startswith('- 400 kilometrelik: in document "ESKİ — Ulaşım Kuralları (yürürlükten kalktı)", section "1. Ulaşım aracı",')
-    assert "iş günüdür" not in line
-    [line] = table_lookup("7 kg", ["Önceki paragraf burada biter. | Ağırlık | Ücret | |---|---| | 0–10 kg | 5 TL | | 10–20 kg | 9 TL |"])
-    assert line.startswith("- 7 kg: in a table,") and "paragraf" not in line
+    assert line.startswith("- 400 kilometrelik: in a table,") and "ESKİ" not in line
 
 
 # --- Unresolved conflicts: a fixed answer instead of a model answer ---------------------------
@@ -220,8 +221,8 @@ TRAVEL_NEW = _flat("""# Ulaşım Kuralları
 
 
 def test_a_shared_boundary_gets_a_fixed_turkish_answer_built_from_the_table():
-    answer = conflict_answer("Kıdemim tam 5 yıl, kaç gün iznim var?", [LEAVE])
-    assert answer.startswith("Belge bu soruya kesin bir yanıt vermiyor: 5 yıl, “İzin Politikası” belgesindeki tabloda")
+    answer = conflict_answer("Kıdemim tam 5 yıl, kaç gün iznim var?", [LEAVE], sources=["izin-politikasi.md"])
+    assert answer.startswith("Belge bu soruya kesin bir yanıt vermiyor: 5 yıl, izin-politikasi.md belgesindeki tabloda")
     assert "“0–5 yıl” satırında Yıllık izin: 16 iş günü" in answer and "“5–15 yıl” satırında Yıllık izin: 21 iş günü" in answer
     assert answer.endswith("Lütfen belge sahibine doğrulatın.")
     english = conflict_answer("Exactly 5 yıl of service", [LEAVE], language="en")
@@ -265,15 +266,16 @@ def test_unrelated_tables_in_the_same_unit_do_not_count():
 
 
 def test_same_table_in_two_documents_with_different_values_is_not_resolved():
-    answer = conflict_answer("400 kilometrelik yolculukta uçakla gidebilir miyim?", [TRAVEL_OLD, TRAVEL_NEW])
+    names = ["ESKI-ulasim-v1.md", "ulasim-v2.md"]
+    answer = conflict_answer("400 kilometrelik yolculukta uçakla gidebilir miyim?", [TRAVEL_OLD, TRAVEL_NEW], sources=names)
     assert answer.startswith("Getirilen belgeler 400 km için farklı bilgi veriyor:")
-    assert "“ESKİ — Ulaşım Kuralları (yürürlükten kalktı)” belgesinde “300 km üzeri” satırında Ulaşım: Uçak" in answer
-    assert "“Ulaşım Kuralları” belgesinde “0–500 km” satırında Ulaşım: Şirket aracı veya tren" in answer
+    assert "ESKI-ulasim-v1.md içinde “300 km üzeri” satırında Ulaşım: Uçak" in answer
+    assert "ulasim-v2.md içinde “0–500 km” satırında Ulaşım: Şirket aracı veya tren" in answer
     assert "hangi belgenin güncel olduğunu doğrulayamıyor" in answer
-    [line] = table_lookup("400 kilometrelik yolculuk", [TRAVEL_OLD, TRAVEL_NEW])
+    [line] = table_lookup("400 kilometrelik yolculuk", [TRAVEL_OLD, TRAVEL_NEW], names)
     assert "cannot verify which document is current" in line and "falls in the row" not in line
     # Where both versions agree (600 km: plane in both) there is nothing to resolve.
-    assert conflict_answer("600 kilometrelik yolculuk", [TRAVEL_OLD, TRAVEL_NEW]) is None
+    assert conflict_answer("600 kilometrelik yolculuk", [TRAVEL_OLD, TRAVEL_NEW], sources=names) is None
 
 
 @pytest.mark.parametrize("text", [
@@ -327,3 +329,54 @@ async def test_retrieval_context_carries_the_fixed_answer_only_for_live_authoriz
     assert context.table_conflict_answer is None
     context = await pipeline.retrieve_rag_context("Kıdemim 3 yıl", db=Db([1, 2]), **scope)
     assert context.table_conflict_answer is None
+
+
+def test_spoken_quantities_are_written_as_digits_for_retrieval_only():
+    from app.services.rag.tables import normalize_quantities
+
+    assert normalize_quantities("Kıdemim üç yıl, kaç gün yıllık iznim var?") == "Kıdemim 3 yıl, kaç gün yıllık iznim var?"
+    assert normalize_quantities("Kırk bin liralık bir satın almayı kim onaylar?") == "40.000 TL'lik bir satın almayı kim onaylar?"
+    assert normalize_quantities("On beş iş günü önce mi?") == "15 iş günü önce mi?"
+    assert normalize_quantities("İki buçuk yıldır") == "2,5 yıldır"
+    # Digits, numbers without a unit and the article "bir" stay as they are.
+    for text in ("Kıdemim 3 yıl", "Bir satın almayı kim onaylar?", "Üç kez sordum", "2026 yılında"):
+        assert normalize_quantities(text) == text
+
+
+@pytest.mark.asyncio
+async def test_retrieval_searches_the_spoken_and_the_digit_form_and_keeps_each_chunk_once(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services.rag import pipeline
+
+    embedded, searched = [], []
+
+    class Embeddings:
+        async def embed_text(self, text):
+            embedded.append(text)
+            return [float(len(embedded))]
+
+    def hit(point_id, score):
+        return SimpleNamespace(id=point_id, score=score, payload={"document_id": point_id, "filename": f"{point_id}.md", "chunk_index": 0, "text": f"chunk {point_id}"})
+
+    class Qdrant:
+        async def search(self, *, vector, limit, **_kwargs):
+            searched.append(limit)
+            # The spoken form finds the leave policy (id 1) lower; the digit form finds it first.
+            return [hit(2, 0.63), hit(3, 0.62), hit(1, 0.61)][:limit] if vector == [1.0] else [hit(1, 0.64), hit(2, 0.60), hit(4, 0.59)][:limit]
+
+    class Db:
+        async def scalars(self, _statement):
+            return SimpleNamespace(all=lambda: [1, 2, 3, 4])
+
+    monkeypatch.setattr(pipeline, "get_embedding_service", lambda: Embeddings())
+    monkeypatch.setattr(pipeline, "qdrant_service", Qdrant())
+    monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
+    context = await pipeline.retrieve_rag_context("Kıdemim üç yıl, kaç gün iznim var?", db=Db(), organization_id=1, workspace_id=2, knowledge_base_ids=[3])
+    assert embedded == ["Kıdemim üç yıl, kaç gün iznim var?", "Kıdemim 3 yıl, kaç gün iznim var?"]
+    assert [source.document for source in context.sources] == ["1.md", "2.md", "3.md"]  # best score per chunk, top 3
+    assert "Kıdemim üç yıl" in context.prompt and "Kıdemim 3 yıl" not in context.prompt  # the question is unchanged
+
+    embedded.clear(); searched.clear()
+    await pipeline.retrieve_rag_context("Kıdemim 3 yıl", db=Db(), organization_id=1, workspace_id=2, knowledge_base_ids=[3])
+    assert embedded == ["Kıdemim 3 yıl"] and searched == [3]  # nothing to normalize: one search

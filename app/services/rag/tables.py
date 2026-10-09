@@ -76,26 +76,30 @@ class Quantity:
     value: float
     unit: str
     text: str
+    number_span: tuple[int, int] = (0, 0)  # character offsets of the number in the question
+    unit_span: tuple[int, int] = (0, 0)
 
 
 def quantities(text: str) -> list[Quantity]:
-    """Numbers directly followed by a unit, in digits ("40.000 TL'lik", "1,5 kilo") or words ("kırk bin liralık")."""
-    tokens = _TOKEN.findall(_lower(text))
+    """Numbers directly followed by a unit, in digits ("40.000 TL'lik", "1,5 kilo") or words ("kırk
+    bin liralık", "on beş iş günü")."""
+    lowered = _lower(text)
+    tokens = [(m.group(), m.start(), m.end()) for m in _TOKEN.finditer(lowered)]
     found: list[Quantity] = []
     i = 0
     while i < len(tokens):
         start = i
         value: float | None = None
-        if re.fullmatch(_NUMBER, tokens[i]):
-            value = _number(tokens[i])
+        if re.fullmatch(_NUMBER, tokens[i][0]):
+            value = _number(tokens[i][0])
             i += 1
-            if i < len(tokens) and tokens[i] in _SCALES:
-                value *= _SCALES[tokens[i]]
+            if i < len(tokens) and tokens[i][0] in _SCALES:
+                value *= _SCALES[tokens[i][0]]
                 i += 1
-        elif tokens[i] in _ONES or tokens[i] in _TENS or tokens[i] in _SCALES or tokens[i] == "yüz":
+        elif tokens[i][0] in _ONES or tokens[i][0] in _TENS or tokens[i][0] in _SCALES or tokens[i][0] == "yüz":
             total, current, seen = 0.0, 0.0, False
             while i < len(tokens):
-                word = tokens[i]
+                word = tokens[i][0]
                 if word in _ONES or word in _TENS:
                     current += _ONES.get(word, 0) + _TENS.get(word, 0)
                 elif word == "yüz":
@@ -113,13 +117,46 @@ def quantities(text: str) -> list[Quantity]:
         if value is None:
             i += 1
             continue
-        unit = _unit(tokens[i]) if i < len(tokens) else None
+        number_end = i
+        if i + 1 < len(tokens) and tokens[i][0] == "iş" and _unit(tokens[i + 1][0]) == "gün":
+            i += 1  # "15 iş günü": business days, counted as days
+        unit = _unit(tokens[i][0]) if i < len(tokens) else None
         if unit == "yıl" and value.is_integer() and 1900 <= value <= 2100:
             unit = None  # a calendar year ("2026 yılında"), not a duration
         if unit:
-            found.append(Quantity(value, unit, " ".join(tokens[start:i + 1])))
+            found.append(Quantity(
+                value, unit, " ".join(token for token, _, _ in tokens[start:i + 1]),
+                (tokens[start][1], tokens[number_end - 1][2]), (tokens[i][1], tokens[i][2]),
+            ))
             i += 1
     return found
+
+
+def _digits(value: float) -> str:
+    if value.is_integer():
+        return f"{int(value):,}".replace(",", ".")
+    return f"{value:.2f}".rstrip("0").replace(".", ",")
+
+
+def normalize_quantities(text: str) -> str:
+    """For retrieval only: a quantity spoken in words written in digits, as documents write it
+    ("üç yıl" -> "3 yıl", "kırk bin liralık" -> "40.000 TL'lik", "on beş iş günü" -> "15 iş
+    günü"). Only numbers followed by a unit are touched; the user's question itself is kept as is."""
+    if len(_lower(text)) != len(text):
+        return text  # offsets would not line up
+    out, cursor = [], 0
+    for quantity in quantities(text):
+        (number_start, number_end), (unit_start, unit_end) = quantity.number_span, quantity.unit_span
+        number = text[number_start:number_end]
+        if not re.fullmatch(_NUMBER, number.strip()):
+            out += [text[cursor:number_start], _digits(quantity.value)]
+            cursor = number_end
+        unit_word = _lower(text[unit_start:unit_end])
+        if unit_word.startswith("lira"):
+            out += [text[cursor:unit_start], "TL'lik" if unit_word[4:] in ("lık", "lik") else "TL"]
+            cursor = unit_end
+    out.append(text[cursor:])
+    return "".join(out)
 
 
 @dataclass(frozen=True)
@@ -284,9 +321,9 @@ def _clean(text: str) -> str:
 
 
 def _location(text: str, table: Table) -> tuple[str | None, str | None]:
-    """The document title (when the chunk starts with one; it also carries labels such as
-    "ESKİ ... (yürürlükten kalktı)") and the nearest heading above the table. Never the tail of the
-    previous paragraph, which the model would repeat."""
+    """The title the chunk starts with and the nearest heading above the table, read from the
+    flattened text. Used only to tell which tables a question is about, never shown: a heading
+    run together with the next paragraph is not a citable title."""
     title = re.match(r"\s*#\s+([^#>|*]{3,120}?)\s*(?=[#>|*-]|$)", text)
     title_end = title.end() if title and title.end() <= table.start else -1
     heading = text.rfind("#", max(0, table.start - 300), table.start)
@@ -322,16 +359,14 @@ class TableMatch:
     quantity: Quantity
     value: float  # in the table's unit
     unit: str
-    title: str | None
-    section: str | None
+    source: str | None  # the document's file name from the index (shown); None without metadata
     table: Table
     column: int
     rows: list[list[str]]
     related: bool  # the table's title, section or columns share a word with the question
 
     def where(self) -> str:
-        parts = [f'document "{self.title}"' if self.title else "", f'section "{self.section}"' if self.section else ""]
-        return ", ".join(part for part in parts if part) or "a table"
+        return f'document "{self.source}"' if self.source else "a table"
 
     def shown(self) -> str:
         converted = self.quantity.unit != self.unit
@@ -341,17 +376,19 @@ class TableMatch:
         return tuple((header, cell) for index, (header, cell) in enumerate(zip(self.table.headers, row)) if index != self.column)
 
 
-def table_matches(question: str, chunks: list[str]) -> list[TableMatch]:
+def table_matches(question: str, chunks: list[str], sources: list[str] | None = None) -> list[TableMatch]:
+    """`sources`: the file name of each chunk (index metadata), shown to say where a row comes from."""
     asked = quantities(question)
     if not asked:
         return []
     question_words = set(re.findall(r"[^\W\d_]+", _lower(question)))
     question_topic = _topic_words(question)
     found: list[TableMatch] = []
-    for chunk in chunks:
+    for index, chunk in enumerate(chunks):
+        source = sources[index] if sources and index < len(sources) else None
         for table in parse_tables(chunk):
             title, section = _location(chunk, table)
-            related = _related(question_topic, _topic_words(" ".join([title or "", section or "", *table.headers])))
+            related = _related(question_topic, _topic_words(" ".join([source or "", title or "", section or "", *table.headers])))
             for column in range(len(table.headers)):
                 ranges = [(row, parse_range(row[column])) for row in table.rows]
                 units = {parsed.unit for _, parsed in ranges if parsed}
@@ -370,7 +407,7 @@ def table_matches(question: str, chunks: list[str]) -> list[TableMatch]:
                         if parsed and parsed.contains(value):
                             by_subject.setdefault(tuple(_qualifier(row[column])), []).append(row)
                     for rows in by_subject.values():
-                        found.append(TableMatch(quantity, value, unit, title, section, table, column, rows, related))
+                        found.append(TableMatch(quantity, value, unit, source, table, column, rows, related))
     # Retrieval often brings unrelated tables in the same unit (a 15.000 km service table next to a
     # 300 km relocation table). When some tables share a word with the question, only those count.
     relevant: list[TableMatch] = []
@@ -395,14 +432,14 @@ def _conflicts(matches: list[TableMatch]) -> list[list[TableMatch]]:
             key = (match.quantity, tuple(_lower(header) for header in match.table.headers), match.column)
             singles.setdefault(key, []).append(match)
     for same_columns in singles.values():
-        if len({m.title for m in same_columns}) > 1 and len({m.outputs(m.rows[0]) for m in same_columns}) > 1:
+        if len({m.source for m in same_columns}) > 1 and len({m.outputs(m.rows[0]) for m in same_columns}) > 1:
             groups.append(same_columns)
     return groups
 
 
-def table_lookup(question: str, chunks: list[str]) -> list[str]:
+def table_lookup(question: str, chunks: list[str], sources: list[str] | None = None) -> list[str]:
     """Prompt lines: the row that contains each quantity from the question, or the conflict."""
-    matches = table_matches(question, chunks)
+    matches = table_matches(question, chunks, sources)
     lines: list[str] = []
     in_conflict = set()
     for group in _conflicts(matches):
@@ -439,12 +476,12 @@ def _row_text(match: TableMatch, row: list[str], english: bool) -> str:
     return f"“{row[match.column]}” row: {outputs}" if english else f"“{row[match.column]}” satırında {outputs}"
 
 
-def conflict_answer(question: str, chunks: list[str], language: str = "tr") -> str | None:
+def conflict_answer(question: str, chunks: list[str], language: str = "tr", sources: list[str] | None = None) -> str | None:
     """A fixed answer, built from the tables, when every table row that contains a number from the
     question is part of an unresolved conflict (a shared boundary, or documents that disagree).
     The model is not asked: a small model picks one of the rows with confidence. None otherwise,
     including when another table gives a single, unambiguous row for the same number."""
-    matches = table_matches(question, chunks)
+    matches = table_matches(question, chunks, sources)
     groups = _conflicts(matches)
     english = language == "en"
     for quantity in dict.fromkeys(match.quantity for match in matches):
@@ -459,17 +496,17 @@ def conflict_answer(question: str, chunks: list[str], language: str = "tr") -> s
             if len(group) == 1:
                 rows = "; ".join(_row_text(first, row, english) for row in first.rows)
                 if english:
-                    where = f'the table in "{first.title}"' if first.title else "the table"
+                    where = f"the table in {first.source}" if first.source else "the table"
                     sentences.append(f"The document does not settle this: {value} is exactly on the boundary between rows of {where}. {rows}. The document does not say which row includes the boundary value.")
                 else:
-                    where = f"“{first.title}” belgesindeki tabloda" if first.title else "getirilen belgedeki tabloda"
+                    where = f"{first.source} belgesindeki tabloda" if first.source else "getirilen belgedeki tabloda"
                     sentences.append(f"Belge bu soruya kesin bir yanıt vermiyor: {value}, {where} iki satırın tam sınırında. {rows}. Belge, sınır değerin hangi satıra dahil olduğunu belirtmiyor.")
             else:
                 if english:
-                    rows = "; ".join(f'in "{match.title}", {_row_text(match, match.rows[0], True)}' for match in group)
+                    rows = "; ".join(f"in {match.source or 'one document'}, {_row_text(match, match.rows[0], True)}" for match in group)
                     sentences.append(f"The retrieved documents disagree for {value}: {rows}. The system cannot verify which document is current.")
                 else:
-                    rows = "; ".join(f"“{match.title}” belgesinde {_row_text(match, match.rows[0], False)}" for match in group)
+                    rows = "; ".join(f"{match.source or 'bir belgede'}{' içinde' if match.source else ''} {_row_text(match, match.rows[0], False)}" for match in group)
                     sentences.append(f"Getirilen belgeler {value} için farklı bilgi veriyor: {rows}. Sistem hangi belgenin güncel olduğunu doğrulayamıyor.")
         sentences.append("Please confirm with the document owner." if english else "Lütfen belge sahibine doğrulatın.")
         return " ".join(sentences)

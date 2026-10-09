@@ -139,6 +139,8 @@ class RagRequest(BaseModel):
     # Presentation only (the voice assistant sends it): the answer language for this request.
     # It never changes authorization, sources or the user's stored preferences.
     response_language: Literal["tr", "en"] | None = None
+    # Request-scoped answer length (the voice assistant asks for "short"); stored preferences are unchanged.
+    response_length: AssistantResponseLength | None = None
     # Return numeric stage timings with the stream (no text).
     diagnostics: bool = False
 class DocumentResponse(BaseModel):

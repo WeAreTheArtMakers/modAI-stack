@@ -88,6 +88,8 @@ async def websocket_rag(ws: WebSocket):
                     if req.response_language is not None:
                         # Request-scoped presentation override; the stored preference is untouched.
                         generation_preferences["language"] = req.response_language
+                    if req.response_length is not None:
+                        generation_preferences["response_length"] = req.response_length
 
                     context = await retrieve_rag_context(
                         req.question,

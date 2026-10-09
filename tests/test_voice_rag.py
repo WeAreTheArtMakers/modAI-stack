@@ -43,8 +43,11 @@ def test_rag_request_accepts_only_known_response_languages():
     assert RagRequest(question="q", knowledge_base_ids=[1], response_language="tr").response_language == "tr"
     assert RagRequest(question="q", knowledge_base_ids=[1]).response_language is None
     assert RagRequest(question="q", knowledge_base_ids=[1]).diagnostics is False
+    assert RagRequest(question="q", knowledge_base_ids=[1]).response_length is None
     with pytest.raises(ValidationError):
         RagRequest(question="q", knowledge_base_ids=[1], response_language="de")
+    with pytest.raises(ValidationError):
+        RagRequest(question="q", knowledge_base_ids=[1], response_length="endless")
 
 
 class FakeWebSocket:
@@ -132,7 +135,7 @@ async def _async_value(value):
 async def test_voice_request_overrides_language_for_this_request_and_reports_numeric_timings(monkeypatch):
     retrieve_calls, stream_calls = [], []
     module = _wire(monkeypatch, retrieve_calls=retrieve_calls, stream_calls=stream_calls)
-    ws = FakeWebSocket({"question": TURKISH_QUESTION, "knowledge_base_ids": [4], "response_language": "tr", "diagnostics": True})
+    ws = FakeWebSocket({"question": TURKISH_QUESTION, "knowledge_base_ids": [4], "response_language": "tr", "response_length": "detailed", "diagnostics": True})
 
     await module.websocket_rag(ws)
 
@@ -140,6 +143,7 @@ async def test_voice_request_overrides_language_for_this_request_and_reports_num
     assert question == TURKISH_QUESTION
     assert kwargs["response_language"] == "tr"
     assert kwargs["preferences"]["language"] == "tr"  # stored preference is "en"
+    assert kwargs["preferences"]["response_length"] == "detailed"  # stored preference is "short"
     assert kwargs["knowledge_base_ids"] == [4]
     sources, *_tokens, complete = ws.messages
     assert sources["type"] == "sources" and complete["type"] == "complete"
@@ -162,6 +166,7 @@ async def test_requests_without_diagnostics_keep_the_existing_event_shape(monkey
 
     assert retrieve_calls[0][1]["response_language"] is None
     assert retrieve_calls[0][1]["preferences"]["language"] == "en"
+    assert retrieve_calls[0][1]["preferences"]["response_length"] == "short"  # the stored preference
     assert "timings" not in ws.messages[0] and ws.messages[-1] == {"type": "complete"}
 
 

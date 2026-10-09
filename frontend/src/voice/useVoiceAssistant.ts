@@ -507,6 +507,8 @@ export function useVoiceAssistant(knowledgeBaseIds: number[], workspaceId: numbe
       }, controller.signal, {
         conversationId,
         responseLanguage: language === "tr" ? "tr" : undefined,
+        // Spoken answers: the essential result, not a long read-out (text chat keeps its preference).
+        responseLength: "short",
         diagnostics: true,
         onTicket: () => { timeline.ragTicket = clock(); },
         onOpen: () => { timeline.ragOpen = clock(); },

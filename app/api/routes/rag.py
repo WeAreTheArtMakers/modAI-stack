@@ -87,6 +87,8 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
     generation_preferences = generation_preference_values(preferences)
     if req.response_language is not None:
         generation_preferences["language"] = req.response_language
+    if req.response_length is not None:
+        generation_preferences["response_length"] = req.response_length
 
     try:
         context = await retrieve_rag_context(

@@ -1,7 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,6 +73,11 @@ async def _limit(request: Request, bucket: str, key: str, limit: int, window: in
     limiter = RedisRateLimiter()
     try: await limiter.enforce(bucket, key, limit, window)
     finally: await limiter.close()
+
+
+def _refresh_cookie(request: Request) -> str | None:
+    """The refresh cookie under its configured name (REFRESH_COOKIE_NAME), as set by login."""
+    return request.cookies.get(get_settings().refresh_cookie_name)
 
 
 def _enforce_cookie_mutation_origin(request: Request) -> None:
@@ -185,7 +190,7 @@ async def setup_invited_account(payload: InvitationSetupRequest, request: Reques
     )
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(request: Request, response: Response, refresh_token: str | None = Cookie(default=None), db: AsyncSession = Depends(get_db)):
+async def refresh(request: Request, response: Response, refresh_token: str | None = Depends(_refresh_cookie), db: AsyncSession = Depends(get_db)):
     _enforce_cookie_mutation_origin(request)
     await _limit(request, "refresh", request.client.host if request.client else "unknown", get_settings().rate_limit_auth_per_minute, 60)
     try:
@@ -206,7 +211,7 @@ async def refresh(request: Request, response: Response, refresh_token: str | Non
 
 
 @router.post("/logout", status_code=204)
-async def logout(request: Request, response: Response, refresh_token: str | None = Cookie(default=None)):
+async def logout(request: Request, response: Response, refresh_token: str | None = Depends(_refresh_cookie)):
     _enforce_cookie_mutation_origin(request)
     try:
         payload = decode_token(refresh_token or "")
