@@ -81,7 +81,7 @@ class FakeStorage:
     async def read(self, path):
         if path in self.fail:
             raise OSError("unreadable")
-        return TEXTS[path].encode()
+        return TEXTS.get(path, f"Belge {path.rsplit('/', 1)[-1]} metni.").encode()
 
 
 class IndexedLocalQdrant:
@@ -103,8 +103,8 @@ class IndexedLocalQdrant:
         return info.model_copy(update={"payload_schema": self.indexes.get(collection_name, {})})
 
 
-def staging(enabled=True, app_env="staging"):
-    return Settings(retrieval_generations_enabled=enabled, app_env=app_env)
+def staging(enabled=True):
+    return Settings(retrieval_generations_enabled=enabled)
 
 
 @pytest_asyncio.fixture
@@ -174,18 +174,13 @@ async def built_and_validated(env):
     return planned, built, validated
 
 
-def test_generation_serving_requires_staging_and_the_flag():
-    assert staging().retrieval_generations_active is True
-    assert staging(enabled=False).retrieval_generations_active is False
-    # Production runs with APP_ENV=development or production: the flag alone does nothing there.
-    assert staging(app_env="development").retrieval_generations_active is False
-    assert staging(app_env="production").retrieval_generations_active is False
+def test_generation_serving_is_off_unless_enabled():
     assert Settings().retrieval_generations_enabled is False
 
 
 @pytest.mark.asyncio
-async def test_tool_refuses_to_plan_build_or_activate_outside_staging(env, monkeypatch):
-    monkeypatch.setattr(runtime, "get_settings", lambda: staging(app_env="development"))
+async def test_tool_refuses_to_plan_build_or_activate_when_disabled(env, monkeypatch):
+    monkeypatch.setattr(runtime, "get_settings", lambda: staging(enabled=False))
     with pytest.raises(tool.GenerationToolError, match="disabled"):
         await tool.plan(env.db, env.ws_id, "balanced-multilingual@1")
     assert (await env.db.scalars(select(IndexGeneration))).all() == []
@@ -441,3 +436,63 @@ async def test_websocket_reports_an_unavailable_index_without_answering(monkeypa
     await module.websocket_rag(ws)
     assert ws.messages == [{"type": "error", "data": runtime.retrieval_index_unavailable_detail()}]
     assert stream_calls == []
+
+
+async def published(env, name, *, kb_id, version=1, revision=2, text="Yeni yan hak: yılda 3 gün gönüllülük izni."):
+    """A source as the worker publishes it: document, ready version, the revision it commits."""
+    doc = await env.db.get(Document, env.doc_ids[name]) if name in env.doc_ids else None
+    if doc is None:
+        user_id = (await env.db.scalar(select(User.id)))
+        doc = Document(user_id=user_id, organization_id=env.org_id, workspace_id=env.ws_id, knowledge_base_id=kb_id,
+                       filename=f"{name}.md", content="", active_version=version, source_revision=revision)
+        env.db.add(doc)
+        await env.db.flush()
+        env.doc_ids[name] = doc.id
+    row = DocumentVersion(document_id=doc.id, version=version, content_hash=f"{name}-{version}" * 4, file_size=10, status="ready",
+                          stored_path=f"/data/modai/uploads/{name}-{version}.md")
+    env.db.add(row)
+    mirrored = await runtime.mirror_to_active_generation(env.db, document=doc, version=row, text=text, source_revision=revision)
+    doc.active_version, doc.source_revision = version, revision
+    await env.db.commit()
+    return mirrored
+
+
+@pytest.mark.asyncio
+async def test_worker_mirroring_keeps_the_active_generation_current(env, monkeypatch):
+    planned, _, _ = await built_and_validated(env)
+    assert await published(env, "before-activation", kb_id=env.kb_id) is False  # legacy workspace: nothing to mirror
+    # That upload arrived after validation: the candidate is incomplete and cannot be activated
+    # until it is built again (resuming: only the new source is indexed) and validated.
+    report = await tool.validate(env.db, planned["generation_id"], env.adapter)
+    assert report["passed"] is False and report["state"] == "building"
+    assert (await tool.build(env.db, planned["generation_id"], env.adapter))["indexed"] == 1
+    assert (await tool.validate(env.db, planned["generation_id"], env.adapter))["passed"] is True
+    await tool.activate(env.db, env.ws_id, planned["generation_id"], expected_epoch=0, confirm_workspace=env.ws_id)
+    monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
+    scope = {"organization_id": env.org_id, "workspace_id": env.ws_id, "knowledge_base_ids": [env.kb_id, env.kb2_id]}
+
+    # A new upload is searchable in the active generation as soon as the worker publishes it.
+    assert await published(env, "gonullu", kb_id=env.kb_id, text="Gönüllülük izni yılda 3 gündür.") is True
+    context = await pipeline.retrieve_rag_context("Gönüllülük izni yılda kaç gündür?", db=env.db, **scope)
+    assert context.sources[0].document == "gonullu.md"
+
+    # A replacement: the new version is served and the old version's points are pruned.
+    await published(env, "gonullu", kb_id=env.kb_id, version=2, revision=3, text="Gönüllülük izni artık yılda 5 gündür.")
+    context = await pipeline.retrieve_rag_context("Gönüllülük izni yılda kaç gündür?", db=env.db, **scope)
+    assert context.sources[0].document == "gonullu.md" and "5 gündür" in context.sources[0].text
+    generation = await env.db.get(IndexGeneration, planned["generation_id"])
+    records, _ = await env.adapter.scroll_generation(tool._write_index(generation, env.org_id))
+    assert [(r.payload["document_version"], r.payload["source_revision"]) for r in records if r.payload["filename"] == "gonullu.md"] == [(2, 3)]
+
+    # Nothing is behind: no missing source, no outdated item.
+    status = await tool.status(env.db, env.ws_id)
+    assert status["generations"][0]["lag"] == {"missing_or_outdated": [], "stale_points": []}
+
+
+@pytest.mark.asyncio
+async def test_mirroring_fails_closed_when_generations_are_disabled(env, monkeypatch):
+    planned, _, _ = await built_and_validated(env)
+    await tool.activate(env.db, env.ws_id, planned["generation_id"], expected_epoch=0, confirm_workspace=env.ws_id)
+    monkeypatch.setattr(runtime, "get_settings", lambda: staging(enabled=False))
+    with pytest.raises(runtime.RetrievalIndexUnavailableError):
+        await published(env, "late", kb_id=env.kb_id)

@@ -70,6 +70,19 @@ CONVERSATION_RULES = (
     "documents."
 )
 
+# With no retrieved source there is nothing to answer from: a model asked anyway was seen inventing
+# a number ("yılda 5 gün" for a Knowledge Base whose only document had been deleted).
+NO_SOURCE_ANSWERS = {
+    "tr": (
+        "Seçili bilgi kaynaklarında bu soruyu yanıtlayacak bir belge bulamadım. Lütfen doğru bilgi "
+        "kaynağının seçili olduğunu kontrol edin."
+    ),
+    "en": (
+        "I found no document in the selected knowledge sources that answers this question. Please "
+        "check that the right knowledge base is selected."
+    ),
+}
+
 LENGTH_INSTRUCTIONS = {
     "short": "Prefer a short answer focused on the essential result.",
     "balanced": "Use a moderate level of detail.",
@@ -85,9 +98,10 @@ class RetrievedRagContext:
     retrieval_latency_ms: float | None = None
     liveness_latency_ms: float | None = None
     prompt_latency_ms: float | None = None
-    # Set when every table row matching a number in the question is in an unresolved conflict
-    # (rag.tables.conflict_answer): the answer is this fixed text and the model is not asked.
-    table_conflict_answer: str | None = None
+    # When set, this fixed text is the answer and the model is not asked: no source was retrieved
+    # (NO_SOURCE_ANSWERS), or every table row matching a number in the question is in an
+    # unresolved conflict (rag.tables.conflict_answer).
+    fixed_answer: str | None = None
 
 
 def build_rag_prompt(
@@ -286,5 +300,9 @@ async def retrieve_rag_context(
         retrieval_latency_ms=retrieval_latency_ms,
         liveness_latency_ms=liveness_latency_ms,
         prompt_latency_ms=(perf_counter() - prompt_started) * 1000,
-        table_conflict_answer=conflict_answer(question, chunks, "en" if language == "en" else "tr", chunk_sources),
+        fixed_answer=(
+            conflict_answer(question, chunks, "en" if language == "en" else "tr", chunk_sources)
+            if chunks
+            else NO_SOURCE_ANSWERS["en" if language == "en" else "tr"]
+        ),
     )

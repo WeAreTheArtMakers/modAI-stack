@@ -5,7 +5,7 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
 
 from app import worker
-from app.models.database import Document, IndexJob
+from app.models.database import Document, IndexJob, WorkspaceRetrievalAssignment
 from app.services.qdrant import QdrantService
 
 
@@ -218,6 +218,8 @@ class Db:
             return self.job
         if model is Document:
             return self.document
+        if model is WorkspaceRetrievalAssignment:
+            return None  # legacy serving: no index generation to mirror into
         raise AssertionError(model)
 
     async def scalar(self, _statement):

@@ -758,6 +758,58 @@ class GenerationQdrantAdapter:
             wait=True,
         )
 
+    async def prune_document(
+        self,
+        index: ResolvedGenerationWriteIndex,
+        *,
+        document_id: int,
+        keep_version: int,
+        keep_chunks: int,
+    ) -> None:
+        """Delete this document's points except chunks 0..keep_chunks-1 of keep_version.
+
+        Used after a new materialization is written, so the document never has no points.
+        """
+        self._validate_positive(keep_version, "keep_version")
+
+        if keep_chunks < 0:
+            raise RetrievalCompatibilityError(
+                "keep_chunks must not be negative"
+            )
+
+        await self.validate_collection(index)
+
+        scope = self._base_filter(
+            index,
+            document_id=document_id,
+        )
+
+        await self.client.delete(
+            collection_name=index.collection_name,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=scope.must,
+                    should=[
+                        models.Filter(
+                            must_not=[
+                                models.FieldCondition(
+                                    key="document_version",
+                                    match=models.MatchValue(
+                                        value=keep_version
+                                    ),
+                                )
+                            ]
+                        ),
+                        models.FieldCondition(
+                            key="chunk_index",
+                            range=models.Range(gte=keep_chunks),
+                        ),
+                    ],
+                )
+            ),
+            wait=True,
+        )
+
     async def count_generation(
         self,
         index: ResolvedGenerationWriteIndex,

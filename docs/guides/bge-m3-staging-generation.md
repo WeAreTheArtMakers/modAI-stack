@@ -1,6 +1,6 @@
-# BGE-M3 staging indeks nesli
+# BGE-M3 çok dilli arama (indeks nesli)
 
-**Durum:** Yalnızca staging. Production'da etkin değil; production embedding ayarı, `rag_documents` koleksiyonu ve veritabanı değişmez. Tasarım: [balanced-multilingual-migration-v1.md](../architecture/balanced-multilingual-migration-v1.md) (#27). Bu belge tasarımın küçültülmüş bir staging uygulamasını anlatır, production geçişi için yetki vermez.
+**Durum:** Staging'de denendi ve doğrulandı. Production'da bir çalışma alanı için açılması sahibin ayrı onayını gerektirir (bkz. 7. bölüm). Açılmadıkça hiçbir çalışma alanının davranışı değişmez. Tasarım: [balanced-multilingual-migration-v1.md](../architecture/balanced-multilingual-migration-v1.md) (#27); bu belge tasarımın tek kurulumlu, küçültülmüş uygulamasını anlatır.
 
 ## 1. Ne yapar
 
@@ -17,21 +17,25 @@ Bir çalışma alanı (Workspace) RAG aramasını doğrulanmış bir **indeks ne
 
 ## 2. Güvenceler
 
-- **Yalnızca staging:** nesil yolu `RETRIEVAL_GENERATIONS_ENABLED=true` **ve** `APP_ENV=staging` birlikte olduğunda açılır. İkisi `docker-compose.staging.yml`'de tanımlıdır. Production bu bayrağı tanımlamaz ve `APP_ENV=development` ile çalışır; bu durumda araç plan/build/validate/activate komutlarını reddeder.
+- **Açık bayrak:** nesil yolu yalnızca `RETRIEVAL_GENERATIONS_ENABLED=true` olduğunda kullanılabilir. Bayrak tek başına hiçbir şeyi değiştirmez: her çalışma alanı, operatör doğrulanmış bir nesli etkinleştirene kadar MiniLM ile hizmet verir. Bayrak kapalıyken araç plan/build/validate/activate komutlarını reddeder.
 - **Vektörler karışmaz:** MiniLM (384) ve BGE-M3 (1024) ayrı koleksiyonlardadır. Sorgu, nesil sözleşmesinin modeliyle gömülür; adaptör, sorgu uzayı ile koleksiyon uzayı aynı değilse Qdrant'a gitmeden hata verir. MiniLM koleksiyonu nesil aracı tarafından okunmaz ve yazılmaz.
 - **Geri dönüş yok:** nesil modundaki bir çalışma alanı hiçbir hatada MiniLM'e düşmez. Atama satırı, nesil durumu ya da sözleşme hash'leri tutmazsa ya da bayrak kapalıysa istek 503 alır (WebSocket'te hata olayı döner).
 - **Yetki aynı kalır:** önce mevcut Knowledge Base yetkilendirmesi çalışır; arama yalnızca yetkili KB'lerde, kurum, çalışma alanı, nesil ve uzay filtreleriyle yapılır. Her sonuç PostgreSQL'de yeniden kontrol edilir: belge silinmemiş, KB yetkili ve sürümü ile kaynak revizyonu indekslenenle aynı olmalı. Eski bir nokta prompt'a girmez.
 - **Eksik indeks etkinleşemez:** etkinleştirme için `ready` durumda, geçmiş bir doğrulama gerekir. Doğrulama sonrası kaynaklar değişmişse veya yeni kaynak olayı varsa etkinleştirme reddedilir.
+- **Yeni yüklemeler nesle de yazılır:** nesil modundaki bir çalışma alanında worker yayınladığı her belgeyi hem `rag_documents`'a (geri dönüş kopyası) hem etkin nesle yazar. Bu yazma kaynak durumu değişmeden önce yapılır. Başarısız olursa yayın commit edilmez ve iş yeniden denenir. Yeni noktalar yazıldıktan sonra eski sürümün noktaları temizlenir; belge arada aranamaz hale gelmez. Silinen belge PostgreSQL'de işaretlenir ve noktaları sorguda elenir. Worker açılışta etkin neslin modelini önceden yükler.
+- **Kaynak yoksa model çağrılmaz:** hiçbir kaynak getirilmezse (boş KB ya da tüm sonuçlar elendi) yanıt, model çağrılmadan sabit bir "belge bulunamadı" metnidir. Staging'de bu durumda model "yılda 5 gün" diye uydurmuştu.
 - **Atomik geçiş:** tek bir `workspace_retrieval_assignments` satırı satır kilidiyle ve beklenen epoch'la değişir. Her istek bu satırı bir kez okur.
 - **Denetim kaydı:** `retrieval_migration_created`, `retrieval_migration_validation_passed/failed`, `retrieval_profile_activated`, `retrieval_profile_rollback`. Kayıtlarda içerik, soru ya da vektör yoktur.
 
 ## 3. Komutlar
 
-Komutlar staging worker konteynerinde çalışır. Çıktıda yalnızca kimlikler, sayılar ve hash'ler bulunur.
+Komutlar worker konteynerinde çalışır. Çıktıda yalnızca kimlikler, sayılar ve hash'ler bulunur.
 
 ```bash
-docker compose -f docker-compose.staging.yml --env-file .env.staging exec -T worker python -m app.tools.retrieval_generation status --workspace-id 1
+docker compose exec -T worker python -m app.tools.retrieval_generation status --workspace-id 1
 ```
+
+Staging'de aynı komut `docker compose -f docker-compose.staging.yml --env-file .env.staging exec -T worker …` ile çalıştırılır. `status`, her nesil için `lag` alanında eksik ya da eski kalan belgeleri gösterir; etkin bir nesilde bu liste boş olmalıdır.
 
 | Komut | Ne yapar |
 |---|---|
@@ -45,9 +49,9 @@ Sonuç: BGE-M3'ü yeniden etkinleştirmek için önce `validate` (durum yeniden 
 
 ## 4. Geri alma
 
-- Worker her yüklemeyi `rag_documents`'a yazmaya devam eder, bu yüzden MiniLM indeksi her zaman günceldir.
+- Worker her yüklemeyi `rag_documents`'a yazmaya devam eder, bu yüzden MiniLM indeksi her zaman günceldir; nesil modunda aynı yükleme etkin nesle de yazılır.
 - Geri alma yalnızca bir işaretçi değişikliğidir; yeniden indeksleme gerekmez. Staging provası 4,2 saniye sürdü (`docker exec` dahil) ve sonraki istek MiniLM kaynaklarıyla yanıtlandı.
-- Geri almadan sonra API süreci BGE-M3'ü bellekte tutmaya devam eder. Belleği boşaltmak için yalnızca staging API konteyneri yeniden başlatılır.
+- Geri almadan sonra API ve worker süreçleri BGE-M3'ü bellekte tutmaya devam eder. Belleği boşaltmak için bu iki konteyner yeniden başlatılır.
 - BGE-M3 koleksiyonunu tamamen kaldırmak ayrı ve onaylı bir işlemdir; bu araç koleksiyon silmez.
 
 ## 5. Staging ölçümleri
@@ -74,6 +78,12 @@ Ortam: Apple M1 Pro 16 GB, Docker CPU. Çalışma alanı 1'de 24 kurgusal belge 
 - Bu küçük kurgusal setteki sonuç üretim güvenilirliğini kanıtlamaz.
 
 Kök neden notu: MiniLM en fazla 256 token görür. Türkçe bir parçada bu yaklaşık ilk 80 kelimedir. Demo belgelerinin hepsi aynı başlık ve uyarı metniyle başladığından MiniLM belgeleri zayıf ayırır. BGE-M3 parçanın tamamını görür (8192 token).
+
+### Yeni yükleme ve silme (staging, BGE-M3 etkin)
+
+- Kurgusal bir test belgesi "General" KB'ye yüklendi. 20,6 saniyede indekslendi; bu süreye worker'ın modeli ilk kez yüklemesi dahil. Belge etkin nesilden hemen bulundu ve yanıt doğruydu ("yılda 3 iş günü").
+- Bellek baskısı altında, API ile aynı anda model yüklenirken aynı işlem 108 saniye sürdü. Worker artık modeli açılışta yüklüyor.
+- Belge silindikten sonra hiçbir kaynakta görünmedi ve yanıt sabit "belge bulunamadı" metni oldu. Bu düzeltmeden önce model aynı durumda kaynaksız "yılda 5 gün" diye uydurmuştu.
 
 ### Bellek ve gecikme
 
@@ -109,10 +119,22 @@ Yanıttaki her sayının getirilen metinde geçmesini isteyen deterministik bir 
 
 Sözcük örtüşmesine dayalı bir kural ise doğru diller arası yanıtları reddederdi; örneğin Türkçe soruya İngilizce "2 devices" satırından verilen yanıtı. Bu yüzden ikisi de eklenmedi. Bu hata türünün ölçülen çözümü doğru belgeyi getirmek: BGE-M3 ile kendinden emin yanlış sayı 3'ten 0'a indi.
 
-## 7. Production için eksikler (ayrı onay gerektirir)
+Eklenen tek koruma, hiç kaynak getirilmediğinde modeli çağırmamak. Bu durum kesin olarak tanımlı olduğu için yanlış ret üretmez.
 
-- **Yeni yüklemeler nesle yazılmaz.** Nesil modunda yeni yüklenen ya da değiştirilen bir belge, nesil yeniden oluşturulana kadar aranamaz. Değişen belgenin eski noktaları sorguda elenir. `status` komutu bunu `validation_current: false` olarak gösterir. Production'da gerekenler: tasarımdaki çift indeksleme, olay kuyruğunu yeniden oynatma, yazma kapısı ve kaynak olayları için alındı kayıtları.
-- **Yönetim yüzü yok.** Komut satırı dışında yönetim API'si, arayüz ve rol kontrolü yok.
-- **Doğrulanmış MiniLM nesli yok.** Bu yapılmadan "anında geri alma" production'da tasarımın istediği biçimde iddia edilemez; staging'de geri alma, sürekli güncel tutulan eski koleksiyona yapılır.
-- **Ölçümler eksik.** Kapasite ve gecikme hedef donanımda swap olmadan ölçülmeli. Eşzamanlılık ve uzun belgeler ölçülmedi.
-- **Değerlendirme seti küçük.** Gerçek, yetkili bir belge setiyle değerlendirme yapılmalı; 24 kurgusal belge ve 9 soru yeterli değil.
+## 7. Production'da açmak (sahip onayıyla)
+
+1. Sürüm dağıtılır (pilot kontrol listesi, 8. bölüm). Production compose dosyasında API ve worker için `RETRIEVAL_GENERATIONS_ENABLED: "true"` ve `RETRIEVAL_MODEL_ROOT: "/models"` tanımlanır. Bu adım tek başına yanıtları değiştirmez.
+2. BGE-M3 dosyası `python3 scripts/fetch_retrieval_models.py` ile indirilir ya da `--check` ile doğrulanır.
+3. Çalışma alanı için sırayla `plan`, `build`, `validate` çalıştırılır. Doğrulama geçmeden etkinleştirme yapılamaz.
+4. `activate` çalıştırılır; `status` çıktısında `serving_mode: generation` ve boş `lag` görülür.
+5. Kabul soruları gerçek belgelerle sorulur. Sorun çıkarsa `rollback` tek komuttur.
+
+Bellek: API ve worker BGE-M3'ü tutar (her biri yaklaşık 2 GiB). Docker VM sınırı en az 8 GiB olmalı ve aynı makinede staging yığını çalışmamalıdır.
+
+## 8. Bilinen sınırlar
+
+- **Tek çalışma alanı için tasarlandı.** Yönetim yalnızca komut satırından yapılır; arayüz, yönetim API'si ve rol kontrolü yok.
+- **Etkinleştirme sırasında yazma kapısı yok.** `validate` ile `activate` arasında gelen bir yükleme etkinleştirmeyi reddettirir; nesil yeniden `build` ve `validate` edilir.
+- **Doğrulanmış bir MiniLM nesli yok.** Geri alma, worker'ın sürekli güncel tuttuğu eski `rag_documents` koleksiyonuna yapılır.
+- **Ölçümler swap altında alındı.** Kapasite ve gecikme pilot makinesinde, yalnızca production yığını çalışırken yeniden ölçülmelidir.
+- **Değerlendirme seti küçük.** 24 kurgusal belge ve 9 soru üretim güvenilirliğini kanıtlamaz; gerçek belgelerle kabul testi gerekir.

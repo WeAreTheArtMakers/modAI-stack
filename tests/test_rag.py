@@ -249,7 +249,7 @@ async def test_websocket_rag_passes_postgres_session_to_retrieval(
         return SimpleNamespace(
             sources=[],
             prompt="prompt",
-            table_conflict_answer=None,
+            fixed_answer=None,
         )
 
     class FakeProvider:
@@ -360,7 +360,7 @@ async def test_http_rag_persists_only_after_generation_completes(
         }
         return SimpleNamespace(
             prompt="prompt",
-            table_conflict_answer=None,
+            fixed_answer=None,
             sources=[
                 Source(
                     document="guide.pdf",
@@ -492,7 +492,7 @@ async def test_stateless_http_rag_uses_current_user_preferences_without_history(
 
     async def retrieve(_question, **kwargs):
         observed.update(kwargs)
-        return SimpleNamespace(prompt="controlled prompt", sources=[], table_conflict_answer=None)
+        return SimpleNamespace(prompt="controlled prompt", sources=[], fixed_answer=None)
 
     class FakeProvider:
         calls = 0
@@ -635,7 +635,7 @@ async def test_websocket_rag_persists_before_complete_event(
         }
         return SimpleNamespace(
             prompt="prompt",
-            table_conflict_answer=None,
+            fixed_answer=None,
             sources=[
                 Source(
                     document="guide.pdf",
@@ -806,7 +806,7 @@ async def test_websocket_rag_does_not_persist_partial_provider_failure(
     async def retrieve(_question, **_kwargs):
         return SimpleNamespace(
             prompt="prompt",
-            table_conflict_answer=None,
+            fixed_answer=None,
             sources=[],
         )
 
@@ -875,3 +875,30 @@ async def test_websocket_rag_does_not_persist_partial_provider_failure(
     assert {
         "type": "complete",
     } not in ws.messages
+
+
+@pytest.mark.asyncio
+async def test_no_retrieved_source_gives_a_fixed_answer_instead_of_the_model(monkeypatch):
+    """Seen in staging: with an empty Knowledge Base the model answered "yılda 5 gün" anyway."""
+
+    class Embeddings:
+        async def embed_text(self, _text):
+            return [1.0]
+
+    class NoHits:
+        async def search(self, **_kwargs):
+            return []
+
+    async def no_assignment(*_args):
+        return None
+
+    monkeypatch.setattr(pipeline, "get_embedding_service", lambda: Embeddings())
+    monkeypatch.setattr(pipeline, "qdrant_service", NoHits())
+    monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
+    scope = {"db": SimpleNamespace(get=no_assignment), "organization_id": 1, "workspace_id": 2, "knowledge_base_ids": [3]}
+
+    turkish = await pipeline.retrieve_rag_context("Yılda kaç gün gönüllülük izni var?", **scope)
+    assert turkish.sources == [] and turkish.fixed_answer == pipeline.NO_SOURCE_ANSWERS["tr"]
+    assert not any(ch.isdigit() for ch in turkish.fixed_answer)
+    english = await pipeline.retrieve_rag_context("How many volunteer days?", response_language="en", **scope)
+    assert english.fixed_answer == pipeline.NO_SOURCE_ANSWERS["en"]
