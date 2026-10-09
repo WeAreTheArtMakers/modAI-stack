@@ -15,7 +15,9 @@ command -v docker >/dev/null 2>&1 || { echo "docker is required" >&2; exit 69; }
 mkdir -p "$archive_dir"
 umask 077
 
-docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-rag_platform}" > "$archive_dir/postgres.sql"
+# The database user and name come from the postgres container's own environment (single quotes:
+# expanded inside the container), never from this shell, where they are usually unset.
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$archive_dir/postgres.sql"
 docker compose cp qdrant:/qdrant/storage "$archive_dir/qdrant-storage"
 docker compose cp worker:/data/modai "$archive_dir/modaidata"
 
