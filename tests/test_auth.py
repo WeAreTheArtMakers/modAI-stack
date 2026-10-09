@@ -223,6 +223,67 @@ async def test_refresh_origin_policy_accepts_same_and_trusted_origin(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_refresh_origin_policy_includes_the_port(monkeypatch):
+    # A console on a non-default port (http://localhost:5183): the proxy must forward Host with the
+    # port, and a Host without it is not the same origin.
+    monkeypatch.setattr(auth, "get_settings", lambda: auth_settings())
+    monkeypatch.setattr(auth, "_limit", no_limit)
+    install_refresh_sessions(monkeypatch)
+    user = User(id=7, email="port@example.com", password_hash="hash", role="user")
+
+    class FakeDb:
+        async def get(self, model, user_id): return user if model is User and user_id == user.id else None
+
+    token = await auth._issue_refresh_token(user)
+    await auth.refresh(request_for("/refresh", {"host": "localhost:5183", "origin": "http://localhost:5183"}), Response(), token, FakeDb())
+    with pytest.raises(HTTPException) as error:
+        await auth.refresh(request_for("/refresh", {"host": "localhost", "origin": "http://localhost:5183"}), Response(), "not-used", FakeDb())
+    assert error.value.status_code == 403
+
+
+def test_refresh_and_logout_read_the_configured_cookie_end_to_end(monkeypatch):
+    # Login sets REFRESH_COOKIE_NAME (modai_refresh); refresh and logout must read that same cookie.
+    from app.db.session import get_db
+
+    settings = auth_settings()
+    monkeypatch.setattr(auth, "get_settings", lambda: settings)
+    monkeypatch.setattr(auth, "_limit", no_limit)
+    sessions = install_refresh_sessions(monkeypatch)
+    user = User(id=8, email="cookie@example.com", password_hash="hash", role="user")
+
+    class FakeDb:
+        async def get(self, model, user_id): return user if model is User and user_id == user.id else None
+
+    import asyncio
+
+    token = asyncio.run(auth._issue_refresh_token(user))
+    app.dependency_overrides[get_db] = lambda: FakeDb()
+    try:
+        client = TestClient(app, base_url="http://localhost:5183")
+        origin = {"Origin": "http://localhost:5183"}
+        client.cookies.set("modai_refresh", token)
+        refreshed = client.post("/auth/refresh", headers=origin)
+        assert refreshed.status_code == 200 and refreshed.json()["access_token"]
+        rotated = refreshed.cookies.get("modai_refresh")
+        assert rotated and rotated != token and len(sessions.sessions) == 1  # one-time: the old session is gone
+        client.cookies.set("modai_refresh", rotated)
+        assert client.post("/auth/logout", headers=origin).status_code == 204
+        assert sessions.sessions == {}  # logout revoked the session on the server
+        client.cookies.set("modai_refresh", rotated)
+        assert client.post("/auth/refresh", headers=origin).status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_console_proxy_forwards_host_with_port():
+    from pathlib import Path
+
+    config = (Path(__file__).resolve().parents[1] / "frontend" / "nginx.conf").read_text()
+    assert config.count("proxy_set_header Host $http_host;") == 2  # /api/ and /ws/
+    assert "proxy_set_header Host $host;" not in config
+
+
+@pytest.mark.asyncio
 async def test_refresh_and_logout_reject_untrusted_origins(monkeypatch):
     monkeypatch.setattr(auth, "get_settings", lambda: auth_settings())
     monkeypatch.setattr(auth, "_limit", no_limit)

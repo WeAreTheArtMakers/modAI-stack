@@ -357,7 +357,7 @@ describe("modAI Voice", () => {
     renderVoice(fakes);
     await askBySpeaking();
     await waitFor(() => expect(phase()).toBe("idle"));
-    expect(fakes.streamRag.mock.calls[0][4]).toEqual(expect.objectContaining({ responseLanguage: "tr", diagnostics: true }));
+    expect(fakes.streamRag.mock.calls[0][4]).toEqual(expect.objectContaining({ responseLanguage: "tr", responseLength: "short", diagnostics: true }));
     expect(fakes.engine.speak.mock.calls.map(([, , text]) => text)).toEqual(["vi pi en rehberine göre en fazla 2 cihazdan bağlanabilirsiniz."]);
     expect(screen.getByText(/1 bölüm Türkçe olmadığı için Türkçe sesle okunmadı/)).toBeInTheDocument();
     expect(screen.getByText(/Every session ends after 12 hours/)).toBeInTheDocument(); // still shown as text

@@ -49,6 +49,8 @@ export function streamRag(
     conversationId?: number;
     /** Answer language for this request only (voice); stored preferences are unchanged. */
     responseLanguage?: "tr" | "en";
+    /** Answer length for this request only (voice asks for "short"); stored preferences are unchanged. */
+    responseLength?: "short" | "balanced" | "detailed";
     /** Ask the server for numeric stage timings. */
     diagnostics?: boolean;
     onTicket?: () => void;
@@ -110,6 +112,7 @@ export function streamRag(
           knowledge_base_ids: number[];
           conversation_id?: number;
           response_language?: "tr" | "en";
+          response_length?: "short" | "balanced" | "detailed";
           diagnostics?: boolean;
         } = {
           question,
@@ -120,6 +123,9 @@ export function streamRag(
         }
         if (options.responseLanguage !== undefined) {
           payload.response_language = options.responseLanguage;
+        }
+        if (options.responseLength !== undefined) {
+          payload.response_length = options.responseLength;
         }
         if (options.diagnostics) {
           payload.diagnostics = true;

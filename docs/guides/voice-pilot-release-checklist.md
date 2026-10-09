@@ -27,7 +27,8 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
 - [ ] Bazı sayısal sorularda tablo bir değeri çözmez: değer iki satırın tam sınırındadır ya da aynı sütunlu iki belge farklı değer verir. Bu durumda model çağrılmaz; tablodan üretilen sabit bir açıklama döner ve kaynaklar yine gösterilir.
 
 ## 6. Bilinen sınırlamalar (müşteriye söylenecek)
-- **Belge arama:** Türkçe sorularla İngilizce belgeler çoğu zaman bulunmaz (MiniLM). Bazı sözcükle söylenmiş sayılarda ("üç yıl", "on bin lira") doğru belge gelmeyebilir.
+- **Belge arama (MiniLM):** Türkçe sorularla İngilizce belgeler bulunmaz. Staging ölçümünde diller arası 7 sorunun 0'ında doğru belge ilk 3'te çıktı; BGE-M3 ile 7/7. Arama, sözcükle söylenen sayıyı ("üç yıl") rakamla ("3 yıl") birlikte de deniyor. Bu yalnızca kısmi bir iyileşme: 15 sorunun 9'undan 10'una çıktı. Kalıcı çözüm, ayrıca onaylanacak çok dilli embedding geçişi (BGE-M3, tasarım #27).
+- **Belgesiz soru:** doğru belge gelmezse model zaman zaman uydurma bir değer verebilir (ör. SLA yanıt süresi). Kaynak paneli bu durumda ilgili belgeyi göstermez.
 - **Sürüm seçimi:** eski ve güncel politika arasında seçim yapılmaz. Sistem iki belgenin farklı olduğunu söyler, ama hangisinin geçerli olduğunu bilemez.
 - **Desteklenmeyenler:** hesaplamalar (toplamlar), PDF ya da birleşik hücreli tablolar.
 - **Tabloda olmayan sütun:** tabloda olmayan bir bilgi sorulursa model yine de bir satırdan yanıt verebilir.
@@ -47,6 +48,11 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
 - [ ] PR #51 sahip tarafından onaylanmış ve merge edilmiş, CI yeşil.
 - [ ] Yeni migration yok. Alembic head `0008_assistant_preferences` olarak kalır. Yeni ortam değişkeni yok.
 - [ ] Güvenlik başlıkları nginx'te ve FastAPI'de değişir: `microphone=(self)`, `script-src 'self' 'wasm-unsafe-eval'`, `worker-src 'self'`.
+- [ ] Oturum yenileme düzeltmesi:
+  - nginx `Host`'u portla birlikte iletir (`$http_host`).
+  - API refresh çerezini yapılandırılmış adla (`REFRESH_COOKIE_NAME`) okur.
+  - Bu düzeltme olmadan production'da da refresh 403/401 döner ve oturum 30 dakikada düşer.
+  - Dağıtım sonrası doğrulama: giriş yapılır, `POST /api/auth/refresh` 200 dönmeli; logout 204, ardından refresh 401 dönmeli.
 - [ ] Ses modelleri build makinesinde `frontend/public/voice-models/` altına indirilmiş ve `--check` ile doğrulanmıştır. Frontend imajı bu dosyaları içerir.
 - [ ] Kuyrukta bekleyen indeksleme işi yok (`LLEN modai:indexing:queued`).
 - [ ] Çalışan imajlar geri alma etiketiyle işaretlenir. Bkz. 9. bölüm.
