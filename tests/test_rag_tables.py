@@ -313,6 +313,9 @@ async def test_retrieval_context_carries_the_fixed_answer_only_for_live_authoriz
         def __init__(self, live):
             self.live = live
 
+        async def get(self, *_args):
+            return None
+
         async def scalars(self, _statement):
             return SimpleNamespace(all=lambda: self.live)
 
@@ -366,6 +369,9 @@ async def test_retrieval_searches_the_spoken_and_the_digit_form_and_keeps_each_c
             return [hit(2, 0.63), hit(3, 0.62), hit(1, 0.61)][:limit] if vector == [1.0] else [hit(1, 0.64), hit(2, 0.60), hit(4, 0.59)][:limit]
 
     class Db:
+        async def get(self, *_args):
+            return None
+
         async def scalars(self, _statement):
             return SimpleNamespace(all=lambda: [1, 2, 3, 4])
 

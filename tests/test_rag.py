@@ -101,9 +101,12 @@ async def test_rag_pipeline_uses_configured_top_k_when_no_limit_is_supplied(monk
     monkeypatch.setattr(pipeline, "qdrant_service", FakeQdrantService())
     monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
 
+    async def no_assignment(*_args):
+        return None
+
     context = await pipeline.retrieve_rag_context(
         "question",
-        db=SimpleNamespace(),
+        db=SimpleNamespace(get=no_assignment),
         organization_id=1,
         workspace_id=2,
         knowledge_base_ids=[3],
@@ -147,6 +150,9 @@ async def test_rag_pipeline_filters_tombstoned_qdrant_hits_using_postgres(
             return [1]
 
     class FakeDb:
+        async def get(self, *_args):
+            return None  # no retrieval assignment: the legacy index
+
         async def scalars(self, _statement):
             return ScalarResult()
 

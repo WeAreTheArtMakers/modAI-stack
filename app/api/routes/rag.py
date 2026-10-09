@@ -6,11 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.api.deps import current_user
 from app.models.schemas import RagRequest, RagResponse
 from app.api.authorization import resolve_knowledge_base_scope
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.llm.ollama import OllamaProvider
 from app.services.rag.pipeline import retrieve_rag_context
 from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail, get_embedding_service
+from app.services.rag.generation_runtime import (
+    RetrievalIndexUnavailableError,
+    retrieval_index_unavailable_detail,
+    warm_active_generation_models,
+)
+from app.services.rag.retrieval_contracts import RetrievalCompatibilityError
 from app.services.security import RedisRateLimiter
 from app.core.config import get_settings
 from app.services.observability import metrics
@@ -54,6 +60,11 @@ async def warm_up_generation_model(user=Depends(current_user)):
             await get_embedding_service().embed_text("ısınma")
         except Exception:
             logger.warning("Embedding model warm-up failed", extra={"component": "rag"})
+        try:
+            async with SessionLocal() as db:
+                await warm_active_generation_models(db)  # staging-only; a no-op otherwise
+        except Exception:
+            logger.warning("Generation model warm-up failed", extra={"component": "rag"})
         try:
             await provider.preload()
         except Exception:
@@ -103,6 +114,9 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
         )
     except EmbeddingModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=embedding_model_unavailable_detail()) from exc
+    except (RetrievalIndexUnavailableError, RetrievalCompatibilityError) as exc:
+        logger.error("Retrieval index unavailable", extra={"component": "rag", "workspace_id": workspace_id})
+        raise HTTPException(status_code=503, detail=retrieval_index_unavailable_detail()) from exc
     metrics.event("rag_requests")
 
     # Retrieval, authorization, and preference reads are complete. Do not keep

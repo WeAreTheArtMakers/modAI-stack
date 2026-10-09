@@ -22,6 +22,11 @@ from app.services.rag.embeddings import (
     EmbeddingModelUnavailableError,
     embedding_model_unavailable_detail,
 )
+from app.services.rag.generation_runtime import (
+    RetrievalIndexUnavailableError,
+    retrieval_index_unavailable_detail,
+)
+from app.services.rag.retrieval_contracts import RetrievalCompatibilityError
 
 
 router = APIRouter()
@@ -108,6 +113,15 @@ async def websocket_rag(ws: WebSocket):
                             "data": (
                                 embedding_model_unavailable_detail()
                             ),
+                        }
+                    )
+                    continue
+                except (RetrievalIndexUnavailableError, RetrievalCompatibilityError):
+                    # Never answered from another index: the workspace's generation is unusable.
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "data": retrieval_index_unavailable_detail(),
                         }
                     )
                     continue
