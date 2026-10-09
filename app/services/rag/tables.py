@@ -12,7 +12,17 @@ Measured on the fictional demo pack (gemma3:4b, 5 runs each): 3 years -> 16 days
 5/5 and 40.000 TL -> department director + purchasing from 3/5 to 5/5. Rewriting the tables row by
 row without the lookup did not help (0/5 and 0/5), so the context text itself is left unchanged.
 
-Supported: Markdown pipe tables with a header and a separator row; range cells written as
+When every row that contains a number from the question is part of an unresolved conflict, the
+model is not asked at all: ``conflict_answer`` returns a fixed Turkish (or English) answer built from
+the table rows. Conflicts are a value exactly on a boundary shared by rows of one table, or tables
+with the same columns in different documents giving different rows (e.g. an obsolete and a current
+version: without version metadata the system does not pick one). If another table answers the same
+number without conflict, the model answers with the lookup lines instead. When a number matches
+tables of several documents, only tables whose title, section or columns share a word with the
+question count (all of them if none does), so an unrelated table in the same unit does not interfere.
+
+Supported: well-formed Markdown pipe tables (a header and a separator row; a table with a row or
+header of the wrong width is ignored entirely); range cells written as
 "A–B unit", "A unit'ye kadar", "A unit üzeri" / "A unit'yi aşan" (exclusive), "A unit ve üzeri",
 "A unit altında" / "A unit'den az", "A unit ve altı", "en fazla A unit", optionally followed by a
 subject ("5.000 TL'yi aşan eğitim" applies only when the question names every subject word); units
@@ -218,7 +228,13 @@ def _row(text: str, position: int, columns: int) -> tuple[list[str], int] | None
     return cells, cursor
 
 
+_EXTRA_CELL = re.compile(r"\s*[^|\n#]{1,80}\|\s*(?:\||$)")  # after the last row: one more cell
+_EXTRA_HEADER_CELL = re.compile(r"\|[^|\n#]{1,80}$")  # before the header: one more cell
+
+
 def parse_tables(text: str) -> list[Table]:
+    """Well-formed Markdown pipe tables only: a header and every row with exactly the separator's
+    number of cells. A table with a short, long or broken row is not returned at all."""
     tables: list[Table] = []
     for separator in _SEPARATOR.finditer(text):
         if tables and separator.start() < tables[-1].end:
@@ -235,14 +251,15 @@ def parse_tables(text: str) -> list[Table]:
                 if pipes == columns + 1:
                     break
             cursor -= 1
-        if pipes != columns + 1 or not before.endswith("|"):
-            continue
+        if pipes != columns + 1 or not before.endswith("|") or _EXTRA_HEADER_CELL.search(before, 0, cursor):
+            continue  # no header, or a header with more cells than the separator
         header_start = cursor
         header = _row(before, header_start, columns)
         if not header:
             continue
         rows: list[list[str]] = []
         position = separator.end()
+        well_formed = True
         while True:
             next_pipe = position
             while next_pipe < len(text) and text[next_pipe] in " \t\r\n":
@@ -251,10 +268,13 @@ def parse_tables(text: str) -> list[Table]:
                 break
             row = _row(text, next_pipe, columns)
             if not row:
+                well_formed = False  # a row with fewer cells
                 break
             rows.append(row[0])
             position = row[1]
-        if rows:
+        if _EXTRA_CELL.match(text, position):
+            well_formed = False  # the last row had more cells than the header
+        if rows and well_formed:
             tables.append(Table(header_start, position, header[0], rows))
     return tables
 
@@ -263,30 +283,75 @@ def _clean(text: str) -> str:
     return " ".join(re.sub(r"[#*>_`|]", " ", text).split())
 
 
-def _location(text: str, table: Table) -> str:
-    """Where a table sits, so tables can be told apart: the document title (when the chunk starts
-    with one; it also carries labels such as "ESKİ ... (yürürlükten kalktı)") and the nearest heading
-    above the table. Never the tail of the previous paragraph, which the model would repeat."""
-    parts = []
+def _location(text: str, table: Table) -> tuple[str | None, str | None]:
+    """The document title (when the chunk starts with one; it also carries labels such as
+    "ESKİ ... (yürürlükten kalktı)") and the nearest heading above the table. Never the tail of the
+    previous paragraph, which the model would repeat."""
     title = re.match(r"\s*#\s+([^#>|*]{3,120}?)\s*(?=[#>|*-]|$)", text)
     title_end = title.end() if title and title.end() <= table.start else -1
-    if title_end != -1:
-        parts.append(f'document "{_clean(title.group(1))}"')
     heading = text.rfind("#", max(0, table.start - 300), table.start)
-    if heading != -1 and heading >= title_end:
-        parts.append(f'section "{" ".join(_clean(text[heading: table.start]).split()[:12])}"')
-    return ", ".join(parts) or "a table"
+    section = " ".join(_clean(text[heading: table.start]).split()[:12]) if heading != -1 and heading >= title_end else None
+    return (_clean(title.group(1)) if title_end != -1 else None), section
 
 
-def table_lookup(question: str, chunks: list[str]) -> list[str]:
-    """Rows whose range column contains a quantity from the question, one line per table."""
+# Question words too generic to tell tables apart.
+_GENERIC_WORDS = {
+    "kadar", "için", "hangi", "nedir", "nasıl", "neler", "olan", "olarak", "bana", "benim", "bunu", "şirket",
+    "şirketin", "gerekir", "gerekiyor", "olur", "olacak", "yapılır", "miyim", "mıyım", "misin", "mısın", "kimin",
+    "kimler", "ediyor", "ediyorum", "tutar", "tutarı", "toplam", "miktar", "miktarı",
+}
+
+
+def _topic_words(text: str) -> set[str]:
+    words = re.findall(r"[^\W\d_]+", _lower(text))
+    return {
+        word for word in words
+        if len(word) >= 4 and word not in _GENERIC_WORDS and word not in _ONES and word not in _TENS and not _unit(word)
+    }
+
+
+def _related(question_words: set[str], table_words: set[str]) -> bool:
+    """A shared word, suffix-tolerant (first five letters): "aracım" ~ "Aracı", "taşınıyorum" ~ "Taşınma"."""
+    return any(q[:5] == w[:5] for q in question_words for w in table_words)
+
+
+@dataclass
+class TableMatch:
+    """Rows of one table that contain a quantity from the question (two or more: a shared boundary)."""
+
+    quantity: Quantity
+    value: float  # in the table's unit
+    unit: str
+    title: str | None
+    section: str | None
+    table: Table
+    column: int
+    rows: list[list[str]]
+    related: bool  # the table's title, section or columns share a word with the question
+
+    def where(self) -> str:
+        parts = [f'document "{self.title}"' if self.title else "", f'section "{self.section}"' if self.section else ""]
+        return ", ".join(part for part in parts if part) or "a table"
+
+    def shown(self) -> str:
+        converted = self.quantity.unit != self.unit
+        return self.quantity.text + (f" (= {self.value:g} {self.unit})" if converted else "")
+
+    def outputs(self, row: list[str]) -> tuple[tuple[str, str], ...]:
+        return tuple((header, cell) for index, (header, cell) in enumerate(zip(self.table.headers, row)) if index != self.column)
+
+
+def table_matches(question: str, chunks: list[str]) -> list[TableMatch]:
     asked = quantities(question)
     if not asked:
         return []
     question_words = set(re.findall(r"[^\W\d_]+", _lower(question)))
-    lines: list[str] = []
+    question_topic = _topic_words(question)
+    found: list[TableMatch] = []
     for chunk in chunks:
         for table in parse_tables(chunk):
+            title, section = _location(chunk, table)
+            related = _related(question_topic, _topic_words(" ".join([title or "", section or "", *table.headers])))
             for column in range(len(table.headers)):
                 ranges = [(row, parse_range(row[column])) for row in table.rows]
                 units = {parsed.unit for _, parsed in ranges if parsed}
@@ -299,20 +364,113 @@ def table_lookup(question: str, chunks: list[str]) -> list[str]:
                     if factor is None:
                         continue
                     value = quantity.value * factor
-                    shown = f"{quantity.text}" + (f" (= {value:g} {unit})" if factor != 1.0 else "")
-                    where = _location(chunk, table)
                     # Only rows about the same subject can share a boundary.
                     by_subject: dict[tuple[str, ...], list[list[str]]] = {}
                     for row, parsed in ranges:
                         if parsed and parsed.contains(value):
                             by_subject.setdefault(tuple(_qualifier(row[column])), []).append(row)
-                    for matches in by_subject.values():
-                        if len(matches) == 1:
-                            lines.append(f"- {shown}: in {where}, this value falls in the row \"{table.describe_row(matches[0])}\".")
-                        else:
-                            rows = " / ".join(f'"{table.describe_row(row)}"' for row in matches)
-                            lines.append(
-                                f"- {shown}: in {where}, this exact value is on the boundary of the rows {rows}. "
-                                "The document does not say which of them applies; do not choose one."
-                            )
+                    for rows in by_subject.values():
+                        found.append(TableMatch(quantity, value, unit, title, section, table, column, rows, related))
+    # Retrieval often brings unrelated tables in the same unit (a 15.000 km service table next to a
+    # 300 km relocation table). When some tables share a word with the question, only those count.
+    relevant: list[TableMatch] = []
+    for quantity in dict.fromkeys(match.quantity for match in found):
+        same = [match for match in found if match.quantity == quantity]
+        relevant += [match for match in same if match.related] or same
+    return relevant
+
+
+def _conflicts(matches: list[TableMatch]) -> list[list[TableMatch]]:
+    """Groups of matches that contradict each other with no rule saying which applies:
+    - one table where the value is on a boundary of rows with different values;
+    - tables with the same columns in different documents (e.g. an old and a current version)
+      giving different values. Without version metadata the system cannot pick one."""
+    groups: list[list[TableMatch]] = []
+    singles: dict[tuple, list[TableMatch]] = {}
+    for match in matches:
+        if len(match.rows) > 1:
+            if len({match.outputs(row) for row in match.rows}) > 1:
+                groups.append([match])
+        else:
+            key = (match.quantity, tuple(_lower(header) for header in match.table.headers), match.column)
+            singles.setdefault(key, []).append(match)
+    for same_columns in singles.values():
+        if len({m.title for m in same_columns}) > 1 and len({m.outputs(m.rows[0]) for m in same_columns}) > 1:
+            groups.append(same_columns)
+    return groups
+
+
+def table_lookup(question: str, chunks: list[str]) -> list[str]:
+    """Prompt lines: the row that contains each quantity from the question, or the conflict."""
+    matches = table_matches(question, chunks)
+    lines: list[str] = []
+    in_conflict = set()
+    for group in _conflicts(matches):
+        in_conflict.update(id(match) for match in group)
+        if len(group) == 1:
+            match = group[0]
+            rows = " / ".join(f'"{match.table.describe_row(row)}"' for row in match.rows)
+            lines.append(
+                f"- {match.shown()}: in {match.where()}, this exact value is on the boundary of the rows {rows}. "
+                "The document does not say which of them applies; do not choose one."
+            )
+        else:
+            rows = "; ".join(f'{match.where()}: "{match.table.describe_row(match.rows[0])}"' for match in group)
+            lines.append(
+                f"- {group[0].shown()}: tables with the same columns in different documents give different rows: {rows}. "
+                "The system cannot verify which document is current; do not present either as the answer."
+            )
+    for match in matches:
+        if id(match) not in in_conflict:
+            lines.append(f"- {match.shown()}: in {match.where()}, this value falls in the row \"{match.table.describe_row(match.rows[0])}\".")
     return lines
+
+
+def _number_text(value: float, unit: str) -> str:
+    if value.is_integer():
+        number = f"{int(value):,}".replace(",", ".")
+    else:
+        number = f"{value:.2f}".rstrip("0").replace(".", ",")
+    return f"{number} {unit}"
+
+
+def _row_text(match: TableMatch, row: list[str], english: bool) -> str:
+    outputs = ", ".join(f"{header}: {cell}" for header, cell in match.outputs(row))
+    return f"“{row[match.column]}” row: {outputs}" if english else f"“{row[match.column]}” satırında {outputs}"
+
+
+def conflict_answer(question: str, chunks: list[str], language: str = "tr") -> str | None:
+    """A fixed answer, built from the tables, when every table row that contains a number from the
+    question is part of an unresolved conflict (a shared boundary, or documents that disagree).
+    The model is not asked: a small model picks one of the rows with confidence. None otherwise,
+    including when another table gives a single, unambiguous row for the same number."""
+    matches = table_matches(question, chunks)
+    groups = _conflicts(matches)
+    english = language == "en"
+    for quantity in dict.fromkeys(match.quantity for match in matches):
+        relevant = [match for match in matches if match.quantity == quantity]
+        conflicting = [group for group in groups if group[0].quantity == quantity]
+        if sum(len(group) for group in conflicting) != len(relevant):
+            continue  # some table answers this number without conflict: leave it to the model
+        sentences = []
+        for group in conflicting:
+            first = group[0]
+            value = _number_text(first.value, first.unit)
+            if len(group) == 1:
+                rows = "; ".join(_row_text(first, row, english) for row in first.rows)
+                if english:
+                    where = f'the table in "{first.title}"' if first.title else "the table"
+                    sentences.append(f"The document does not settle this: {value} is exactly on the boundary between rows of {where}. {rows}. The document does not say which row includes the boundary value.")
+                else:
+                    where = f"“{first.title}” belgesindeki tabloda" if first.title else "getirilen belgedeki tabloda"
+                    sentences.append(f"Belge bu soruya kesin bir yanıt vermiyor: {value}, {where} iki satırın tam sınırında. {rows}. Belge, sınır değerin hangi satıra dahil olduğunu belirtmiyor.")
+            else:
+                if english:
+                    rows = "; ".join(f'in "{match.title}", {_row_text(match, match.rows[0], True)}' for match in group)
+                    sentences.append(f"The retrieved documents disagree for {value}: {rows}. The system cannot verify which document is current.")
+                else:
+                    rows = "; ".join(f"“{match.title}” belgesinde {_row_text(match, match.rows[0], False)}" for match in group)
+                    sentences.append(f"Getirilen belgeler {value} için farklı bilgi veriyor: {rows}. Sistem hangi belgenin güncel olduğunu doğrulayamıyor.")
+        sentences.append("Please confirm with the document owner." if english else "Lütfen belge sahibine doğrulatın.")
+        return " ".join(sentences)
+    return None

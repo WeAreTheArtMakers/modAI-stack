@@ -426,6 +426,13 @@ Geri yükleme sırası: önce aynı sürümde PostgreSQL’i geri yükleyin, son
 
 Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolaması kullanır. Gerçek canlı RAG kabulü tamamlandı; TXT/PDF/DOCX retrieval ile reindex, replace ve delete/vectors cleanup yaşam döngüsü doğrulandı. Üretim dağıtımında merkezi secret vault entegrasyonu, TLS işletimi, nesne depolama, yedekleme/restore tatbikatı ve yük testleri ayrıca planlanmalıdır. Alembic migration akışı ve fresh PostgreSQL doğrulaması CI’da çalıştırılır.
 
+- **Tablolar ve sayılar (teknik borç):**
+  - Parçalayıcı (`app/services/rag/chunker.py`) kelimeleri tek boşlukla birleştirdiği için indekslenen Markdown tabloları tek satıra düzleşir.
+  - `app/services/rag/tables.py`, sorudaki birimli sayıyı yanıttan önce bu tablolardaki satırla eşleştirir. Çelişki çözülemiyorsa modele sormadan sabit bir açıklama döner. Çözülemeyen çelişki, değerin aynı tablodaki iki satırın tam sınırına düşmesi ya da aynı sütunlu tabloların farklı belgelerde farklı satır vermesidir.
+  - Belgelerde sürüm meta verisi olmadığı için eski ve güncel politika arasında seçim yapılmaz.
+  - Tablo yapısının indekslemede korunması ayrı bir iştir ve mevcut belgeler için yeniden indeksleme gerektirir.
+  - PDF ya da birleşik hücreli tablolar ve hesaplamalar desteklenmez.
+
 ## License
 
 **© 2026 We Are The Art Makers. All rights reserved.**
