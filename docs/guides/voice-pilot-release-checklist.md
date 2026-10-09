@@ -59,9 +59,9 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
 - [ ] Ses modelleri build makinesinde `frontend/public/voice-models/` altına indirilmiş ve `--check` ile doğrulanmıştır. Frontend imajı bu dosyaları içerir.
 - [ ] `python3 scripts/fetch_retrieval_models.py --check` başarılıdır (BGE-M3, `models/` altında).
 - [ ] `python3 scripts/preflight.py` çıktısında `FAIL` yoktur; `WARN` satırları teslim notuna yazılmıştır.
-- [ ] Production compose (`docker-compose.yml`) için sahip onaylı değişiklikler uygulanmıştır:
-  - API ve worker'a `RETRIEVAL_GENERATIONS_ENABLED: "true"` ve `RETRIEVAL_MODEL_ROOT: "/models"` eklenir.
-  - PostgreSQL, Redis ve Qdrant portları `127.0.0.1:` önekiyle yalnızca yerel makineye bağlanır. Bu, o üç konteynerin yeniden oluşturulmasını gerektirir; volume'lar korunur.
+- [ ] `docker-compose.yml` bu sürümde iki şeyi değiştirir:
+  - API ve worker'da `RETRIEVAL_GENERATIONS_ENABLED: "true"` ve `RETRIEVAL_MODEL_ROOT: "/models"` tanımlıdır.
+  - PostgreSQL, Redis ve Qdrant portları `127.0.0.1:` önekiyle yalnızca yerel makineye bağlıdır. Bu yüzden ilk dağıtımda o üç konteyner de yeniden oluşturulur (`docker compose up -d postgres redis qdrant`); volume'lar korunur. Öncesinde `scripts/backup_local.sh` ile yedek alınır.
 - [ ] Kuyrukta bekleyen indeksleme işi yok (`LLEN modai:indexing:queued`).
 - [ ] Çalışan imajlar geri alma etiketiyle işaretlenir. Bkz. 9. bölüm.
 - [ ] `BUILD_SHA=<sha> docker compose build api worker frontend` çalıştırılır. Ardından imajlardaki BUILD_SHA, frontend bundle SHA ve `app/` dosya hash'leri git ağacıyla doğrulanır.

@@ -62,7 +62,7 @@ Bu değerler Apple M1 Pro 16 GB üzerindeki ölçümlere dayanır.
 
 ## 4. Güvenlik kontrolleri
 
-- Ağdan yalnızca web arayüzüne (5173) ve gerekiyorsa API'ye (8000) erişilmelidir. PostgreSQL (55432), Redis (6379) ve Qdrant (6333) yalnızca `127.0.0.1`'e bağlı olmalıdır. Compose dosyasında bu portlar için `127.0.0.1:` öneki olduğunu kontrol edin.
+- Ağdan yalnızca web arayüzüne (5173) ve gerekiyorsa API'ye (8000) erişilmelidir. PostgreSQL (55432), Redis (6379) ve Qdrant (6333) yalnızca `127.0.0.1`'e bağlı olmalıdır. Sağlanan `docker-compose.yml` bunları `127.0.0.1:` önekiyle bağlar; yerelde değiştirildiyse kontrol edin.
 - **Birden fazla kullanıcının ağdan erişeceği kurulumlarda:**
   - TLS sonlandıran bir ters proxy kullanılır.
   - `APP_ENV=production` ve `REFRESH_COOKIE_SECURE=true` ayarlanır.
