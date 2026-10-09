@@ -6,7 +6,9 @@
 
 modAI-stack, şirketlerin iç belgelerini kendi altyapılarında tutup yetkili çalışanların doğal dille arayabildiği yerel-öncelikli kurumsal bilgi platformudur. Belgeler Organization → Workspace → Knowledge Base yapısında düzenlenir; yerel LLM yanıtları erişilebilir kaynaklarla birlikte sunulur. Yerel/on-premise kurulumda belge ve sorgu içeriği varsayılan olarak bir bulut LLM servisine gönderilmez.
 
-Organization, Workspace ve Knowledge Base sınırları rol tabanlı erişimle korunur. Çok dilli retrieval profilleri için mimari hazırlanmaktadır; mevcut embedding baseline'ı İngilizce odaklıdır ve Türkçe optimizasyonu iddia edilmemektedir. Bu proje herhangi bir güvenlik sertifikası iddiasında bulunmaz.
+Organization, Workspace ve Knowledge Base sınırları rol tabanlı erişimle korunur. Varsayılan embedding modeli (MiniLM) İngilizce odaklıdır. Bir çalışma alanı, yönetici komutuyla çok dilli BGE-M3 aramasına geçirilebilir: kurgusal belgelerle yapılan staging kabulünde Türkçe soruların 18 koşusunun 18'inde doğru yanıt alındı (MiniLM ile 11/18). Ayrıntılar [BGE-M3 rehberinde](docs/guides/bge-m3-staging-generation.md). Bu proje herhangi bir güvenlik sertifikası iddiasında bulunmaz.
+
+**Kurulum ve satış belgeleri:** [kurulum ve teslim rehberi](docs/guides/kurulum-ve-teslim-rehberi.md) · [ürün özeti](docs/sales/modai-voice-urun-ozeti.md) · [sürüm notları](CHANGELOG.md)
 
 [GitHub deposu](https://github.com/WeAreTheArtMakers/modAI-stack)
 
@@ -41,12 +43,12 @@ modules and are not necessarily distributed through this public repository.
 
 ## Search / Retrieval Profiles
 
-Yöneticiler ileride embedding model adları yerine dil ve donanım ihtiyacına göre bir arama profili seçebilecek. Şimdilik katalog ve aktif profil durumu salt okunurdur; model değiştirme veya yeniden indeksleme başlatan bir işlem yoktur.
+Yöneticiler ileride embedding model adları yerine dil ve donanım ihtiyacına göre bir arama profili seçebilecek. Arayüzdeki katalog salt okunurdur. Balanced Multilingual (BGE-M3), bir çalışma alanı için `python -m app.tools.retrieval_generation` komutlarıyla kurulur, doğrulanır, etkinleştirilir ve geri alınır ([rehber](docs/guides/bge-m3-staging-generation.md)). Sistem sayfasındaki profil durumu kurulumun varsayılan modelini gösterir; çalışma alanının hangi indeksten yanıt verdiğini `status` komutu gösterir.
 
 | Profil | Kullanım hedefi | Yerel kaynak sınıfı | Durum |
 | --- | --- | --- | --- |
 | Compact Multilingual | Türkçe + İngilizce + çok dilli kullanım; düşük bellek ve hızlı yerel kurulum | Düşük | Deneysel; model eşlemesi ve ölçüm bekliyor |
-| Balanced Multilingual | Çok dilli retrieval ile kaynak kullanımı arasında denge | Orta | Model sağlama ve benchmark bekliyor |
+| Balanced Multilingual | Çok dilli retrieval ile kaynak kullanımı arasında denge | Orta (süreç başına ~2 GiB) | BGE-M3; çalışma alanı başına komutla etkinleştirilir; staging kabulü geçti |
 | Advanced Long-Document | Uzun belgeler ve çok dilli koleksiyonlar | Yüksek | Yapılandırılmadı |
 | English Optimized | Mevcut hafif, İngilizce odaklı embedding baseline'ı | Düşük | Aktif profil eşlemesi; Türkçe performansı ölçülmedi |
 

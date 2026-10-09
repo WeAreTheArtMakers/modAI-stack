@@ -3,7 +3,7 @@
 modAI-stack uses third-party open-source software distributed under their own
 licenses.
 
-The Business Source License that governs modAI-stack does not replace,
+The WATAM Source-Available License (see `LICENSE`) that governs modAI-stack does not replace,
 restrict, or modify the licenses of third-party dependencies.
 
 Third-party components remain subject to their respective license terms.
@@ -47,6 +47,27 @@ they are not part of the Git repository except where noted.
 | Transformers.js (`@huggingface/transformers`) | 4.3.0 | Apache-2.0 | npm dependency, bundled into the voice worker |
 | ONNX Runtime Web (`onnxruntime-web`) | 1.30.0 | MIT | npm dependency; WebAssembly runtime bundled as an asset |
 | Whisper tiny ONNX (`Xenova/whisper-tiny`, from `openai/whisper-tiny`) | revision 5332fcc35e32a33b86612b9a57a89be7906102b1 | Apache-2.0 (model card) | downloaded by `scripts/fetch_voice_models.py` |
+| Whisper base ONNX (`Xenova/whisper-base`, from `openai/whisper-base`), optional | revision 64da57285918e20ea79ea5c88eed7197933abaa8 | Apache-2.0 (model card) | downloaded only with `scripts/fetch_voice_models.py --include-optional` |
 | EMA Lightning ONNX (`ozcancelik/ema-lightning-onnx`, from `canberkkkkkk/ema-lightning`) | revision 13c431db0356b2f7fafb1247cd823ec0d777c820 | Apache-2.0 | downloaded by `scripts/fetch_voice_models.py`; LICENSE and NOTICE in `frontend/public/third-party/ema-lightning-onnx/` |
 | normalizer-tr (inside EMA's `normalizer.wasm`) | commit d0bc1bc6523faa4f6257642190bb723b7f4274a5 | Apache-2.0 | Rust dependency notices in `frontend/public/third-party/ema-lightning-onnx/normalizer-tr-THIRD_PARTY_NOTICES.md` |
 | EMA Lightning JavaScript engine (`web/tts.js`, `web/normalizer.js`) | same revision | Apache-2.0 | ported to TypeScript with modifications in `frontend/src/voice/vendor/emaLightning.ts` |
+
+## Server-side models and services
+
+Model weights and container images are not part of the Git repository. Each is obtained by the
+installer from its publisher, under that publisher's terms.
+
+| Component | Version | License or terms | How it is obtained |
+|---|---|---|---|
+| BGE-M3 (`BAAI/bge-m3`), multilingual retrieval profile | revision 31e47391fcbda65be526abe98e646b3c6cd845a8 | MIT (model card) | `scripts/fetch_retrieval_models.py`, verified against `retrieval-models.lock.json` |
+| all-MiniLM-L6-v2 (`sentence-transformers/all-MiniLM-L6-v2`), legacy retrieval profile | Hugging Face cache | Apache-2.0 (model card) | `python -m app.tools.prefetch_embedding_model` |
+| Generation model served by Ollama (default `gemma3:4b` / `modAIJet:latest`) | as pulled | the model publisher's terms (Gemma models: Gemma Terms of Use and Prohibited Use Policy) | `ollama pull` by the operator |
+| Ollama | host installation | MIT | installed by the operator |
+| Qdrant (`qdrant/qdrant`) | v1.12.5 | Apache-2.0 | Docker image |
+| PostgreSQL (`postgres`) | 16 | PostgreSQL License | Docker image |
+| Redis (`redis:7-alpine`) | 7.x (7.4.11 observed in October 2026) | Redis 7.4 and later: RSALv2 or SSPLv1 (earlier 7.x: BSD-3-Clause) | Docker image |
+
+Release review items:
+- **Redis:** RSALv2 and SSPLv1 are not open-source licenses and restrict offering Redis itself as a service. Confirm that the intended deployment model is acceptable, or pin a BSD-licensed alternative (for example Redis 7.2 or Valkey) before commercial redistribution.
+- **Gemma models:** if a release ships or pre-installs Gemma weights, the Gemma Terms of Use must accompany them and the use restrictions passed on to the customer.
+- This table is a summary for review. It is not legal advice and does not replace the release-time dependency inventory described above.

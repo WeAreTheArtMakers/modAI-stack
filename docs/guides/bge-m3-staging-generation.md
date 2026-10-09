@@ -73,7 +73,7 @@ Ortam: Apple M1 Pro 16 GB, Docker CPU. Çalışma alanı 1'de 24 kurgusal belge 
 | Kıdemim tam 5 yıl (tablo sınırı) | 0/2 | 0/2 (genel çekimserlik) | 2/2 (1.) | 2/2 sabit sınır yanıtı (16 / 21 iş günü, model çağrılmadı) |
 
 - Toplam: MiniLM 11/18, BGE-M3 18/18 doğru.
-- Kendinden emin yanlış sayı: MiniLM 3 (iki kez "1 saat", bir kez fazladan onaylayan), BGE-M3 0.
+- Kendinden emin yanlış yanıt: MiniLM 3 (iki kez yanlış sayı "1 saat", bir kez fazladan onaylayan), BGE-M3 0.
 - Her iki modelde de sonuçlar yalnızca seçilen KB'den geldi.
 - Bu küçük kurgusal setteki sonuç üretim güvenilirliğini kanıtlamaz.
 
@@ -117,7 +117,7 @@ Yanıttaki her sayının getirilen metinde geçmesini isteyen deterministik bir 
 - 97 kendinden emin yanlış yanıtın ve 59 eksik yanıtın **hiçbirini** yakalamadı.
 - 407 doğru yanıttan 2'sini (toplam ve çarpım hesapları) engelledi.
 
-Sözcük örtüşmesine dayalı bir kural ise doğru diller arası yanıtları reddederdi; örneğin Türkçe soruya İngilizce "2 devices" satırından verilen yanıtı. Bu yüzden ikisi de eklenmedi. Bu hata türünün ölçülen çözümü doğru belgeyi getirmek: BGE-M3 ile kendinden emin yanlış sayı 3'ten 0'a indi.
+Sözcük örtüşmesine dayalı bir kural ise doğru diller arası yanıtları reddederdi; örneğin Türkçe soruya İngilizce "2 devices" satırından verilen yanıtı. Bu yüzden ikisi de eklenmedi. Bu hata türünün ölçülen çözümü doğru belgeyi getirmek: BGE-M3 ile kendinden emin yanlış yanıt 3'ten 0'a indi.
 
 Eklenen tek koruma, hiç kaynak getirilmediğinde modeli çağırmamak. Bu durum kesin olarak tanımlı olduğu için yanlış ret üretmez.
 
