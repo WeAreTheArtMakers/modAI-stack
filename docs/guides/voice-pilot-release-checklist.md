@@ -27,7 +27,7 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
 - [ ] Bazı sayısal sorularda tablo bir değeri çözmez: değer iki satırın tam sınırındadır ya da aynı sütunlu iki belge farklı değer verir. Bu durumda model çağrılmaz; tablodan üretilen sabit bir açıklama döner ve kaynaklar yine gösterilir.
 
 ## 6. Bilinen sınırlamalar (müşteriye söylenecek)
-- **Belge arama (MiniLM):** Türkçe sorularla İngilizce belgeler bulunmaz. Staging ölçümünde diller arası 7 sorunun 0'ında doğru belge ilk 3'te çıktı; BGE-M3 ile 7/7. Arama, sözcükle söylenen sayıyı ("üç yıl") rakamla ("3 yıl") birlikte de deniyor. Bu yalnızca kısmi bir iyileşme: 15 sorunun 9'undan 10'una çıktı. Kalıcı çözüm, ayrıca onaylanacak çok dilli embedding geçişi (BGE-M3, tasarım #27).
+- **Belge arama (MiniLM):** Türkçe sorularla İngilizce belgeler bulunmaz. Staging ölçümünde diller arası 7 sorunun 0'ında doğru belge ilk 3'te çıktı; BGE-M3 ile 7/7. Arama, sözcükle söylenen sayıyı ("üç yıl") rakamla ("3 yıl") birlikte de deniyor. Bu yalnızca kısmi bir iyileşme: 15 sorunun 9'undan 10'una çıktı. Kalıcı çözüm, ayrıca onaylanacak çok dilli embedding geçişi (BGE-M3, tasarım #27). Staging'de bir BGE-M3 indeks nesli denendi: 9 kabul sorusu × 2 koşuda MiniLM 11/18, BGE-M3 18/18 doğru yanıt verdi (bkz. `bge-m3-staging-generation.md`). Production'da etkin değildir.
 - **Belgesiz soru:** doğru belge gelmezse model zaman zaman uydurma bir değer verebilir (ör. SLA yanıt süresi). Kaynak paneli bu durumda ilgili belgeyi göstermez.
 - **Sürüm seçimi:** eski ve güncel politika arasında seçim yapılmaz. Sistem iki belgenin farklı olduğunu söyler, ama hangisinin geçerli olduğunu bilemez.
 - **Desteklenmeyenler:** hesaplamalar (toplamlar), PDF ya da birleşik hücreli tablolar.

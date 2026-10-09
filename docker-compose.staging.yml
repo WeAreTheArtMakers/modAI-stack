@@ -4,7 +4,11 @@
 # - its own secrets (.env.staging, git- and docker-ignored); the production .env is not read;
 # - ports bound to 127.0.0.1 only: web console http://localhost:5183, API http://localhost:8100;
 # - generation reuses the host's Ollama (no second model instance, no model or setting change);
-# - the embedding model is mounted read-only from ./models.
+# - the embedding model is mounted read-only from ./models;
+# - BGE-M3 index generations are enabled here only (RETRIEVAL_GENERATIONS_ENABLED with
+#   APP_ENV=staging). Every workspace still serves the legacy MiniLM index until a validated
+#   generation is activated with `python -m app.tools.retrieval_generation` (see
+#   docs/guides/bge-m3-staging-generation.md).
 # See README "Yerel kabul ortamı (staging)" for the commands.
 name: modai-staging
 
@@ -23,6 +27,8 @@ x-backend-environment: &backend-environment
   EMBEDDING_CACHE_DIR: "/models/cache"
   HF_HOME: "/models/cache"
   SENTENCE_TRANSFORMERS_HOME: "/models/cache"
+  RETRIEVAL_GENERATIONS_ENABLED: "true"
+  RETRIEVAL_MODEL_ROOT: "/models"
 
 services:
   frontend:

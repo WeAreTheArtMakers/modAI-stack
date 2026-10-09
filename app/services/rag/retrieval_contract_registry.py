@@ -32,6 +32,10 @@ class ReviewedEmbeddingCandidate:
     space: EmbeddingSpaceContract
     runtime_enabled: bool = False
     selectable: bool = False
+    # The provisioned local artifact (relative to RETRIEVAL_MODEL_ROOT) and its weights size, so
+    # a loader can refuse a different snapshot. Metadata only; nothing here loads a model.
+    artifact_dir: str | None = None
+    weights_bytes: int | None = None
 
     def __post_init__(self) -> None:
         if not self.profile_id.strip():
@@ -67,6 +71,8 @@ BALANCED_MULTILINGUAL_BGE_M3_V1 = ReviewedEmbeddingCandidate(
         distance_metric="cosine",
         vector_name="dense",
     ),
+    artifact_dir=f"compact-multilingual-bge-m3-v1/bge-m3-{BGE_M3_REVISION}",
+    weights_bytes=2_271_064_456,
 )
 
 
