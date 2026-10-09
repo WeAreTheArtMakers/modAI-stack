@@ -134,6 +134,21 @@ def test_a_subject_with_several_words_must_match_all_of_them():
     assert "Direktör" in line and "Finans" not in line
 
 
+def test_short_subject_words_do_not_match_other_words_and_subjects_never_share_a_boundary():
+    advances = " ".join("""| Avans | Onaylayan |
+|---|---|
+| 3.000 TL'ye kadar yurt içi avans | Yönetici |
+| 3.000 TL'yi aşan yurt içi avans | Yönetici ve Finans |
+| 10.000 TL'ye kadar yurt dışı avans | Direktör |
+| 10.000 TL'yi aşan yurt dışı avans | Direktör ve CFO |""".split())
+    # "için" is not "içi": only the "yurt dışı" rows apply.
+    [line] = table_lookup("On beş bin liralık yurt dışı avansı için kimin onayı gerekir?", [advances])
+    assert "Direktör ve CFO" in line and "boundary" not in line and "Finans" not in line
+    # A question naming both subjects gets one line per subject, not a "boundary".
+    lines = table_lookup("15.000 TL'lik yurt içi ve yurt dışı avans", [advances])
+    assert len(lines) == 2 and not any("boundary" in line for line in lines)
+
+
 def test_years_are_converted_for_tables_that_count_months():
     months = " ".join("| Hizmet süresi | İhbar |\n|---|---|\n| 0–12 ay | 2 hafta |\n| 12–36 ay | 4 hafta |".split())
     [line] = table_lookup("İki yıldır çalışıyorum", [months])
@@ -157,3 +172,18 @@ def test_prompt_keeps_the_context_and_adds_the_lookup_after_it():
 def test_prompts_without_tables_or_quantities_have_no_lookup_section():
     prompt = build_rag_prompt("Deneme süresi kaç ay?", ["Deneme süresi 2 aydır."], None, None, "tr")
     assert "TABLE LOOKUP" not in prompt and "Deneme süresi 2 aydır." in prompt
+
+
+def test_lookup_names_the_document_title_and_section_never_the_previous_paragraph():
+    old = " ".join("""# ESKİ — Ulaşım Kuralları (yürürlükten kalktı)
+> Bu sürüm yürürlükten kalkmıştır. Onay süresi 3 iş günüdür.
+## 1. Ulaşım aracı
+| Mesafe | Ulaşım |
+|---|---|
+| 0–300 km | Şirket aracı |
+| 300 km üzeri | Uçak |""".split())
+    [line] = table_lookup("400 kilometrelik yolculuk", [old])
+    assert line.startswith('- 400 kilometrelik: in document "ESKİ — Ulaşım Kuralları (yürürlükten kalktı)", section "1. Ulaşım aracı",')
+    assert "iş günüdür" not in line
+    [line] = table_lookup("7 kg", ["Önceki paragraf burada biter. | Ağırlık | Ücret | |---|---| | 0–10 kg | 5 TL | | 10–20 kg | 9 TL |"])
+    assert line.startswith("- 7 kg: in a table,") and "paragraf" not in line
