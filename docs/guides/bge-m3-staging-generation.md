@@ -123,7 +123,7 @@ Eklenen tek koruma, hiç kaynak getirilmediğinde modeli çağırmamak. Bu durum
 
 ## 7. Production'da açmak (sahip onayıyla)
 
-1. Sürüm dağıtılır (pilot kontrol listesi, 8. bölüm). Production compose dosyasında API ve worker için `RETRIEVAL_GENERATIONS_ENABLED: "true"` ve `RETRIEVAL_MODEL_ROOT: "/models"` tanımlanır. Bu adım tek başına yanıtları değiştirmez.
+1. Sürüm dağıtılır (pilot kontrol listesi, 8. bölüm). `docker-compose.yml` API ve worker için `RETRIEVAL_GENERATIONS_ENABLED: "true"` ve `RETRIEVAL_MODEL_ROOT: "/models"` tanımlar. Bu tek başına yanıtları değiştirmez.
 2. BGE-M3 dosyası `python3 scripts/fetch_retrieval_models.py` ile indirilir ya da `--check` ile doğrulanır.
 3. Çalışma alanı için sırayla `plan`, `build`, `validate` çalıştırılır. Doğrulama geçmeden etkinleştirme yapılamaz.
 4. `activate` çalıştırılır; `status` çıktısında `serving_mode: generation` ve boş `lag` görülür.
