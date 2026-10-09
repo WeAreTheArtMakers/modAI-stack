@@ -143,11 +143,18 @@ def _qualifier(cell: str) -> list[str]:
     return [word for word in words if len(word) >= 3 and word not in _RELATION_WORDS and not _unit(word)]
 
 
+def _named(term: str, word: str) -> bool:
+    """`word` is `term` with Turkish suffixes ("avansı", "eğitime"); long terms also tolerate a changed
+    last letter ("kitap" -> "kitabı"), short ones must match exactly ("içi" is not "için")."""
+    if word.startswith(term) and _SUFFIXES.fullmatch(word[len(term):]):
+        return True
+    return len(term) >= 6 and word[:5] == term[:5]
+
+
 def _applies(cell: str, question_words: set[str]) -> bool:
     """A row narrowed to a subject ("... aşan eğitim") applies only when the question names every
-    subject word, suffix-tolerant ("eğitim" matches "eğitime"): "yurt içi avans" does not apply to
-    a question about "yurt dışı avans"."""
-    return all(any(word.startswith(term[:5]) for word in question_words) for term in _qualifier(cell))
+    subject word: "yurt içi avans" does not apply to a question about "yurt dışı avans"."""
+    return all(any(_named(term, word) for word in question_words) for term in _qualifier(cell))
 
 
 def _scaled(number: str, scale: str | None) -> float:
@@ -252,10 +259,23 @@ def parse_tables(text: str) -> list[Table]:
     return tables
 
 
-def _lead_in(text: str, table: Table, words: int = 8) -> str:
-    """The few words before a table (usually its section heading), to tell tables apart."""
-    preceding = re.sub(r"[#*>_`]", " ", text[max(0, table.start - 300): table.start]).split()
-    return " ".join(preceding[-words:])
+def _clean(text: str) -> str:
+    return " ".join(re.sub(r"[#*>_`|]", " ", text).split())
+
+
+def _location(text: str, table: Table) -> str:
+    """Where a table sits, so tables can be told apart: the document title (when the chunk starts
+    with one; it also carries labels such as "ESKİ ... (yürürlükten kalktı)") and the nearest heading
+    above the table. Never the tail of the previous paragraph, which the model would repeat."""
+    parts = []
+    title = re.match(r"\s*#\s+([^#>|*]{3,120}?)\s*(?=[#>|*-]|$)", text)
+    title_end = title.end() if title and title.end() <= table.start else -1
+    if title_end != -1:
+        parts.append(f'document "{_clean(title.group(1))}"')
+    heading = text.rfind("#", max(0, table.start - 300), table.start)
+    if heading != -1 and heading >= title_end:
+        parts.append(f'section "{" ".join(_clean(text[heading: table.start]).split()[:12])}"')
+    return ", ".join(parts) or "a table"
 
 
 def table_lookup(question: str, chunks: list[str]) -> list[str]:
@@ -279,17 +299,20 @@ def table_lookup(question: str, chunks: list[str]) -> list[str]:
                     if factor is None:
                         continue
                     value = quantity.value * factor
-                    matches = [row for row, parsed in ranges if parsed and parsed.contains(value)]
-                    if not matches:
-                        continue
                     shown = f"{quantity.text}" + (f" (= {value:g} {unit})" if factor != 1.0 else "")
-                    where = f'the table after "{_lead_in(chunk, table)}"'
-                    if len(matches) == 1:
-                        lines.append(f"- {shown}: in {where}, this value falls in the row \"{table.describe_row(matches[0])}\".")
-                    else:
-                        rows = " / ".join(f'"{table.describe_row(row)}"' for row in matches)
-                        lines.append(
-                            f"- {shown}: in {where}, this exact value is on the boundary of the rows {rows}. "
-                            "The document does not say which of them applies; do not choose one."
-                        )
+                    where = _location(chunk, table)
+                    # Only rows about the same subject can share a boundary.
+                    by_subject: dict[tuple[str, ...], list[list[str]]] = {}
+                    for row, parsed in ranges:
+                        if parsed and parsed.contains(value):
+                            by_subject.setdefault(tuple(_qualifier(row[column])), []).append(row)
+                    for matches in by_subject.values():
+                        if len(matches) == 1:
+                            lines.append(f"- {shown}: in {where}, this value falls in the row \"{table.describe_row(matches[0])}\".")
+                        else:
+                            rows = " / ".join(f'"{table.describe_row(row)}"' for row in matches)
+                            lines.append(
+                                f"- {shown}: in {where}, this exact value is on the boundary of the rows {rows}. "
+                                "The document does not say which of them applies; do not choose one."
+                            )
     return lines
