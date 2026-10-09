@@ -107,7 +107,10 @@ async def query(req: RagRequest, request: Request, user=Depends(current_user), d
     # their transaction open while waiting for model generation.
     await db.rollback()
 
-    answer = await OllamaProvider().generate(context.prompt)
+    if context.table_conflict_answer is not None:
+        answer = context.table_conflict_answer  # retrieved tables conflict for the number asked
+    else:
+        answer = await OllamaProvider().generate(context.prompt)
 
     if req.conversation_id is not None:
         await persist_completed_turn(

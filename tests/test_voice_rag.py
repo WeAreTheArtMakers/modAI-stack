@@ -77,7 +77,7 @@ class SessionContext:
         return None
 
 
-def _wire(monkeypatch, *, history=None, retrieve_calls=None, stream_calls=None):
+def _wire(monkeypatch, *, history=None, retrieve_calls=None, stream_calls=None, conflict_answer=None, persisted=None):
     import app.api.websocket.rag as module
 
     async def fake_user(_ws, _scope):
@@ -93,6 +93,7 @@ def _wire(monkeypatch, *, history=None, retrieve_calls=None, stream_calls=None):
         retrieve_calls.append((question, kwargs))
         return SimpleNamespace(
             prompt="prompt",
+            table_conflict_answer=conflict_answer,
             sources=[Source(document="vpn.md", document_id=8, chunk_index=0, score=0.8, text="secret excerpt")],
             embedding_latency_ms=12.3456,
             retrieval_latency_ms=4.0,
@@ -108,8 +109,9 @@ def _wire(monkeypatch, *, history=None, retrieve_calls=None, stream_calls=None):
             yield "En fazla "
             yield "2 cihaz."
 
-    async def persist(*_args, **_kwargs):
-        return None
+    async def persist(*_args, **kwargs):
+        if persisted is not None:
+            persisted.append(kwargs)
 
     monkeypatch.setattr(module, "websocket_user", fake_user)
     monkeypatch.setattr(module, "SessionLocal", lambda: SessionContext())
@@ -177,6 +179,61 @@ async def test_a_voice_request_cannot_use_a_conversation_outside_its_scope(monke
 
     assert ws.messages == [{"type": "error", "data": "RAG request failed"}]
     assert retrieve_calls == [] and stream_calls == []
+
+
+@pytest.mark.asyncio
+async def test_an_unresolved_table_conflict_is_answered_without_the_model_and_keeps_sources(monkeypatch):
+    retrieve_calls, stream_calls, persisted = [], [], []
+    fixed = "Belge bu soruya kesin bir yanıt vermiyor: 5 yıl, tabloda iki satırın tam sınırında."
+    module = _wire(monkeypatch, retrieve_calls=retrieve_calls, stream_calls=stream_calls, conflict_answer=fixed, persisted=persisted)
+    ws = FakeWebSocket({"question": "Kıdemim tam 5 yıl", "knowledge_base_ids": [4], "conversation_id": 12, "response_language": "tr"})
+
+    await module.websocket_rag(ws)
+
+    assert stream_calls == []  # no model call
+    sources, token, complete = ws.messages
+    assert sources["type"] == "sources" and sources["data"][0]["document"] == "vpn.md"
+    assert token == {"type": "token", "data": fixed} and complete == {"type": "complete"}
+    assert persisted[0]["answer"] == fixed and persisted[0]["sources"][0].document == "vpn.md"
+
+
+@pytest.mark.asyncio
+async def test_http_query_returns_the_fixed_answer_without_the_model(monkeypatch):
+    from app.api.routes import rag as rag_routes
+
+    fixed = "Getirilen belgeler 400 km için farklı bilgi veriyor."
+
+    class NoopLimiter:
+        async def enforce(self, *_args):
+            return None
+
+        async def close(self):
+            return None
+
+    class Db:
+        async def rollback(self):
+            return None
+
+    async def resolve_scope(_db, _user, _ids):
+        return [4], (SimpleNamespace(id=4), SimpleNamespace(id=3, organization_id=2), SimpleNamespace(role="user"))
+
+    async def preferences(*_args):
+        return {"language": "tr", "tone": "professional", "response_length": "short"}
+
+    async def retrieve(_question, **_kwargs):
+        return SimpleNamespace(prompt="prompt", sources=[Source(document="ulasim.md", document_id=8, chunk_index=0, score=0.8)], table_conflict_answer=fixed)
+
+    class NoModel:
+        def __init__(self, *_args):
+            raise AssertionError("the model must not be called")
+
+    monkeypatch.setattr(rag_routes, "RedisRateLimiter", NoopLimiter)
+    monkeypatch.setattr(rag_routes, "resolve_knowledge_base_scope", resolve_scope)
+    monkeypatch.setattr(rag_routes, "get_effective_assistant_preferences", preferences)
+    monkeypatch.setattr(rag_routes, "retrieve_rag_context", retrieve)
+    monkeypatch.setattr(rag_routes, "OllamaProvider", NoModel)
+    response = await rag_routes.query(RagRequest(question="400 km", knowledge_base_ids=[4]), request=None, user={"sub": "7"}, db=Db())
+    assert response.answer == fixed and response.sources[0].document == "ulasim.md"
 
 
 @pytest.mark.asyncio

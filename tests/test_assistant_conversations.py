@@ -577,7 +577,7 @@ async def test_http_rag_persists_conversation_turn_after_real_orm_rollback(
             "tone": "friendly",
             "response_length": "short",
         }
-        return SimpleNamespace(prompt="completed prompt", sources=[])
+        return SimpleNamespace(prompt="completed prompt", sources=[], table_conflict_answer=None)
 
     monkeypatch.setattr(rag_module, "RedisRateLimiter", NoopLimiter)
     monkeypatch.setattr(rag_module, "OllamaProvider", FakeProvider)

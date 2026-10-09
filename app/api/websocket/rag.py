@@ -28,6 +28,10 @@ router = APIRouter()
 provider = OllamaProvider()
 
 
+async def _fixed(text: str):
+    yield text
+
+
 @router.websocket("/ws/rag")
 async def websocket_rag(ws: WebSocket):
     await ws.accept()
@@ -136,11 +140,13 @@ async def websocket_rag(ws: WebSocket):
             first_token_ms: float | None = None
 
             try:
-                stream = (
-                    provider.stream(context.prompt, stats=generation_stats)
-                    if req.diagnostics
-                    else provider.stream(context.prompt)
-                )
+                if context.table_conflict_answer is not None:
+                    # The retrieved tables conflict for the number asked: no model answer.
+                    stream = _fixed(context.table_conflict_answer)
+                elif req.diagnostics:
+                    stream = provider.stream(context.prompt, stats=generation_stats)
+                else:
+                    stream = provider.stream(context.prompt)
                 async for token in stream:
                     if first_token_ms is None:
                         first_token_ms = (perf_counter() - generation_started) * 1000

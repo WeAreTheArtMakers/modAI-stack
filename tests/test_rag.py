@@ -243,6 +243,7 @@ async def test_websocket_rag_passes_postgres_session_to_retrieval(
         return SimpleNamespace(
             sources=[],
             prompt="prompt",
+            table_conflict_answer=None,
         )
 
     class FakeProvider:
@@ -353,6 +354,7 @@ async def test_http_rag_persists_only_after_generation_completes(
         }
         return SimpleNamespace(
             prompt="prompt",
+            table_conflict_answer=None,
             sources=[
                 Source(
                     document="guide.pdf",
@@ -484,7 +486,7 @@ async def test_stateless_http_rag_uses_current_user_preferences_without_history(
 
     async def retrieve(_question, **kwargs):
         observed.update(kwargs)
-        return SimpleNamespace(prompt="controlled prompt", sources=[])
+        return SimpleNamespace(prompt="controlled prompt", sources=[], table_conflict_answer=None)
 
     class FakeProvider:
         calls = 0
@@ -627,6 +629,7 @@ async def test_websocket_rag_persists_before_complete_event(
         }
         return SimpleNamespace(
             prompt="prompt",
+            table_conflict_answer=None,
             sources=[
                 Source(
                     document="guide.pdf",
@@ -797,6 +800,7 @@ async def test_websocket_rag_does_not_persist_partial_provider_failure(
     async def retrieve(_question, **_kwargs):
         return SimpleNamespace(
             prompt="prompt",
+            table_conflict_answer=None,
             sources=[],
         )
 
