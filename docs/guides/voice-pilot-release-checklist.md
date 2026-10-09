@@ -24,6 +24,7 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
 
 ## 5. Kanıt ve kaynaklar
 - [ ] Her yanıtla birlikte kaynak belgeler gösterilir. Geri yüklenen eski yanıtlarda alıntı metni saklanmadığı için "Alıntı kayıtlı değil" yazar.
+- [ ] Seçili KB'lerden hiç kaynak gelmezse model çağrılmaz; "belge bulunamadı" sabit yanıtı döner.
 - [ ] Bazı sayısal sorularda tablo bir değeri çözmez: değer iki satırın tam sınırındadır ya da aynı sütunlu iki belge farklı değer verir. Bu durumda model çağrılmaz; tablodan üretilen sabit bir açıklama döner ve kaynaklar yine gösterilir.
 
 ## 6. Bilinen sınırlamalar (müşteriye söylenecek)
@@ -46,7 +47,8 @@ Kapsam: PR #51 (`feat/voice-assistant-mvp`). Canlı sürüm şu an `6f0adabe`. B
 
 ## 8. Dağıtım ön koşulları (sahip onayıyla)
 - [ ] PR #51 sahip tarafından onaylanmış ve merge edilmiş, CI yeşil.
-- [ ] Yeni migration yok. Alembic head `0008_assistant_preferences` olarak kalır. Yeni ortam değişkeni yok.
+- [ ] Yeni migration yok. Alembic head `0008_assistant_preferences` olarak kalır.
+- [ ] Yeni ortam değişkenleri: `RETRIEVAL_GENERATIONS_ENABLED` (varsayılan kapalı) ve `RETRIEVAL_MODEL_ROOT` (varsayılan `/models`). Açılmaları tek başına yanıtları değiştirmez; BGE-M3 bir çalışma alanında ancak `app.tools.retrieval_generation activate` ile devreye girer (bkz. `bge-m3-staging-generation.md`, 7. bölüm).
 - [ ] Güvenlik başlıkları nginx'te ve FastAPI'de değişir: `microphone=(self)`, `script-src 'self' 'wasm-unsafe-eval'`, `worker-src 'self'`.
 - [ ] Oturum yenileme düzeltmesi:
   - nginx `Host`'u portla birlikte iletir (`$http_host`).

@@ -1,7 +1,7 @@
-"""Staging-only retrieval from a validated index generation (design #27, reduced).
+"""Retrieval from a validated index generation (design #27, reduced).
 
 A workspace serves RAG from an index generation only when all of these hold:
-- the deployment sets RETRIEVAL_GENERATIONS_ENABLED=true and APP_ENV=staging;
+- the deployment sets RETRIEVAL_GENERATIONS_ENABLED=true;
 - its ``workspace_retrieval_assignments`` row says ``serving_mode='generation'``;
 - the referenced generation belongs to that workspace, is ``ready`` (it passed
   ``app.tools.retrieval_generation validate``), and its stored contracts hash to their recorded
@@ -11,11 +11,11 @@ Workspaces without a row, or in ``legacy`` mode, keep the existing MiniLM ``rag_
 unchanged. A generation-mode workspace never falls back to the legacy collection: if anything above
 fails, retrieval raises ``RetrievalIndexUnavailableError`` (HTTP 503 / WebSocket error).
 
-Deliberately not implemented here (production prerequisites in the design): mirrored indexing of
-new uploads into the active generation, outbox replay, the activation write gate, and admin APIs.
-New or replaced documents in a generation-mode workspace are indexed by the worker into the legacy
-collection only; their stale generation points are dropped at query time by the SQL check in
-``live_generation_hits`` and the generation must be rebuilt to include them.
+The worker keeps an active generation current: every source it publishes in a generation-mode
+workspace is written to the legacy collection (the rollback copy) and to the active generation
+(``mirror_to_active_generation``). Deleted documents are tombstoned in PostgreSQL and their points
+are dropped at query time by ``live_generation_hits``. Not implemented (design prerequisites for a
+multi-workspace rollout): outbox replay, the activation write gate, and admin APIs.
 """
 
 from __future__ import annotations
@@ -40,8 +40,10 @@ from app.models.database import (
     DocumentIndexEvent,
     DocumentVersion,
     IndexGeneration,
+    IndexGenerationItem,
     WorkspaceRetrievalAssignment,
 )
+from app.services.rag.chunker import chunk_text
 from app.services.rag.generation_qdrant import GenerationQdrantAdapter
 from app.services.rag.retrieval_contract_registry import (
     ReviewedEmbeddingCandidate,
@@ -50,8 +52,10 @@ from app.services.rag.retrieval_contract_registry import (
 from app.services.rag.retrieval_contracts import (
     AuthorizedTenantGeneration,
     EmbeddingSpaceContract,
+    GenerationWriteScope,
     LegacyUnverifiedRetrieval,
     MaterializationContract,
+    ResolvedGenerationWriteIndex,
     ResolvedRetrievalIndex,
     RetrievalCompatibilityError,
     collection_name_for_space,
@@ -82,7 +86,7 @@ def retrieval_index_unavailable_detail() -> str:
 
 
 def generations_enabled() -> bool:
-    return get_settings().retrieval_generations_active
+    return get_settings().retrieval_generations_enabled
 
 
 @dataclass(frozen=True, slots=True)
@@ -310,3 +314,90 @@ async def warm_active_generation_models(db: AsyncSession) -> None:
             await embedder.embed_text("ısınma")
         except Exception:
             logger.warning("Generation embedding warm-up failed", extra={"component": "rag"})
+
+
+async def mirror_to_active_generation(
+    db: AsyncSession,
+    *,
+    document: Document,
+    version: DocumentVersion,
+    text: str,
+    source_revision: int,
+) -> bool:
+    """Write one published source into its workspace's active generation, if it has one.
+
+    Called by the worker after the legacy write and before it changes any source state;
+    ``source_revision`` is the revision its commit will make current, and the item row commits with
+    it. New points are written before the document's older points are pruned, so the document
+    stays searchable throughout. A failure raises and the job is retried: a workspace in generation
+    mode never publishes a source its active generation does not contain. Runs under the
+    document's row lock (BGE-M3 embedding takes about a second per short document on CPU).
+    """
+    if None in (document.organization_id, document.workspace_id, document.knowledge_base_id):
+        return False
+    assignment = await db.get(WorkspaceRetrievalAssignment, document.workspace_id)
+    if assignment is None or assignment.serving_mode != "generation":
+        return False
+    if not generations_enabled():
+        raise RetrievalIndexUnavailableError("generation serving is not enabled in this deployment")
+    generation = await db.get(IndexGeneration, assignment.active_generation_id)
+    if generation is None or generation.workspace_id != document.workspace_id or generation.state != "ready":
+        raise RetrievalIndexUnavailableError("active index generation is missing or not ready")
+    contracts = generation_contracts(generation)
+    write = ResolvedGenerationWriteIndex(
+        scope=GenerationWriteScope(
+            organization_id=document.organization_id,
+            workspace_id=document.workspace_id,
+            generation_id=UUID(generation.id),
+        ),
+        space=contracts.space,
+        materialization=contracts.materialization,
+        collection_name=contracts.collection_name,
+    )
+    chunks = chunk_text(text, contracts.materialization.chunk_size, contracts.materialization.chunk_overlap)
+    vectors = await get_contract_embedder(contracts.candidate).embed_texts(chunks)
+    adapter = get_generation_adapter()
+    await adapter.upsert_document(
+        write,
+        vector_space=contracts.space,
+        knowledge_base_id=document.knowledge_base_id,
+        document_id=document.id,
+        document_version=version.version,
+        source_revision=source_revision,
+        content_hash=version.content_hash,
+        filename=document.filename,
+        chunks=chunks,
+        vectors=vectors,
+    )
+    await adapter.prune_document(write, document_id=document.id, keep_version=version.version, keep_chunks=len(chunks))
+    item = await db.get(IndexGenerationItem, (generation.id, document.id))
+    if item is None:
+        item = IndexGenerationItem(generation_id=generation.id, document_id=document.id, attempts=0)
+        db.add(item)
+    item.source_revision, item.document_version, item.content_hash = source_revision, version.version, version.content_hash
+    item.expected_chunk_count = item.indexed_chunk_count = len(chunks)
+    item.attempts = (item.attempts or 0) + 1
+    item.state, item.error_code = "complete", None
+    return True
+
+
+async def generation_lag(db: AsyncSession, generation: IndexGeneration, organization_id: int) -> dict:
+    """Sources the generation does not match right now (ids only)."""
+    sources = await eligible_sources(db, generation.workspace_id, organization_id)
+    items = {
+        item.document_id: item
+        for item in (await db.scalars(select(IndexGenerationItem).where(IndexGenerationItem.generation_id == generation.id))).all()
+    }
+    missing = [
+        document.id
+        for document, version in sources
+        if (item := items.get(document.id)) is None
+        or item.state != "complete"
+        or (item.source_revision, item.document_version, item.content_hash)
+        != (document.source_revision, version.version, version.content_hash)
+    ]
+    eligible = {document.id for document, _ in sources}
+    # Points of deleted or no longer eligible sources: never served (live_generation_hits drops
+    # them), removed by the next build.
+    stale = [document_id for document_id, item in items.items() if document_id not in eligible and item.state == "complete"]
+    return {"missing_or_outdated": missing, "stale_points": stale}

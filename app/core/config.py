@@ -34,15 +34,12 @@ class Settings(BaseSettings):
     auto_create_schema: bool = False
     indexing_job_timeout_seconds: int = 900
     indexing_max_retries: int = 3
-    # Staging-only serving from a validated index generation (app.services.rag.generation_runtime).
-    # Takes effect only together with APP_ENV=staging; production keeps the legacy MiniLM path.
+    # Serving from validated index generations (app.services.rag.generation_runtime). Enabling it
+    # changes nothing by itself: a workspace keeps the legacy MiniLM index until an operator
+    # activates a validated generation for it (app.tools.retrieval_generation).
     retrieval_generations_enabled: bool = False
     retrieval_model_root: str = "/models"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    @property
-    def retrieval_generations_active(self) -> bool:
-        return self.retrieval_generations_enabled and self.app_env == "staging"
 
     @property
     def trusted_frontend_origin_set(self) -> set[str]:

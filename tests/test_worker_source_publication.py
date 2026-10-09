@@ -13,6 +13,7 @@ from app.models.database import (
     DocumentIndexEvent,
     DocumentVersion,
     IndexJob,
+    WorkspaceRetrievalAssignment,
 )
 from app.services.document_source_events import (
     ACTIVE_VERSION_PUBLISHED,
@@ -115,6 +116,8 @@ class Db:
             return self.job
         if model is Document:
             return self.document
+        if model is WorkspaceRetrievalAssignment:
+            return None  # legacy serving: no index generation to mirror into
         raise AssertionError(model)
 
     async def scalar(
@@ -515,3 +518,80 @@ async def test_tombstoned_document_job_never_publishes_vectors(
     assert qdrant.upserts == []
     assert qdrant.activations == []
     assert qdrant.deletions == []
+
+
+@pytest.mark.asyncio
+async def test_publication_is_mirrored_with_the_revision_it_publishes(
+    monkeypatch,
+):
+    calls = []
+
+    async def mirror(_db, *, document, version, text, source_revision):
+        # Called before the publication changes any source state.
+        calls.append((source_revision, document.source_revision, version.status, version.version, text))
+        return True
+
+    monkeypatch.setattr(worker, "mirror_to_active_generation", mirror)
+
+    document = make_document(active_version=1, source_revision=1)
+    job = make_job(1)
+    await run_worker(monkeypatch, job=job, version=make_version(1), document=document)
+    assert calls == [(2, 1, "queued", 1, "indexed")] and job.status == "ready"
+
+    # An older version finishing late is not the active source: never mirrored.
+    calls.clear()
+    stale = make_document(active_version=3, source_revision=7, index_status="ready")
+    await run_worker(monkeypatch, job=make_job(2), version=make_version(2), document=stale)
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_a_failed_mirror_does_not_publish_the_source(
+    monkeypatch,
+):
+    async def mirror(*_args, **_kwargs):
+        raise RuntimeError("generation unavailable")
+
+    monkeypatch.setattr(worker, "mirror_to_active_generation", mirror)
+
+    job = make_job(1)
+    version = make_version(1)
+    document = make_document(active_version=1, source_revision=1)
+    db, queue, _qdrant = await run_worker(
+        monkeypatch,
+        job=job,
+        version=version,
+        document=document,
+    )
+
+    # Nothing was published: same revision, no event, version not ready; the job is retried.
+    assert job.status == "queued" and queue.enqueued == [job.id]
+    assert document.source_revision == 1 and version.status == "queued"
+    assert source_events(db) == []
+
+
+@pytest.mark.asyncio
+async def test_worker_preloads_active_generation_models_before_taking_jobs(monkeypatch):
+    order = []
+
+    class Stop(Exception):
+        pass
+
+    class StartQueue:
+        async def dequeue(self, timeout):
+            order.append("dequeue")
+            raise Stop
+
+        async def close(self):
+            pass
+
+    async def warm(_db):
+        order.append("warm")
+        raise RuntimeError("model missing")  # never keeps the worker from starting
+
+    monkeypatch.setattr(worker, "SessionLocal", lambda: SessionContext(object()))
+    monkeypatch.setattr(worker, "warm_active_generation_models", warm)
+    monkeypatch.setattr(worker, "RedisIndexQueue", StartQueue)
+    with pytest.raises(Stop):
+        await worker.worker_main()
+    assert order == ["warm", "dequeue"]

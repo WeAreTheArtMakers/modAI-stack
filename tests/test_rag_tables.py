@@ -325,13 +325,13 @@ async def test_retrieval_context_carries_the_fixed_answer_only_for_live_authoriz
     scope = {"organization_id": 1, "workspace_id": 2, "knowledge_base_ids": [3]}
 
     context = await pipeline.retrieve_rag_context("Kıdemim tam 5 yıl", db=Db([1, 2]), **scope)
-    assert context.table_conflict_answer.startswith("Belge bu soruya kesin bir yanıt vermiyor")
+    assert context.fixed_answer.startswith("Belge bu soruya kesin bir yanıt vermiyor")
     assert [source.document for source in context.sources] == ["1.md", "2.md"]
     # Document 1 deleted since indexing: its table no longer counts.
     context = await pipeline.retrieve_rag_context("Kıdemim tam 5 yıl", db=Db([2]), **scope)
-    assert context.table_conflict_answer is None
+    assert context.fixed_answer is None
     context = await pipeline.retrieve_rag_context("Kıdemim 3 yıl", db=Db([1, 2]), **scope)
-    assert context.table_conflict_answer is None
+    assert context.fixed_answer is None
 
 
 def test_spoken_quantities_are_written_as_digits_for_retrieval_only():

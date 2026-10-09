@@ -181,7 +181,9 @@ async def test_worker_releases_its_document_version_lock_after_indexing(monkeypa
 
     class Db:
         async def get(self, model, _identifier):
-            return job if model is worker.IndexJob else document
+            if model is worker.IndexJob:
+                return job
+            return document if model is worker.Document else None  # no retrieval assignment: legacy
 
         async def scalar(self, _statement):
             return version

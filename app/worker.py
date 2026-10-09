@@ -15,6 +15,7 @@ from app.services.document_source_events import (
 from app.services.jobs.redis_queue import RedisIndexQueue
 from app.services.rag.chunker import chunk_text
 from app.services.rag.embeddings import EmbeddingModelUnavailableError, embedding_model_unavailable_detail, get_embedding_service
+from app.services.rag.generation_runtime import mirror_to_active_generation, warm_active_generation_models
 from app.services.qdrant import qdrant_service
 from app.services.storage import storage
 from app.services.observability import metrics
@@ -214,6 +215,18 @@ async def process_job(job_id: str) -> None:
                     is_active=True,
                 )
 
+            if not stale:
+                # A workspace serving an index generation gets the source there too, before any
+                # source state changes (the failure path below commits without a rollback), with
+                # the revision this commit publishes. rag_documents above stays the rollback copy.
+                await mirror_to_active_generation(
+                    db,
+                    document=locked_document,
+                    version=version,
+                    text=content,
+                    source_revision=locked_document.source_revision + (1 if publishes_source else 0),
+                )
+
             if stale:
                 # Indexing completed, but this source lost the race to a
                 # newer publication. Do not touch Document source state.
@@ -363,6 +376,13 @@ async def process_job(job_id: str) -> None:
                 logger.warning("Index job lock could not be released", extra={"job_id": job_id})
             await queue.close()
 async def worker_main() -> None:
+    # A workspace serving an index generation needs its model for every upload: load it now
+    # rather than inside the first job (a cold BGE-M3 load took 16-90 s on a busy 16 GB Mac).
+    try:
+        async with SessionLocal() as db:
+            await warm_active_generation_models(db)
+    except Exception:
+        logger.warning("Generation embedding preload failed", extra={"component": "worker"})
     queue = RedisIndexQueue()
     try:
         while True:

@@ -156,9 +156,9 @@ async def websocket_rag(ws: WebSocket):
             first_token_ms: float | None = None
 
             try:
-                if context.table_conflict_answer is not None:
-                    # The retrieved tables conflict for the number asked: no model answer.
-                    stream = _fixed(context.table_conflict_answer)
+                if context.fixed_answer is not None:
+                    # No source, or the retrieved tables conflict for the number asked: no model answer.
+                    stream = _fixed(context.fixed_answer)
                 elif req.diagnostics:
                     stream = provider.stream(context.prompt, stats=generation_stats)
                 else:

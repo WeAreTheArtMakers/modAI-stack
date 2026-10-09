@@ -96,7 +96,7 @@ def _wire(monkeypatch, *, history=None, retrieve_calls=None, stream_calls=None, 
         retrieve_calls.append((question, kwargs))
         return SimpleNamespace(
             prompt="prompt",
-            table_conflict_answer=conflict_answer,
+            fixed_answer=conflict_answer,
             sources=[Source(document="vpn.md", document_id=8, chunk_index=0, score=0.8, text="secret excerpt")],
             embedding_latency_ms=12.3456,
             retrieval_latency_ms=4.0,
@@ -226,7 +226,7 @@ async def test_http_query_returns_the_fixed_answer_without_the_model(monkeypatch
         return {"language": "tr", "tone": "professional", "response_length": "short"}
 
     async def retrieve(_question, **_kwargs):
-        return SimpleNamespace(prompt="prompt", sources=[Source(document="ulasim.md", document_id=8, chunk_index=0, score=0.8)], table_conflict_answer=fixed)
+        return SimpleNamespace(prompt="prompt", sources=[Source(document="ulasim.md", document_id=8, chunk_index=0, score=0.8)], fixed_answer=fixed)
 
     class NoModel:
         def __init__(self, *_args):

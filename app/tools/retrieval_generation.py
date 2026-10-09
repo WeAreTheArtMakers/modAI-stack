@@ -1,4 +1,4 @@
-"""Build, validate, activate and roll back a workspace index generation (staging only).
+"""Build, validate, activate and roll back a workspace index generation.
 
     python -m app.tools.retrieval_generation status   --workspace-id 1
     python -m app.tools.retrieval_generation plan     --workspace-id 1 [--profile balanced-multilingual@1]
@@ -7,9 +7,9 @@
     python -m app.tools.retrieval_generation activate --workspace-id 1 --generation-id <uuid> --expected-epoch N --confirm-workspace 1
     python -m app.tools.retrieval_generation rollback --workspace-id 1 --expected-epoch N --confirm-workspace 1
 
-plan/build/validate/activate refuse to run unless RETRIEVAL_GENERATIONS_ENABLED=true and
-APP_ENV=staging. Rollback to the legacy MiniLM index always works: the worker keeps indexing every
-upload into rag_documents, so the legacy collection stays complete and rollback is a pointer change.
+plan/build/validate/activate refuse to run unless RETRIEVAL_GENERATIONS_ENABLED=true. Rollback to
+the legacy MiniLM index always works: the worker keeps indexing every upload into rag_documents
+(and, once a generation is active, into that generation too), so rollback is a pointer change.
 
 A generation is built from the stored source files of each document's active ready version, with the
 pinned materialization contract, into its embedding space's own collection; MiniLM points and the
@@ -47,6 +47,7 @@ from app.services.rag.generation_runtime import (
     WORD_CHUNKS_V1,
     eligible_sources,
     generation_contracts,
+    generation_lag,
     generations_enabled,
     get_contract_embedder,
     latest_source_event_id,
@@ -432,6 +433,9 @@ async def status(db: AsyncSession, workspace_id: int) -> dict:
                 "validated": generation.validation_json.get("passed"), "points": generation.validation_json.get("points"),
                 # Current means: activation would accept this validation now.
                 "validation_current": generation.validation_json.get("snapshot_sha256") == snapshot and generation.validation_json.get("max_event_id") == latest_event,
+                # Sources the generation does not match now; empty for an active generation the
+                # worker keeps current.
+                "lag": await generation_lag(db, generation, workspace.organization_id),
             }
             for generation in generations
         ],

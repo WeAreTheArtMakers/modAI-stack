@@ -5,10 +5,9 @@
 # - ports bound to 127.0.0.1 only: web console http://localhost:5183, API http://localhost:8100;
 # - generation reuses the host's Ollama (no second model instance, no model or setting change);
 # - the embedding model is mounted read-only from ./models;
-# - BGE-M3 index generations are enabled here only (RETRIEVAL_GENERATIONS_ENABLED with
-#   APP_ENV=staging). Every workspace still serves the legacy MiniLM index until a validated
-#   generation is activated with `python -m app.tools.retrieval_generation` (see
-#   docs/guides/bge-m3-staging-generation.md).
+# - BGE-M3 index generations are enabled (RETRIEVAL_GENERATIONS_ENABLED): every workspace still
+#   serves the legacy MiniLM index until a validated generation is activated with
+#   `python -m app.tools.retrieval_generation` (see docs/guides/bge-m3-staging-generation.md).
 # See README "Yerel kabul ortamı (staging)" for the commands.
 name: modai-staging
 
