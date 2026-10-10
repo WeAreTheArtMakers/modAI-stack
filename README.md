@@ -58,7 +58,7 @@ Giriş yapmış kullanıcılar mevcut kataloğu `GET /retrieval/profiles` ve etk
 
 ## Proje hakkında
 
-modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, asenkron indekslemeyi, semantik aramayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Redis indeks iş kuyruğu ve ilerleme olaylarını, Qdrant ise vektör aramayı destekler. Model sağlayıcı arayüzü sayesinde Ollama yerine başka bir sağlayıcı eklenebilir.
+modAI-stack; Ollama üzerinde yerel model çalıştırmayı, belge yüklemeyi, asenkron indekslemeyi, semantik aramayı ve yanıtları WebSocket ile gerçek zamanlı aktarmayı sağlar. FastAPI ve `asyncio` tabanlıdır. PostgreSQL kalıcı verileri, Valkey (Redis uyumlu, BSD lisanslı) indeks iş kuyruğu ve ilerleme olaylarını, Qdrant ise vektör aramayı destekler. Model sağlayıcı arayüzü sayesinde Ollama yerine başka bir sağlayıcı eklenebilir.
 
 Kullanıcı kaydı sırasında başlangıç Organization, Workspace ve Knowledge Base oluşturulur. Knowledge Base erişimi Membership kayıtlarıyla kontrol edilir; `admin`, `manager` ve `user` üyelik rolleri belge, Knowledge Base, RAG ve workspace işlemlerini tenant kapsamı içinde sınırlar. Belge ve Qdrant erişimi bu kapsam bilgileriyle ilişkilendirilir.
 
@@ -108,7 +108,7 @@ Detaylı şema, metrik sınırları, embedding modeli değiştiğinde reindex uy
 | RAG | Sentence Transformers, metin parçalama | Belge kaynaklı yanıt üretimi |
 | Vektör arama | Qdrant, cosine similarity, metadata filtreleri | Embedding saklama ve arama |
 | Kalıcı veri | PostgreSQL, SQLAlchemy Async ORM, asyncpg | Kullanıcı, belge, oturum ve mesajlar |
-| Geçici veri ve işler | Redis | Asenkron indeks kuyruğu, retry ve workspace kapsamlı ilerleme olayları |
+| Geçici veri ve işler | Valkey (Redis uyumlu) | Asenkron indeks kuyruğu, retry ve workspace kapsamlı ilerleme olayları |
 | Gerçek zamanlı iletişim | WebSocket | Token akışı ve canlı sohbet |
 | Güvenlik | JWT, access/refresh token, bcrypt, RBAC | Kimlik doğrulama ve yetkilendirme |
 | Belge işleme | `pypdf`, `python-docx`, Markdown, TXT | Dosyadan metin çıkarma |
@@ -138,7 +138,7 @@ Sorgu akışı şöyledir: `question → embed → yetkili Organization/Workspac
 
 Upload isteği artık embedding çalıştırmaz. API dosyayı güvenli, üretilmiş bir adla `DATA_DIR/uploads/` altına atomik olarak kaydeder; PostgreSQL’de belge sürümü ve `IndexJob` oluşturur; işi Redis kuyruğuna bırakır ve `queued` durumuyla döner. Ayrı worker süreci `queued → processing → ready` akışında extraction, chunking, embedding ve Qdrant upsert işlemlerini yürütür. Hatalar güvenli `failed` durumuna alınır ve sınırlı retry uygulanır.
 
-Desteklenen dosya türleri PDF, TXT, Markdown ve DOCX’tir. Kullanıcı dosya adı yalnızca metadata olarak saklanır; filesystem yolu hiçbir zaman istemciden alınmaz. Docker Compose içinde `api`, `worker`, PostgreSQL, Redis ve Qdrant servisleri bulunur; kaynak dosyalar `modaidata` volume’unda kalıcıdır.
+Desteklenen dosya türleri PDF, TXT, Markdown ve DOCX’tir. Kullanıcı dosya adı yalnızca metadata olarak saklanır; filesystem yolu hiçbir zaman istemciden alınmaz. Docker Compose içinde `api`, `worker`, PostgreSQL, Valkey (Redis uyumlu; servis adı `redis`) ve Qdrant servisleri bulunur; kaynak dosyalar `modaidata` volume’unda kalıcıdır.
 
 Belge yaşam döngüsü için `POST /documents/{id}/reindex`, `POST /documents/{id}/replace`, `GET /documents/{id}/versions` ve `DELETE /documents/{id}` endpoint’leri bulunur. Replace işleminde yeni sürüm indekslenene kadar eski sürüm aktif kalır; başarılı sürüm aktivasyonundan sonra eski Qdrant noktaları temizlenir.
 
@@ -437,7 +437,7 @@ Mevcut sürüm belge metnini PostgreSQL’e kaydeder ve yerel filesystem depolam
 
 ## License
 
-**© 2026 We Are The Art Makers. All rights reserved.**
+**© 2026 WATAM — We Are The Art Makers ([wearetheartmakers.com](https://wearetheartmakers.com)). All rights reserved.**
 
 modAI-stack is proprietary **source-available software** distributed under the
 [WATAM Source-Available License](LICENSE).
@@ -460,7 +460,8 @@ https://wearetheartmakers.github.io/modAI-stack/
 
 See [COMMERCIAL_LICENSING.md](COMMERCIAL_LICENSING.md) for current commercial
 packages and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for information
-about third-party components.
+about third-party components. A Turkish summary of the licensing model and of
+why each bundled component was chosen is in [docs/guides/lisanslama.md](docs/guides/lisanslama.md).
 
 The ownership of modAI-stack and its proprietary intellectual property remains
 with We Are The Art Makers. Purchasing a Pilot, Business, or Enterprise license

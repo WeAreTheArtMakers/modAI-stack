@@ -65,9 +65,9 @@ installer from its publisher, under that publisher's terms.
 | Ollama | host installation | MIT | installed by the operator |
 | Qdrant (`qdrant/qdrant`) | v1.12.5 | Apache-2.0 | Docker image |
 | PostgreSQL (`postgres`) | 16 | PostgreSQL License | Docker image |
-| Redis (`redis:7-alpine`) | 7.x (7.4.11 observed in October 2026) | Redis 7.4 and later: RSALv2 or SSPLv1 (earlier 7.x: BSD-3-Clause) | Docker image |
+| Valkey (`valkey/valkey`), Redis-protocol compatible queue and cache | 8.1 (8.1.10 verified October 2026) | BSD-3-Clause | Docker image |
 
 Release review items:
-- **Redis:** RSALv2 and SSPLv1 are not open-source licenses and restrict offering Redis itself as a service. Confirm that the intended deployment model is acceptable, or pin a BSD-licensed alternative (for example Redis 7.2 or Valkey) before commercial redistribution.
+- **Redis replaced by Valkey:** Redis 7.4 and later are licensed under RSALv2/SSPLv1 (Redis 8 adds AGPLv3), which are not permissive and are routinely flagged by customer legal reviews. Releases from v0.6.1 use Valkey (BSD-3-Clause), a Linux Foundation fork that speaks the same protocol; no application change is needed. See `docs/guides/lisanslama.md`.
 - **Gemma models:** if a release ships or pre-installs Gemma weights, the Gemma Terms of Use must accompany them and the use restrictions passed on to the customer.
 - This table is a summary for review. It is not legal advice and does not replace the release-time dependency inventory described above.

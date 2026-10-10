@@ -8,6 +8,8 @@
 
 modAI-stack is proprietary source-available software distributed under the WATAM Source-Available License.
 
+Licensor: **WATAM — We Are The Art Makers** ([wearetheartmakers.com](https://wearetheartmakers.com)).
+
 Public source-code visibility does not grant production or commercial
 usage rights. Production use, commercial deployment, hosted services,
 redistribution, resale, and other commercial exploitation require a separate
