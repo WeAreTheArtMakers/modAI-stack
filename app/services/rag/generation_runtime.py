@@ -14,8 +14,9 @@ fails, retrieval raises ``RetrievalIndexUnavailableError`` (HTTP 503 / WebSocket
 The worker keeps an active generation current: every source it publishes in a generation-mode
 workspace is written to the legacy collection (the rollback copy) and to the active generation
 (``mirror_to_active_generation``). Deleted documents are tombstoned in PostgreSQL and their points
-are dropped at query time by ``live_generation_hits``. Not implemented (design prerequisites for a
-multi-workspace rollout): outbox replay, the activation write gate, and admin APIs.
+are dropped at query time by ``live_generation_hits``, as are the points of archived documents. Not
+implemented (design prerequisites for a multi-workspace rollout): outbox replay, the activation
+write gate, and admin APIs.
 """
 
 from __future__ import annotations
@@ -237,8 +238,11 @@ async def resolve_retrieval_index(
 
 
 async def live_generation_hits(db: AsyncSession, index: ResolvedRetrievalIndex, hits: list) -> list:
-    """Keep hits whose document is still current in PostgreSQL: not deleted, in an authorized
-    Knowledge Base, and at the same active version and source revision that was indexed."""
+    """Keep hits whose document is still current in PostgreSQL: not deleted, not archived, in an
+    authorized Knowledge Base, and at the same active version and source revision that was indexed.
+
+    Archiving changes no revision, so an archived document's points stay current in the generation
+    and serve again as soon as it is un-archived."""
     ids = {hit.payload["document_id"] for hit in hits}
     if not ids:
         return []
@@ -249,6 +253,7 @@ async def live_generation_hits(db: AsyncSession, index: ResolvedRetrievalIndex, 
             Document.workspace_id == index.scope.workspace_id,
             Document.knowledge_base_id.in_(index.scope.knowledge_base_ids),
             Document.deleted_at.is_(None),
+            Document.archived_at.is_(None),
         )
     )
     current = {row.id: row for row in rows}
@@ -263,7 +268,8 @@ async def live_generation_hits(db: AsyncSession, index: ResolvedRetrievalIndex, 
 
 
 async def eligible_sources(db: AsyncSession, workspace_id: int, organization_id: int) -> list[tuple[Document, DocumentVersion]]:
-    """Documents a generation must contain: live, scoped, with a ready active version."""
+    """Documents a generation must contain: live, scoped, with a ready active version. Archived
+    documents stay included (they are filtered at query time), so un-archiving needs no reindex."""
     rows = await db.execute(
         select(Document, DocumentVersion)
         .join(

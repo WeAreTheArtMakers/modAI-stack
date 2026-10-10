@@ -362,6 +362,118 @@ async def replace_document(request: Request, document_id: int, file: UploadFile 
 
     return locked_doc
 
+# Archiving is a serving decision, not a source change, so it neither advances
+# source_revision nor writes a document source event. Index generation points
+# carry the revision they were built from and live_generation_hits serves a
+# point only while that revision is current: a bump would leave an un-archived
+# document unservable until it was reindexed. The archived document stays in
+# eligible_sources and in Qdrant; both retrieval paths drop it at query time
+# from documents.archived_at, so archive and unarchive take effect at once.
+async def _set_document_archived(
+    request: Request,
+    document_id: int,
+    user: dict,
+    db: AsyncSession,
+    *,
+    archived: bool,
+):
+    doc, _ = await require_document_access(
+        db,
+        user,
+        document_id,
+        "manager",
+    )
+
+    try:
+        # Serialize with replace, delete and worker publication.
+        locked_doc = await lock_document_source(
+            db,
+            doc.id,
+        )
+
+        if locked_doc.deleted_at is not None:
+            raise HTTPException(
+                409,
+                "Document has been deleted",
+            )
+
+        if (locked_doc.archived_at is not None) == archived:
+            # Idempotent: nothing changes and nothing is audited; the
+            # first archive time is kept. Commit only releases the lock.
+            await db.commit()
+            return locked_doc
+
+        locked_doc.archived_at = (
+            datetime.now(timezone.utc) if archived else None
+        )
+
+        record_audit_event(
+            db,
+            action=(
+                "document_archive"
+                if archived
+                else "document_unarchive"
+            ),
+            resource_type="document",
+            actor_user_id=int(user["sub"]),
+            organization_id=locked_doc.organization_id,
+            workspace_id=locked_doc.workspace_id,
+            resource_id=locked_doc.id,
+            request=request,
+        )
+
+        await db.commit()
+        await db.refresh(locked_doc)
+
+    except HTTPException:
+        await db.rollback()
+        raise
+
+    except Exception as exc:
+        await db.rollback()
+
+        logger.exception(
+            "Document archive transaction failed",
+            extra={"document_id": document_id},
+        )
+
+        raise HTTPException(
+            503,
+            "Document archive state could not be saved",
+        ) from exc
+
+    return locked_doc
+
+@router.post("/{document_id}/archive", response_model=DocumentResponse)
+async def archive_document(
+    request: Request,
+    document_id: int,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _set_document_archived(
+        request,
+        document_id,
+        user,
+        db,
+        archived=True,
+    )
+
+@router.post("/{document_id}/unarchive", response_model=DocumentResponse)
+async def unarchive_document(
+    request: Request,
+    document_id: int,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _set_document_archived(
+        request,
+        document_id,
+        user,
+        db,
+        archived=False,
+    )
+
 @router.post("/upload-batch", response_model=list[DocumentResponse], status_code=201)
 async def upload_batch(request: Request, files: list[UploadFile] = File(...), knowledge_base_id: int | None = Form(default=None), user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     results = []

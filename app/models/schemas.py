@@ -154,6 +154,8 @@ class DocumentResponse(BaseModel):
     active_version: int = 1
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    # Set while the document is archived as obsolete: listed, but never retrieved.
+    archived_at: datetime | None = None
 
 class DocumentListResponse(BaseModel):
     items: list[DocumentResponse]

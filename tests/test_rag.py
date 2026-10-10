@@ -1,10 +1,15 @@
 import asyncio
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from qdrant_client import AsyncQdrantClient
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import Settings
+from app.models.database import Base, Document, KnowledgeBase, Organization, User, Workspace
 from app.models.schemas import AssistantHistoryMessage
+from app.services.qdrant import QdrantService
 from app.services.rag import pipeline
 from app.services.rag.chunker import chunk_text
 from app.services.rag.pipeline import build_rag_prompt
@@ -183,6 +188,80 @@ async def test_rag_pipeline_filters_tombstoned_qdrant_hits_using_postgres(
     assert [source.document_id for source in context.sources] == [1]
     assert "live source" in context.prompt
     assert "deleted secret" not in context.prompt
+
+
+@pytest.mark.asyncio
+async def test_rag_pipeline_never_serves_an_archived_document_from_the_legacy_index(
+    monkeypatch,
+):
+    """An obsolete v2 kept next to v3: archived, its vectors stay in Qdrant but never reach the
+    prompt or the sources; un-archived, it is served again without reindexing."""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    client = AsyncQdrantClient(":memory:")
+    qdrant = QdrantService(client)
+
+    class FakeEmbeddingService:
+        async def embed_text(self, _text: str):
+            return [1.0, 0.0]
+
+    monkeypatch.setattr(pipeline, "get_embedding_service", lambda: FakeEmbeddingService())
+    monkeypatch.setattr(pipeline, "qdrant_service", qdrant)
+    monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
+
+    try:
+        async with maker() as db:
+            organization = Organization(name="Org", slug="org")
+            workspace = Workspace(name="Destek", slug="destek", organization=organization)
+            kb = KnowledgeBase(name="Destek", slug="destek", workspace=workspace)
+            user = User(email="manager@example.com", password_hash="x")
+            db.add_all([organization, workspace, kb, user])
+            await db.flush()
+            old, current = (
+                Document(user_id=user.id, organization_id=organization.id, workspace_id=workspace.id,
+                         knowledge_base_id=kb.id, filename=filename, content="")
+                for filename in ("destek-v2.md", "destek-v3.md")
+            )
+            db.add_all([old, current])
+            await db.commit()
+
+            texts = {
+                old.id: "v2: destek ekibi lisans sayısını artırabilir.",
+                current.id: "v3: destek ekibi lisans sayısını değiştirmez.",
+            }
+            # The obsolete version ranks first, as it did in the demo.
+            for document, vector in ((old, [1.0, 0.0]), (current, [0.9, 0.1])):
+                await qdrant.upsert_document(
+                    user_id=user.id, document_id=document.id, filename=document.filename,
+                    organization_id=organization.id, workspace_id=workspace.id,
+                    knowledge_base_id=kb.id, chunks=[texts[document.id]], vectors=[vector],
+                )
+            scope = {"organization_id": organization.id, "workspace_id": workspace.id, "knowledge_base_ids": [kb.id]}
+
+            both = await pipeline.retrieve_rag_context("Lisans sayısını artırabilir miyiz?", db=db, **scope)
+            assert [source.document_id for source in both.sources] == [old.id, current.id]
+
+            old.archived_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            context = await pipeline.retrieve_rag_context("Lisans sayısını artırabilir miyiz?", db=db, **scope)
+            assert [source.document_id for source in context.sources] == [current.id]
+            assert texts[current.id] in context.prompt
+            assert texts[old.id] not in context.prompt
+            assert "destek-v2.md" not in context.prompt
+            # The archived vectors are kept: filtering happens at query time.
+            assert (await client.count(QdrantService.collection_name)).count == 2
+
+            old.archived_at = None
+            await db.commit()
+
+            restored = await pipeline.retrieve_rag_context("Lisans sayısını artırabilir miyiz?", db=db, **scope)
+            assert [source.document_id for source in restored.sources] == [old.id, current.id]
+    finally:
+        await client.close()
+        await engine.dispose()
 
 
 @pytest.mark.asyncio

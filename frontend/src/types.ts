@@ -43,6 +43,8 @@ export interface DocumentItem {
   index_error: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // Set while archived as an obsolete version: still listed, never used in answers.
+  archived_at: string | null;
 }
 
 export interface DocumentPage {
