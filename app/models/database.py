@@ -181,6 +181,13 @@ class Document(Base):
         nullable=True,
         index=True,
     )
+    # An archived (obsolete) document stays listed and indexed but is never
+    # retrieved. Not a source change: no revision or source event.
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     user: Mapped[User] = relationship()
