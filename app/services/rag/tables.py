@@ -37,7 +37,10 @@ import re
 from dataclasses import dataclass
 
 _SEPARATOR = re.compile(r"\|(?:[ \t]*:?-{3,}:?[ \t]*\|)+")
-_NUMBER = r"\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?"
+# Turkish grouping ("40.000", "1.250,5"), English grouping ("40,000": a comma followed by groups of
+# exactly three digits is read as thousands, never as a three-decimal fraction), or a plain number
+# with an optional Turkish decimal comma ("1,5").
+_NUMBER = r"\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?!\d)|\d+(?:,\d+)?"
 _TOKEN = re.compile(rf"{_NUMBER}|[^\W\d_]+(?:['’][^\W\d_]+)?|₺")
 
 _UNITS = (  # longest first: "kilometre" before "kilo"
@@ -68,6 +71,8 @@ def _unit(token: str) -> str | None:
 
 
 def _number(token: str) -> float:
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+", token):
+        return float(token.replace(",", ""))  # "40,000" in an English question: forty thousand
     return float(token.replace(".", "").replace(",", "."))
 
 
