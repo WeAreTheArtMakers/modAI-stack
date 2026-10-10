@@ -40,6 +40,14 @@ export function replaceDocument(id: number, file: File): Promise<DocumentItem> {
   return request<DocumentItem>(`/documents/${id}/replace`, { method: "POST", body: form });
 }
 
+export function archiveDocument(id: number): Promise<DocumentItem> {
+  return request<DocumentItem>(`/documents/${id}/archive`, { method: "POST" });
+}
+
+export function unarchiveDocument(id: number): Promise<DocumentItem> {
+  return request<DocumentItem>(`/documents/${id}/unarchive`, { method: "POST" });
+}
+
 export function listDocumentVersions(id: number): Promise<DocumentVersion[]> {
   return request<DocumentVersion[]>(`/documents/${id}/versions`);
 }
