@@ -1,5 +1,11 @@
 # Sürüm notları
 
+## v0.6.1 — Lisans uyumu ve İngilizce sayı düzeltmesi
+
+- **Redis yerine Valkey:** kuyruk ve geçici veri için `valkey/valkey:8.1-alpine` (BSD-3-Clause) kullanılır. Redis 7.4 ve sonrası RSALv2/SSPLv1 lisanslıdır ve kurumsal hukuk incelemelerinde sorun çıkarabilir. Valkey aynı protokolü konuşur; kod değişikliği yoktur. Geçişten sonra kullanıcılar bir kez yeniden giriş yapar. Gerekçe: [lisanslama](docs/guides/lisanslama.md).
+- **İngilizce binlik ayırıcı:** "40,000 TL" artık 40 bin TL olarak okunur; önceden 40 TL sayılıyor ve yanlış onay satırı veriliyordu.
+- **Lisans veren:** WATAM — We Are The Art Makers ([wearetheartmakers.com](https://wearetheartmakers.com)).
+
 ## v0.6.0 — modAI Voice ve çok dilli arama (yayın adayı)
 
 Sürüm numarası ve etiket, sahip onayıyla birleştirme sırasında kesinleşir.

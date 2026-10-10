@@ -96,7 +96,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: valkey/valkey:8.1-alpine  # BSD-3-Clause, Redis-compatible; see docs/guides/lisanslama.md
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

@@ -117,7 +117,8 @@ services:
 
 
   redis:
-    image: redis:7-alpine
+    # Valkey: BSD-3-Clause, Redis-protocol compatible (Redis 7.4+ is RSALv2/SSPLv1). See docs/guides/lisanslama.md.
+    image: valkey/valkey:8.1-alpine
 
     ports:
       - "127.0.0.1:6379:6379"
