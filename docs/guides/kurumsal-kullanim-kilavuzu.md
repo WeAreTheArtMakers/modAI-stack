@@ -43,6 +43,15 @@ Dashboard'daki **Kurumsal alanınızı hazırlayın** kartı eksik adımları ge
 
 Hazır olmayan bir belgeden yanıt beklemeyin.
 
+## Yeni sürüm mü, eski sürüm arşivi mi?
+
+Bir politikanın güncel hâli geldiğinde iki yol vardır:
+
+- **Belgeyi değiştir (tercih edilen):** Güncel dosyayı aynı belgenin yeni sürümü olarak yükleyin. Belge kaydı ve sürüm geçmişi korunur; yeni sürüm **Hazır** olunca yanıtlar yalnızca yeni sürümden gelir. Aynı belgenin güncellenmiş hâli için her zaman bu yolu kullanın.
+- **Eski sürüm olarak arşivle:** Eski sürüm ayrı bir belge olarak yüklenmişse (örneğin destek talimatlarının v2 ve v3 dosyaları yan yana duruyorsa) eski belgeyi arşivleyin. Arşivlenen belge silinmez, listede **Arşivde** etiketiyle görünmeye devam eder, ancak artık yanıtlarda kaynak olarak kullanılmaz. Gerekirse **Arşivden çıkar** ile hemen geri alınır; yeniden indeksleme gerekmez.
+
+Arşivleme yalnızca manager/admin rolüyle yapılır ve denetim kaydına işlenir. Belgeyi tamamen kaldırmak için **Sil**'i kullanın; silinen belge listeden de kalkar.
+
 ## RAG Chat ve kaynak kartları
 
 Chat yalnızca seçilen Workspace'teki yetkili Knowledge Base'leri sunar. Birden çok kaynak seçebilirsiniz. Bilgi tabanı ayrıntısındaki **Bu kaynaklarla chat** bağlantısı o bilgi tabanını önceden seçer. Yanıt altında kaynak kartları belge adını, ilgili parça numarasını, skoru ve açılabilir alıntıyı gösterir. Kaynak görünmüyorsa cevabın belgeye dayandığını varsaymayın.
