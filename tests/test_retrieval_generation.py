@@ -15,7 +15,9 @@ from qdrant_client import AsyncQdrantClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
+from starlette.requests import Request
 
+from app.api.routes import documents
 from app.core.config import Settings
 from app.models.database import (
     AuditEvent,
@@ -320,6 +322,52 @@ async def test_request_path_serves_the_active_generation_and_rollback_restores_l
     assert await env.adapter.count_generation(tool._write_index(generation, env.org_id)) == points_before  # retained
     actions = (await env.db.scalars(select(AuditEvent.action))).all()
     assert "retrieval_profile_activated" in actions and "retrieval_profile_rollback" in actions
+
+
+@pytest.mark.asyncio
+async def test_archived_document_is_never_served_and_unarchiving_needs_no_reindex(env, monkeypatch):
+    planned, _, _ = await built_and_validated(env)
+    await tool.activate(env.db, env.ws_id, planned["generation_id"], expected_epoch=0, confirm_workspace=env.ws_id)
+    monkeypatch.setattr(pipeline, "get_settings", lambda: SimpleNamespace(rag_top_k=3))
+    scope = {"organization_id": env.org_id, "workspace_id": env.ws_id, "knowledge_base_ids": [env.kb_id, env.kb2_id]}
+    question = "Premium plan Severity 2 first response"
+    sla_id = env.doc_ids["sla"]
+
+    async def manager_access(db, _user, document_id, role):
+        assert role == "manager"
+        return await db.get(Document, document_id), SimpleNamespace(role="manager")
+
+    monkeypatch.setattr(documents, "require_document_access", manager_access)
+
+    def request_for(path):
+        return Request({"type": "http", "method": "POST", "scheme": "http", "path": path, "headers": []})
+
+    generation = await env.db.get(IndexGeneration, planned["generation_id"])
+    write = tool._write_index(generation, env.org_id)
+    points_before = await env.adapter.count_generation(write)
+    last_event_before = await runtime.latest_source_event_id(env.db, env.ws_id)
+    assert (await pipeline.retrieve_rag_context(question, db=env.db, **scope)).sources[0].document == "sla.md"
+
+    await documents.archive_document(request_for(f"/documents/{sla_id}/archive"), sla_id, {"sub": "1"}, env.db)
+
+    context = await pipeline.retrieve_rag_context(question, db=env.db, **scope)
+    assert "sla.md" not in {source.document for source in context.sources}
+    assert sla_id not in {source.document_id for source in context.sources}
+    assert TEXTS["/data/modai/uploads/sla.md"] not in context.prompt
+    # Its points stay in the generation, current and eligible: nothing is behind and no source
+    # event was written, so the activation gate and the lag report are unaffected.
+    assert await env.adapter.count_generation(write) == points_before
+    assert sla_id in {document.id for document, _ in await runtime.eligible_sources(env.db, env.ws_id, env.org_id)}
+    assert (await tool.status(env.db, env.ws_id))["generations"][0]["lag"] == {"missing_or_outdated": [], "stale_points": []}
+    assert await runtime.latest_source_event_id(env.db, env.ws_id) == last_event_before
+
+    # Un-archiving serves the same points again at once, without any reindex.
+    embed_calls = env.embedder.calls
+    await documents.unarchive_document(request_for(f"/documents/{sla_id}/unarchive"), sla_id, {"sub": "1"}, env.db)
+    restored = await pipeline.retrieve_rag_context(question, db=env.db, **scope)
+    assert restored.sources[0].document == "sla.md"
+    assert env.embedder.calls == embed_calls + 1  # the question only
+    assert await env.adapter.count_generation(write) == points_before
 
 
 @pytest.mark.asyncio

@@ -231,8 +231,9 @@ async def retrieve_rag_context(
         hits = hits[:search_limit]
     retrieval_latency_ms = (perf_counter() - retrieval_started) * 1000
 
-    # Qdrant may temporarily retain vectors after a logical delete.
-    # PostgreSQL is authoritative for source liveness.
+    # Qdrant may temporarily retain vectors after a logical delete, and keeps
+    # an archived document's vectors on purpose. PostgreSQL is authoritative
+    # for source liveness: neither may reach the prompt or the sources.
     liveness_started = perf_counter()
     candidate_document_ids = {
         hit.payload.get("document_id")
@@ -253,6 +254,7 @@ async def retrieve_rag_context(
                         Document.workspace_id == workspace_id,
                         Document.knowledge_base_id.in_(knowledge_base_ids),
                         Document.deleted_at.is_(None),
+                        Document.archived_at.is_(None),
                     )
                 )
             ).all()
