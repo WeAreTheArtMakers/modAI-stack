@@ -386,3 +386,27 @@ async def test_retrieval_searches_the_spoken_and_the_digit_form_and_keeps_each_c
     embedded.clear(); searched.clear()
     await pipeline.retrieve_rag_context("Kıdemim 3 yıl", db=Db(), organization_id=1, workspace_id=2, knowledge_base_ids=[3])
     assert embedded == ["Kıdemim 3 yıl"] and searched == [3]  # nothing to normalize: one search
+
+
+@pytest.mark.parametrize(("question", "value"), [
+    ("Who approves a 40,000 TL purchase?", 40_000),
+    ("A 1,250,000 TL contract", 1_250_000),
+    ("1,5 kiloluk zarf", 1.5),  # Turkish decimal comma is unchanged
+])
+def test_english_thousands_separators_are_read_as_thousands(question, value):
+    # Seen in staging: "Who approves a 40,000 TL purchase?" was read as 40 TL and answered
+    # from the "up to 25.000 TL" row.
+    [found] = quantities(question)
+    assert found.value == value
+
+
+def test_an_english_question_finds_the_same_table_row_as_the_turkish_one():
+    english = table_lookup("Who approves a 40,000 TL purchase?", [LIMITS])
+    turkish = table_lookup("40.000 TL'lik bir satın alma", [LIMITS])
+    assert len(english) == 1 and "Bölüm müdürü" in english[0]
+    assert english[0].split(": ", 1)[1] == turkish[0].split(": ", 1)[1]
+
+
+def test_ranges_written_with_english_grouping_are_parsed():
+    found = parse_range("25,000 TL – 150,000 TL")
+    assert (found.low, found.high, found.unit) == (25_000, 150_000, "TL")
