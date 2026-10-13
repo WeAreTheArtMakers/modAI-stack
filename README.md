@@ -15,7 +15,7 @@
 | **Şirketin içinde, internetsiz** | Belgeler, arama dizini, dil modeli ve ses modelleri şirketinizin makinesindedir. Kurulum, güncelleme ve lisans doğrulaması internete çıkmadan yapılır. |
 | **Bilgiyi bulmakla kalmaz, işi başlatır** | "Gelecek pazartesiden itibaren 3 gün izin almak istiyorum" yazan çalışana izin talebini önerir ve formu cümlesinden doldurur. Onaycı, talepten hesaplanan sayıları politikanın kendi cümlesinin yanında görür. Satın almada tutarın girdiği onay limiti vurgulanır. Dört göz kuralı, vekâlet ve hatırlatma vardır. Son onaydan sonra talep İK ya da ERP sisteminize imzalı olarak gider. |
 | **Kaynak gösterir, uydurmaz** | Yanıtın dayandığı belge, bölüm ve alıntı yanıtın yanındadır. Soruyu karşılayan belge yoksa modAI tahmin yürütmez; soru "yanıtlanamayan sorular" raporuna düşer ve eksik belge görünür olur. |
-| **Türkçe ve sesli** | Türkçe nöral ses ve sunucuda Türkçe konuşma tanıma. "Kırk bin lira" ya da "gelecek pazartesi" gibi ifadeler doğru okunur. Türkçe soru İngilizce belgede de bulunur. |
+| **Türkçe, İngilizce ve sesli** | Konsol Türkçe ve İngilizce; her kullanıcı dilini seçer. Türkçe nöral ses ve sunucuda Türkçe konuşma tanıma. "Kırk bin lira" ya da "gelecek pazartesi" gibi ifadeler doğru okunur. Türkçe soru İngilizce belgede de bulunur. |
 | **Kurumsal kimlik** | Active Directory, Microsoft Entra ID, Okta ve Google ile giriş; SCIM ile hesap açma-kapatma. Dosya sunucusu ve SharePoint izinleri belgeyle birlikte gelir. |
 | **Kalite sayıyla ölçülür** | Kabul soruları ve gizli talimat güvenlik testleri her model değişikliğinde yeniden çalışır. Güven raporu (PDF) satın alma dosyanıza eklenir. |
 | **KVKK araçları** | Veri envanteri, saklama süreleri, kişisel veri dökümü ve silme. |

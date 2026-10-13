@@ -1,5 +1,26 @@
 # Sürüm notları
 
+## v1.13.0 — İngilizce konsol
+
+13 Ekim 2026'da yayımlandı. Migration yok.
+
+### Yeni
+- **Konsol İngilizce de kullanılabilir:** başlıktaki ve giriş sayfasındaki **TR / EN** düğmesiyle bütün konsol İngilizceye geçer: menüler, giriş ve ilk kurulum, lisans ekranı, sohbet, sesli asistan, belgeler, bilgi tabanları, talepler ve onaylar, yönetim, kurumsal kimlik, Kalite, güven raporu (PDF dahil), yanıtlanamayan sorular, onaylı yanıtlar, sistem ve modeller. Seçim tarayıcıda saklanır; varsayılan Türkçedir ve Türkçe ekranlar değişmedi.
+- Tarih ve sayılar dile göre biçimlenir (ör. "20 October 2026", "1,250.00 TL").
+- Sunucudan gelen veriler (belge adları, talep türleri, politika cümleleri, sorular ve yanıtlar) kendi dilinde kalır. Yanıtlar her zaman sorunun dilindedir.
+- Sesli asistanın Türkçe sesi ve RAG'e giden soru değişmez; İngilizce konsolda da sesli yanıt Türkçe okunur, İngilizce yanıtlar metin olarak gösterilir.
+
+### Teknik
+- Türkçe metin kaynak dildir; `t()` İngilizce sözlükten karşılığını verir, eksikse Türkçeyi gösterir. Her `t()` metninin İngilizce karşılığı olduğu testle denetlenir (dört alanda yaklaşık 1.750 metin).
+
+## v1.12.1 — Sesli asistanda model önceden yüklenir
+
+13 Ekim 2026'da yayımlandı. Migration yok.
+
+### Düzeltildi
+- **İlk sesli soru modelin yüklenmesini bekliyordu:** üretimde (Docker Desktop, M1 Pro) sunucudaki Whisper Small'ın ilk yüklenmesi 12–28 saniye sürdü. Sesli asistan sayfası açılınca ve kayıt başlarken model artık arka planda yüklenir (`POST /voice/warmup`, en fazla dakikada bir). Yüklüyse ya da bir soru modeli kullanıyorsa istek bir şey yapmaz.
+- Kapasite rehberine üretimde ölçülen süre eklendi: Docker içinde 2 saniyelik soru yaklaşık 3,4 saniyede yazıya çevriliyor.
+
 ## v1.12.0 — Lisans anahtarı, sunucuda konuşma tanıma, satışa hazır paket
 
 13 Ekim 2026'da yayımlandı. Migration yok. **Kurulum artık lisans anahtarıyla çalışır:** güncellemeden sonra platform yöneticisi giriş yapar ve WATAM'ın gönderdiği anahtarı **Lisans** ekranına yapıştırır (internet gerekmez). Sunucuda konuşma tanıma, ses ve video belgeleriyle aynı modeli kullanır: `python3 scripts/fetch_transcription_models.py` ile indirilmiş olmalıdır (çevrimdışı pakette zaten vardır). Model yoksa sesli asistan eskisi gibi tarayıcıda çalışır.
