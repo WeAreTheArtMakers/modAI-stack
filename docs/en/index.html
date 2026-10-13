@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>modAI — Your company knowledge, on your infrastructure</title>
+  <meta name="description" content="modAI answers from your company documents and runs on your own server. Every answer shows the document it rests on, and it does not invent what the documents do not say. Turkish-first, with voice.">
+  <link rel="canonical" href="https://wearetheartmakers.github.io/modAI-stack/en/">
+  <link rel="alternate" hreflang="tr" href="https://wearetheartmakers.github.io/modAI-stack/">
+  <link rel="alternate" hreflang="en" href="https://wearetheartmakers.github.io/modAI-stack/en/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="modAI — Your company knowledge, on your infrastructure">
+  <meta property="og:description" content="A self-hosted assistant that answers from your company documents and shows the source of every answer.">
+  <meta property="og:url" content="https://wearetheartmakers.github.io/modAI-stack/en/">
+  <meta property="og:image" content="https://wearetheartmakers.github.io/modAI-stack/assets/img/og-en.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#101727">
+  <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="../assets/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./" aria-label="modAI home">modAI<span>.</span></a>
+      <nav class="nav" aria-label="Main">
+        <a href="#difference">Difference</a>
+        <a href="#use-cases">Use cases</a>
+        <a href="#how">How it works</a>
+        <a href="#security">Security</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#buy">How to buy</a>
+        <a href="#faq">FAQ</a>
+        <a class="lang" href="../" hreflang="tr" lang="tr">TR</a>
+        <a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot">Request a pilot</a>
+      </nav>
+      <details class="menu">
+        <summary>Menu</summary>
+        <div class="menu-panel">
+          <a href="#difference">Difference</a>
+          <a href="#use-cases">Use cases</a>
+          <a href="#how">How it works</a>
+          <a href="#security">Security</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#buy">How to buy</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/WeAreTheArtMakers/modAI-stack">GitHub</a>
+          <a href="../" hreflang="tr" lang="tr">Türkçe</a>
+          <a href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot">Request a pilot</a>
+        </div>
+      </details>
+    </div>
+  </header>
+
+  <main id="content">
+    <section class="hero hero--long">
+      <div class="wrap">
+        <div class="hero-copy">
+          <h1>Your company knowledge, on your infrastructure.</h1>
+          <p class="lead">modAI is an assistant that answers from your company documents. It runs on your own server, shows the document behind every answer, and does not invent what the documents do not say.</p>
+          <div class="hero-actions">
+            <a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot">Request a pilot</a>
+            <a class="button button--ghost" href="#how">See how it works</a>
+          </div>
+          <p class="hero-proof">Turkish interface and voice assistant; English questions and documents work too. Separate knowledge bases for HR, Finance, IT and Support. Leave, purchase and expense requests with approval steps. A licence key and an offline installation package on the day you order.</p>
+        </div>
+
+        <div class="console" data-console>
+          <div class="console-questions" role="tablist" aria-label="Example questions">
+            <button type="button" role="tab" aria-controls="console-exchange">Leave days</button>
+            <button type="button" role="tab" aria-controls="console-exchange">Turkish document</button>
+            <button type="button" role="tab" aria-controls="console-exchange">Not in the documents</button>
+          </div>
+          <div class="exchange" id="console-exchange" role="tabpanel">
+            <p class="bubble-question" data-question></p>
+            <p class="bubble-answer" data-answer aria-live="polite"></p>
+            <div class="evidence" data-evidence>
+              <p class="evidence-label" data-evidence-label></p>
+              <p class="evidence-doc" data-evidence-doc></p>
+              <div class="evidence-quote" data-evidence-quote></div>
+            </div>
+          </div>
+          <p class="console-note">Real system answers: fictional Atlasnova demo documents, test environment, Gemma 3 4B and BGE-M3. The source display is simplified here.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--white" id="difference">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>What it does differently</h2>
+          <p class="lead">Not a general chatbot. An assistant tied to your company's documents that knows its limits.</p>
+        </div>
+        <dl class="facts">
+          <div class="fact">
+            <dt>It does the work too, with approvals.</dt>
+            <dd>An employee who writes "I want three days of leave" is offered the leave request, drafted from that sentence. Approvers see the numbers computed from the request ("4 working days of notice") next to the policy's own sentence. Steps move in order, an approver who is away delegates, and waiting steps are reminded. After the last approval the request is sent, signed, to the HR, ERP or ticketing system. Nobody approves their own request; every step is recorded.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md#talepler-onaylı-iş-akışları">Source: requests (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>It says when it does not know.</dt>
+            <dd>If no document in the selected knowledge bases matches the question, the language model is not called at all and the answer says no document was found. Nor does it answer from an unrelated passage: with multilingual search, questions below a measured relevance floor go to the unanswered-questions report. When a value sits exactly on the boundary between two table rows, it does not guess; it points to the document owner.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/guvenlik-mimarisi.md">Source: security architecture (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Every answer comes with its source.</dt>
+            <dd>The document, section and quote behind the answer appear next to it. Employees check it in one click and can go back to the document before an important decision.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md">Source: the enterprise usage guide (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Ask in one language, find it in another.</dt>
+            <dd>Multilingual search (BGE-M3) matches an English question with Turkish policies and a Turkish question with English procedures. The answer comes in the language of the question.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/bge-m3-staging-generation.md">Source: the multilingual search guide (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Department boundaries apply before search.</dt>
+            <dd>HR, Finance and IT documents live in separate knowledge bases, and everyone searches only where they are authorized. Archived old versions never reach answers.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md">Source: roles and knowledge bases (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>It reads numbers from the table.</dt>
+            <dd>For questions like “Who approves a 40,000 TL purchase?” the amount is matched to the right table row. Turkish (40.000) and English (40,000) number formats are both read correctly.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md">Source: user guide (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Policies do not go stale quietly.</dt>
+            <dd>Every document has an owner and a review date. An answer that relies on an overdue document carries a warning on its source card, and managers see every document waiting for review in one list.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md#belge-sahibi-ve-gözden-geçirme">Source: document owners and reviews (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Quality is measured, not assumed.</dt>
+            <dd>Acceptance questions live on the Quality page and are asked again through the same search and model your users get, nightly if you like. Every run also tries 9 prompt-injection scenarios, instructions hidden in documents, and shows the result as it is; the assurance report exports them as PDF. The unanswered-questions report shows what is missing from your documents, and answers employees mark with a thumbs down point to wrong or outdated ones.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurulum-ve-teslim-rehberi.md#3-kabul-testi-teslimden-önce">Source: the acceptance test (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>It reads your videos and scanned documents too.</dt>
+            <dd>Training videos and meeting recordings are transcribed minute by minute, and an answer shows the minute it was said. Draft minutes come from a recording: decisions, action items and owners. YouTube videos need no download: paste the transcript or the AI summary. Scanned PDFs and images are read with Turkish text recognition.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md#taranmış-belgeler-ses-ve-video">Source: scanned documents, audio and video (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Employees sign in with the company account.</dt>
+            <dd>No separate password: Microsoft Entra ID, Google Workspace or Keycloak over OpenID Connect, or the Active Directory user name and password directly. When someone leaves and their company account is closed, modAI closes with it.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurulum-ve-teslim-rehberi.md#86-şirket-hesabıyla-giriş-sso-openid-connect">Source: single sign-on setup (Turkish)</a></dd>
+          </div>
+          <div class="fact">
+            <dt>It runs on your own server.</dt>
+            <dd>Documents, the search index, the language model and the voice models stay on your company's machine. After setup, answering needs no internet connection.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurulum-ve-teslim-rehberi.md">Source: the installation and handover guide (Turkish)</a></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>From installation to the first question in four steps.</h2>
+          <p class="lead">Screenshots of the product itself, with demo data of the fictional company Atlasnova Yazılım. The interface is in Turkish.</p>
+        </div>
+        <div class="steps">
+          <ol class="step-list" role="tablist" aria-label="Setup steps" aria-orientation="vertical">
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="step-1"><strong>Set up departments</strong><span>One knowledge base per department: Human Resources, Finance, IT, Customer Support.</span></button>
+              <figure class="screen step-inline"><a href="../assets/img/bilgi-tabanlari-1600.webp"><img src="../assets/img/bilgi-tabanlari-960.webp" width="960" height="600" loading="lazy" alt="Knowledge bases page with Human Resources, Finance, IT and Customer Support."></a></figure>
+            </li>
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="step-2"><strong>Upload documents</strong><span>Pick a folder: documents, scanned pages, audio and video upload in batches and, if you like, land in the right knowledge base by content.</span></button>
+              <figure class="screen step-inline"><a href="../assets/img/belgeler-1600.webp"><img src="../assets/img/belgeler-960.webp" width="960" height="600" loading="lazy" alt="Documents page with a drop area, the folder upload button and HR documents marked ready."></a></figure>
+            </li>
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="step-3"><strong>Invite employees</strong><span>With an invitation link, a role and a scope. Everyone sees only their own area.</span></button>
+              <figure class="screen step-inline"><a href="../assets/img/davet-1600.webp"><img src="../assets/img/davet-960.webp" width="960" height="600" loading="lazy" alt="Invitations page with e-mail, role and scope fields."></a></figure>
+            </li>
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="step-4"><strong>Ask</strong><span>By typing or by voice. Each answer shows how many sources it rests on.</span></button>
+              <figure class="screen step-inline"><a href="../assets/img/konusma-1200.webp"><img src="../assets/img/konusma-720.webp" width="720" height="438" loading="lazy" alt="Voice assistant conversation: an English VPN question answered in English and a Turkish leave question answered in Turkish, each with 3 sources."></a></figure>
+            </li>
+          </ol>
+          <div class="step-figures">
+            <figure class="screen" id="step-1" role="tabpanel" data-step-figure><img src="../assets/img/bilgi-tabanlari-1600.webp" srcset="../assets/img/bilgi-tabanlari-960.webp 960w, ../assets/img/bilgi-tabanlari-1600.webp 1600w" sizes="(max-width: 1200px) 60vw, 700px" width="1600" height="1000" alt="Knowledge bases page with Human Resources, Finance, IT and Customer Support."><figcaption>Each department has its own knowledge base; access is granted per knowledge base and workspace.</figcaption></figure>
+            <figure class="screen" id="step-2" role="tabpanel" data-step-figure hidden><img src="../assets/img/belgeler-1600.webp" srcset="../assets/img/belgeler-960.webp 960w, ../assets/img/belgeler-1600.webp 1600w" sizes="(max-width: 1200px) 60vw, 700px" width="1600" height="1000" loading="lazy" alt="Documents page with a drop area, the folder upload button and HR documents marked ready."><figcaption>For a first migration of hundreds of documents there is a command-line tool that reports in a dry run first.</figcaption></figure>
+            <figure class="screen" id="step-3" role="tabpanel" data-step-figure hidden><img src="../assets/img/davet-1600.webp" srcset="../assets/img/davet-960.webp 960w, ../assets/img/davet-1600.webp 1600w" sizes="(max-width: 1200px) 60vw, 700px" width="1600" height="1000" loading="lazy" alt="Invitations page with e-mail, role and scope fields."><figcaption>Invitation links work once and expire.</figcaption></figure>
+            <figure class="screen" id="step-4" role="tabpanel" data-step-figure hidden><img src="../assets/img/konusma-1200.webp" srcset="../assets/img/konusma-720.webp 720w, ../assets/img/konusma-1200.webp 1200w" sizes="(max-width: 1200px) 60vw, 700px" width="1200" height="729" loading="lazy" alt="Voice assistant conversation: an English VPN question answered in English and a Turkish leave question answered in Turkish, each with 3 sources."><figcaption>The answer follows the language of the question; documents can be Turkish or English.</figcaption></figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--ink" id="voice">
+      <div class="wrap voice">
+        <img src="../assets/img/robot-600.webp" width="600" height="600" loading="lazy" alt="The face of the modAI voice assistant.">
+        <div>
+          <h2>Ask out loud, listen to the answer.</h2>
+          <p class="lead">A short path to the same knowledge at a desk or on the floor: say the question, hear the answer in modAI's Turkish voice, see the source on screen.</p>
+          <ul class="voice-points">
+            <li>Speech is transcribed on your company's own modAI server. The recording never leaves the company and is not kept; recognition can also run entirely in the browser.</li>
+            <li>Answers are read aloud by the Turkish neural voice that ships with the product, at an adjustable speed.</li>
+            <li>The question is shown before it is sent, so a misheard word can be corrected.</li>
+            <li>Work described by voice starts as a request too: an employee who asks for three days off next week is offered the leave request.</li>
+            <li>Conversations are kept; leave the page and pick up where you left off.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--white" id="use-cases">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Where it helps inside a company</h2>
+          <p class="lead">The most measurable gain from internal AI is fewer repeated questions and less time spent searching. modAI does this from the company's own documents, with sources.</p>
+        </div>
+        <dl class="facts">
+          <div class="fact"><dt>HR policy questions</dt><dd>Leave, benefits, remote work, expenses: employees ask directly and the answer comes with the clause. HR answers the same question less often.</dd></div>
+          <div class="fact"><dt>IT helpdesk</dt><dd>VPN, passwords, a lost laptop and access steps are read from the procedure. The unanswered-questions report shows which guide is missing.</dd></div>
+          <div class="fact"><dt>Training and onboarding</dt><dd>Onboarding videos and recorded trainings become searchable; a new employee finds where something was explained, down to the minute.</dd></div>
+          <div class="fact"><dt>Customer support teams</dt><dd>Product instructions, SLAs and escalation rules in one place. Once an old version is archived, answers come only from the current one.</dd></div>
+          <div class="fact"><dt>Finance and purchasing</dt><dd>Approval limits and spending rules are read from the right table row, so "who approves a 40,000 TL purchase?" is answered from the table, not guessed.</dd></div>
+          <div class="fact"><dt>Quality and audit</dt><dd>Procedures have an owner and a review date; an answer that relies on an overdue document carries a warning. Every answer is traced to the document versions it used, so when a procedure is corrected you can find the answers that relied on it.</dd></div>
+          <div class="fact"><dt>Meetings</dt><dd>Upload a meeting recording or notes and get draft minutes: decisions, action items, owners and dates, each with the minute it was said. Edit the draft and save it to a knowledge base, so "when did we decide this?" has an answer.</dd></div>
+          <div class="fact"><dt>Sales and proposals</dt><dd>Product information, discount policy and contract terms in one place. The sales team reads what to tell a customer from the policy, with its source.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="section" id="security">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Knowledge stays inside your company.</h2>
+          <p class="lead">Documents, the search index, the language model and the voice models run on your company's machine. Employees connect from the browser.</p>
+        </div>
+        <div class="arch" aria-label="Deployment architecture">
+          <div class="arch-box">
+            <h3>The employee's browser</h3>
+            <ul>
+              <li>Interface and voice assistant</li>
+              <li>Turkish voice (EMA Lightning)</li>
+              <li>Optional: on-device speech recognition</li>
+            </ul>
+          </div>
+          <div class="arch-link">Company network, HTTPS</div>
+          <div class="arch-box arch-box--server">
+            <h3>Your company's server</h3>
+            <ul>
+              <li>modAI: access control, search and indexing</li>
+              <li>PostgreSQL: users, documents and audit log</li>
+              <li>Qdrant: search index; Valkey: job queue</li>
+              <li>Ollama and Gemma 3: answer generation</li>
+              <li>BGE-M3: multilingual search</li>
+              <li>Whisper Small: speech recognition</li>
+            </ul>
+          </div>
+        </div>
+        <p class="arch-outside"><strong>No external AI service is used.</strong> Documents and questions are not sent to third parties.</p>
+        <ul class="controls">
+          <li><strong>Invitations and roles.</strong> Accounts are created by invitation; access is granted by role and scope.</li>
+          <li><strong>Department and document boundaries.</strong> Search is limited to the knowledge bases a user is authorized for. A file's folder or SharePoint permissions come with the document: only its readers find a restricted document.</li>
+          <li><strong>Approved workflows.</strong> Leave, purchase, expense and IT access requests: computed numbers next to the policy, four eyes, delegation and reminders, then a signed webhook, a Teams or Slack message and a CSV report.</li>
+          <li><strong>Connected sources.</strong> A folder on the file server or a SharePoint library stays in line with a knowledge base: new files are added, changed files become new versions, removed files are archived.</li>
+          <li><strong>Company sign-in.</strong> OpenID Connect with Entra ID, Google Workspace and Keycloak, or Active Directory directly (LDAP); no separate password.</li>
+          <li><strong>Audit log.</strong> Document uploads, deletions, archiving and permission changes are recorded.</li>
+          <li><strong>Answer traces.</strong> Each answer records which document versions it used, never the question or the answer text.</li>
+          <li><strong>Expert-verified answers.</strong> An answer an expert approved is given to the same question without the model; the approval lapses when a source document changes.</li>
+          <li><strong>Model choice, tested first.</strong> Another local model on the server passes the quality checks and security scenarios before it is activated; documents are not re-indexed.</li>
+          <li><strong>Assurance report.</strong> Installation, access, retention, quality and security results on one page, saved as PDF for procurement.</li>
+          <li><strong>Hidden instructions.</strong> Invisible comments and sentences addressed to the AI never reach the model; the Quality page measures this with 9 scenarios.</li>
+          <li><strong>HTTPS.</strong> A ready HTTPS layer for multi-user network installations.</li>
+          <li><strong>Installation, backups and upgrades.</strong> One command each to install, back up, upgrade and roll back. Backups are also copied to a second disk and restored with one command.</li>
+          <li><strong>modAI Box.</strong> A pre-installed appliance: plug it into power and the network, then open it in the browser with the setup code on its label. A watchdog restarts a stuck service.</li>
+          <li><strong>Offline installation package.</strong> Every release ships as one folder with its images, models and checksums; installation and upgrades run without internet and roll back with one command.</li>
+          <li><strong>Enterprise identity.</strong> Sign-in with the company account (Entra ID, Okta, Google Workspace, Keycloak) or Active Directory, workspace roles from directory groups and SCIM 2.0 provisioning: someone who leaves is disabled in the directory and can no longer sign in to modAI.</li>
+          <li><strong>Model choice with visible licenses.</strong> Administrators choose among the local models on the machine (Gemma, Qwen and your own adaptations); each passes the quality and security checks first, and its license is shown.</li>
+          <li><strong>Install and forget.</strong> Nightly backups run by themselves and are thinned so they never fill the disk; administrators are warned when space runs low, and a capacity card says when to scale up.</li>
+          <li><strong>Measured capacity.</strong> On a 16 GB machine, 95% of answers within 10 seconds with 4 simultaneous questions; about 250 employees comfortably. The load test runs on the customer's machine too.</li>
+          <li><strong>Data protection tools.</strong> Personal data export, conversation deletion and account erasure are in the admin console. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kvkk-veri-envanteri.md">Data inventory (Turkish)</a></li>
+          <li><strong>Supply chain and security architecture.</strong> Every package carries a bill of materials (SBOM, CycloneDX); dependencies are scanned for known vulnerabilities. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/guvenlik-mimarisi.md">Security architecture (Turkish)</a></li>
+          <li><strong>Retention.</strong> Conversation retention is configurable; IP addresses in the audit log and backups are deleted after six months, and logs are capped in size.</li>
+          <li><strong>Licenses.</strong> PostgreSQL, Qdrant, Valkey and Ollama are permissively licensed. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section--white" id="fit">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Which one fits you?</h2>
+          <p class="lead">modAI is not a cheaper ChatGPT. It is control over where company knowledge lives and how it is used.</p>
+        </div>
+        <div class="fit">
+          <div>
+            <h3>A general-purpose AI tool may be better if</h3>
+            <ul>
+              <li>you want immediate access to the strongest hosted models,</li>
+              <li>you want ready-made sync from cloud sources such as Google Drive or Confluence (modAI syncs network folders and SharePoint; others come by upload or folder import),</li>
+              <li>processing your data in a cloud service is acceptable to you.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>modAI fits better if</h3>
+            <ul>
+              <li>company documents must not leave the company,</li>
+              <li>answers must rest on documents and be verifiable,</li>
+              <li>access boundaries between departments matter and should follow the groups of your company directory (Active Directory, Entra ID, Okta, Keycloak) and the files' own permissions,</li>
+              <li>you want Turkish and voice use,</li>
+              <li>you prefer an annual license to per-user monthly subscriptions.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="section" id="compare">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Side by side with cloud assistants.</h2>
+          <p class="lead">Where is company knowledge processed, what happens when the internet goes down, and what does a 250-person company pay per year?</p>
+        </div>
+        <div class="compare-wrap">
+          <table class="compare">
+            <thead><tr><th scope="col"><span class="sr-only">Topic</span></th><th scope="col">modAI</th><th scope="col">Cloud AI assistants <span>e.g. Microsoft 365 Copilot, ChatGPT Business</span></th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Where documents and questions are processed</th><td>On your company's server or the modAI Box</td><td>In the provider's cloud</td></tr>
+              <tr><th scope="row">When the internet goes down</th><td>Keeps working</td><td>Stops</td></tr>
+              <tr><th scope="row">Pricing model</th><td>Fixed annual licence</td><td>Monthly subscription per user</td></tr>
+              <tr><th scope="row">250 people, one year</th><td><strong>€9,900</strong> (Business)</td><td>$60,000 ($20 per user per month) – $90,000 ($30 per user per month, plus a Microsoft 365 licence)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="compare-note"><strong>Included with modAI:</strong> answers that show their source and say so when no document covers the question; approved leave, purchase, expense and access requests; a Turkish voice assistant; Active Directory, SSO and SCIM; quality measurement and an assurance report; data protection tools.</p>
+        <p class="fine-print">Cloud prices are October 2026 list prices (ChatGPT Business annual $20, Microsoft 365 Copilot enterprise annual $30), excluding taxes. Check the provider's current price before buying.</p>
+      </div>
+    </section>
+
+    <section class="section section--white" id="pricing">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Pricing</h2>
+          <p class="lead">Start with a narrow, measurable pilot. Expand once it proves useful on your real documents.</p>
+        </div>
+        <div class="plans">
+          <div class="plan">
+            <p class="plan-name">Pilot</p>
+            <p class="plan-price">€2,900 <span>one-time</span></p>
+            <p class="plan-desc">A 2–4 week validation with selected company documents and a limited user group.</p>
+            <ul>
+              <li>30-day licence, 25 users</li>
+              <li>Private pilot installed at your company</li>
+              <li>1–2 knowledge bases, selected documents</li>
+              <li>Role-based pilot access</li>
+              <li>Local AI configuration</li>
+              <li>Acceptance test for source-backed answers</li>
+              <li>Findings and rollout recommendation</li>
+              <li>Credited against the first annual licence</li>
+            </ul>
+            <a class="button button--ghost" href="mailto:info@wearetheartmakers.com?subject=modAI%20Pilot">Start a pilot</a>
+          </div>
+          <div class="plan plan--featured">
+            <p class="plan-name">Business <small>Recommended</small></p>
+            <p class="plan-price">€9,900 <span>per year</span></p>
+            <p class="plan-desc">For a team or business unit that wants a supported private knowledge assistant.</p>
+            <ul>
+              <li>Annual licence, up to 250 users</li>
+              <li>Production installation on your own server</li>
+              <li>Multiple workspaces and knowledge bases</li>
+              <li>Role-based user access</li>
+              <li>Source-backed answers and the voice assistant</li>
+              <li>Standard installation and update guidance</li>
+              <li>Business support channel</li>
+            </ul>
+            <a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20Business">Write about Business</a>
+          </div>
+          <div class="plan">
+            <p class="plan-name">Enterprise</p>
+            <p class="plan-price">€19,900+ <span>per year</span></p>
+            <p class="plan-desc">For broader deployments that need custom scope, integration work or installation support.</p>
+            <ul>
+              <li>Everything in Business; number of users by contract</li>
+              <li>Multi-team deployment scope</li>
+              <li>Custom infrastructure planning</li>
+              <li>Custom workflow and integration work</li>
+              <li>Model and search configuration support</li>
+              <li>Priority implementation support; custom SLA and commercial terms</li>
+            </ul>
+            <a class="button button--ghost" href="mailto:info@wearetheartmakers.com?subject=modAI%20Enterprise">Write about Enterprise</a>
+          </div>
+        </div>
+        <p class="fine-print">Prices exclude taxes, dedicated hardware and third-party model or API fees. Custom integrations, SAML, high-availability architecture, certifications and customer-specific compliance work are not included unless explicitly scoped in a commercial agreement. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/COMMERCIAL_LICENSING.md">Commercial license terms</a></p>
+      </div>
+    </section>
+
+
+    <section class="section section--ink" id="buy">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Order today, running today.</h2>
+          <p class="lead">Order, licence key and installation on the same day. Moving to the annual licence needs no reinstallation; your documents and settings stay where they are.</p>
+        </div>
+        <ol class="buy-steps">
+          <li><strong>20-minute demo</strong><span>Live or on video. Bring your own questions.</span></li>
+          <li><strong>Pilot order</strong><span>A one-page order form, signed electronically. Pay by bank transfer.</span></li>
+          <li><strong>Licence and package the same day</strong><span>The licence key and the installation package arrive by e-mail. Or the modAI Box arrives installed.</span></li>
+          <li><strong>One-hour setup</strong><span>The package installs offline; the key is pasted into the Licence screen. We set up the first knowledge base and ask the first questions together.</span></li>
+          <li><strong>Annual licence</strong><span>Paste the new key and that is it. The pilot fee is credited against the first year.</span></li>
+        </ol>
+        <div class="buy-regions">
+          <div>
+            <h3>Outside Turkey</h3>
+            <ul>
+              <li>Invoice in euros, payment by bank transfer (SWIFT).</li>
+              <li>Setup session in English; answers come in the language of the question.</li>
+              <li>The console is in Turkish today; English documents and questions work fully.</li>
+              <li>Packages for Apple silicon, ARM and x86_64 servers.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>In Turkey</h3>
+            <ul>
+              <li>Prices in euros; invoiced in Turkish lira at the Central Bank selling rate of the invoice date.</li>
+              <li>e-Invoice; bank transfer or a card payment link.</li>
+              <li>Setup and support in Turkish.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="buy-cta"><a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot%20order">Order a pilot</a> <span>info@wearetheartmakers.com · +90 505 314 9360</span></p>
+      </div>
+    </section>
+
+    <section class="section section--white" id="faq">
+      <div class="wrap">
+        <h2>Questions</h2>
+        <div class="faq">
+          <details>
+            <summary>How soon can we start?</summary>
+            <p>On the day you order. The licence key and the installation package arrive the same day; the package installs offline (80 seconds in our measurement) and in a one-hour session you ask questions about your first knowledge base. The modAI Box arrives installed.</p>
+          </details>
+          <details>
+            <summary>How does the licence key work? Does it need the internet?</summary>
+            <p>WATAM signs the key; your installation verifies it by itself, without going online. There is no licence server. The key carries the licensee, plan, end date and number of users. A renewal is a new key pasted into the console; administrators are warned before the end date, and a 14-day grace period follows it.</p>
+          </details>
+          <details>
+            <summary>Do you provide the source code?</summary>
+            <p>No. modAI is proprietary software licensed for use. The installation package contains the application as container images. For security reviews we provide the security architecture document and a software bill of materials (SBOM); a supervised code review under a non-disclosure agreement can be arranged if needed.</p>
+          </details>
+          <details>
+            <summary>Does it replace ChatGPT, Claude or Copilot?</summary>
+            <p>No. modAI is the answer layer for company knowledge: access boundaries, deployment control and source-backed answers. Teams can keep using those tools for general writing and research.</p>
+          </details>
+          <details>
+            <summary>What hardware does it need?</summary>
+            <p>A Mac or Linux server that runs Docker and Ollama, with at least 16 GB of memory; 32 GB is recommended. Our measurements are from an Apple M1 Pro with 16 GB. The language model (Gemma 3 4B) uses about 4–4.6 GB and multilingual search about 2 GB.</p>
+          </details>
+          <details>
+            <summary>Does it need an internet connection?</summary>
+            <p>No. The installation package includes the models; installation, upgrades and licence checks work offline. Search and answering run inside your company network; documents and questions are not sent out.</p>
+          </details>
+          <details>
+            <summary>Which documents can be uploaded?</summary>
+            <p>PDF, DOCX, TXT and Markdown; DOCX tables are kept. Scanned PDFs and images (PNG, JPG, TIFF) are read with Turkish and English text recognition. Audio and video recordings, such as company videos downloaded from YouTube Studio, are transcribed minute by minute, and a source shows the minute an answer was said. All of it is processed on your own server.</p>
+          </details>
+          <details>
+            <summary>Do old and new versions of a document get mixed up?</summary>
+            <p>An updated document is uploaded as a new version with “Replace document”. An old policy can be archived; archived documents are never used in answers and can be restored.</p>
+          </details>
+          <details>
+            <summary>Do you claim SSO, certifications or high availability?</summary>
+            <p>Shipped with the product: single sign-on with the company account (OpenID Connect: Microsoft Entra ID, Google Workspace, Keycloak, Okta), Active Directory sign-in (LDAP), SCIM 2.0 provisioning and HTTPS for network installations. SAML and high availability are scoped as separate project work. There is no automatic failover; a second machine can stand by warm and take over in minutes, and restore drills prove the backups. An independent penetration test is planned; every release runs an automated authentication sweep; the safeguards and the gaps are in the <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/guvenlik-mimarisi.md">security architecture</a> guide (Turkish). We do not claim a security certification (ISO 27001, SOC 2).</p>
+          </details>
+          <details>
+            <summary>Does the price include hardware?</summary>
+            <p>No. Servers, GPUs, storage and third-party model or API charges are excluded unless explicitly included in a project scope.</p>
+          </details>
+          <details>
+            <summary>Why start with a paid pilot?</summary>
+            <p>A pilot measures answer quality, access design and deployment fit on your real documents before a larger rollout. The result is made concrete with an acceptance test built from questions we prepare together.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap closing">
+        <div class="measure">
+          <h2>A 2–4 week pilot with your own documents.</h2>
+          <p class="lead">One department, selected documents and a small user group. We measure the result with questions we prepare together.</p>
+        </div>
+        <a class="button" href="#buy">Order a pilot</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p><a class="wordmark" href="./">modAI<span>.</span></a><br>© 2026 WATAM — We Are The Art Makers</p>
+      <ul class="footer-links">
+        <li><a href="https://github.com/WeAreTheArtMakers/modAI-stack">GitHub</a></li>
+        <li><a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/COMMERCIAL_LICENSING.md">Commercial license</a></li>
+        <li><a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a></li>
+        <li><a href="../" hreflang="tr" lang="tr">Türkçe</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script type="application/json" id="console-data">
+  [
+    {
+      "question": "I have three years of seniority. How many days of annual leave do I get?",
+      "answer": "You have 16 days of annual leave.",
+      "source": { "label": "Source (Turkish document)", "document": "yillik-izin-ve-devamsizlik-politikasi-v3.md, 2. Yıllık izin hakkı",
+        "text": "Annual leave depends on seniority (Kıdem: seniority, Yıllık izin: annual leave):",
+        "rows": [ { "cells": ["Kıdem", "Yıllık izin"] }, { "cells": ["0–5 yıl", "16 iş günü"], "match": true }, { "cells": ["5–15 yıl", "21 iş günü"] }, { "cells": ["15 yıl ve üzeri", "27 iş günü"] } ] }
+    },
+    {
+      "question": "Who approves a 40,000 TL purchase?",
+      "answer": "According to the document, a purchase of 40,000 TL requires approval from the department director and the purchasing unit.",
+      "source": { "label": "Source (Turkish document)", "document": "satin-alma-ve-onay-limitleri.md",
+        "rows": [ { "cells": ["Tutar", "Onaylayan"] }, { "cells": ["25.000 TL'ye kadar", "Takım yöneticisi"] }, { "cells": ["25.000 TL – 150.000 TL", "Departman direktörü ve Satın Alma birimi"], "match": true }, { "cells": ["150.000 TL – 750.000 TL", "Finans Direktörü"] } ] }
+    },
+    {
+      "question": "What will the company's salary increase be in 2027?",
+      "answer": "The provided documents do not contain information about the company’s salary increase in 2027.",
+      "source": { "label": "Source", "document": null, "none": "No section of the selected documents answers this question. Nothing was invented." }
+    }
+  ]
+  </script>
+  <script src="../assets/site.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>modAI — Şirket bilginiz, sizin altyapınızda</title>
+  <meta name="description" content="modAI, şirket belgelerinizden yanıt veren ve kendi sunucunuzda çalışan bir asistan. Her yanıtı dayandığı belgeyle gösterir, belgede olmayanı uydurmaz. Türkçe ve sesli.">
+  <link rel="canonical" href="https://wearetheartmakers.github.io/modAI-stack/">
+  <link rel="alternate" hreflang="tr" href="https://wearetheartmakers.github.io/modAI-stack/">
+  <link rel="alternate" hreflang="en" href="https://wearetheartmakers.github.io/modAI-stack/en/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="tr_TR">
+  <meta property="og:title" content="modAI — Şirket bilginiz, sizin altyapınızda">
+  <meta property="og:description" content="Şirket belgelerinizden, dayanağını göstererek yanıt veren; kendi sunucunuzda çalışan Türkçe ve sesli asistan.">
+  <meta property="og:url" content="https://wearetheartmakers.github.io/modAI-stack/">
+  <meta property="og:image" content="https://wearetheartmakers.github.io/modAI-stack/assets/img/og-tr.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#101727">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip" href="#icerik">İçeriğe geç</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./" aria-label="modAI ana sayfa">modAI<span>.</span></a>
+      <nav class="nav" aria-label="Ana menü">
+        <a href="#fark">Farkı</a>
+        <a href="#senaryolar">Senaryolar</a>
+        <a href="#nasil">Nasıl çalışır</a>
+        <a href="#guvenlik">Güvenlik</a>
+        <a href="#fiyat">Fiyatlar</a>
+        <a href="#satin-al">Satın alma</a>
+        <a href="#sss">SSS</a>
+        <a class="lang" href="en/" hreflang="en" lang="en">EN</a>
+        <a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot">Pilot isteyin</a>
+      </nav>
+      <details class="menu">
+        <summary>Menü</summary>
+        <div class="menu-panel">
+          <a href="#fark">Farkı</a>
+          <a href="#senaryolar">Senaryolar</a>
+          <a href="#nasil">Nasıl çalışır</a>
+          <a href="#guvenlik">Güvenlik</a>
+          <a href="#fiyat">Fiyatlar</a>
+          <a href="#satin-al">Satın alma</a>
+          <a href="#sss">SSS</a>
+          <a href="https://github.com/WeAreTheArtMakers/modAI-stack">GitHub</a>
+          <a href="en/" hreflang="en" lang="en">English</a>
+          <a href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot">Pilot isteyin</a>
+        </div>
+      </details>
+    </div>
+  </header>
+
+  <main id="icerik">
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-copy">
+          <h1>Şirket bilginiz, sizin altyapınızda.</h1>
+          <p class="lead">modAI, şirket belgelerinizden yanıt veren bir asistan. Kendi sunucunuzda çalışır, her yanıtı dayandığı belgeyle gösterir ve belgede olmayanı uydurmaz.</p>
+          <div class="hero-actions">
+            <a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot">Pilot isteyin</a>
+            <a class="button button--ghost" href="#nasil">Nasıl çalıştığını görün</a>
+          </div>
+          <p class="hero-proof">Türkçe arayüz ve sesli asistan. İzin, satın alma ve masraf talepleri onaylı adımlarla. Sipariş günü lisans anahtarı ve internetsiz kurulum paketi.</p>
+        </div>
+
+        <div class="console" data-console>
+          <div class="console-questions" role="tablist" aria-label="Örnek sorular">
+            <button type="button" role="tab" aria-controls="console-exchange">İzin hakkı</button>
+            <button type="button" role="tab" aria-controls="console-exchange">İngilizce soru</button>
+            <button type="button" role="tab" aria-controls="console-exchange">Sınırdaki değer</button>
+            <button type="button" role="tab" aria-controls="console-exchange">Belgede yok</button>
+          </div>
+          <div class="exchange" id="console-exchange" role="tabpanel">
+            <p class="bubble-question" data-question></p>
+            <p class="bubble-answer" data-answer aria-live="polite"></p>
+            <div class="evidence" data-evidence>
+              <p class="evidence-label" data-evidence-label></p>
+              <p class="evidence-doc" data-evidence-doc></p>
+              <div class="evidence-quote" data-evidence-quote></div>
+            </div>
+          </div>
+          <p class="console-note">Gerçek sistem yanıtları: kurgusal Atlasnova demo belgeleri, test ortamı, Gemma 3 4B ve BGE-M3. Dayanak gösterimi burada sadeleştirildi.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--white" id="fark">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Neyi farklı yapıyor?</h2>
+          <p class="lead">Genel bir sohbet botu değil. Şirketinizin belgelerine bağlı, sınırlarını bilen bir asistan.</p>
+        </div>
+        <dl class="facts">
+          <div class="fact">
+            <dt>İşi de yapar, onayla.</dt>
+            <dd>"3 gün izin almak istiyorum" yazan çalışana izin talebini önerir, formu cümlesinden doldurur. Onaycı, talepten hesaplanan sayıları ("başvuru ile başlangıç arasında 4 iş günü") politikanın kendi cümlesinin yanında görür. Talep sırayla onaylanır; izindeki yönetici vekâlet verir, bekleyen adım hatırlatılır. Son onaydan sonra talep İK, ERP ya da talep sistemine imzalı olarak iletilir. Kimse kendi talebini onaylayamaz; her adım kayıtlıdır.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md#talepler-onaylı-iş-akışları">Dayanak: Talepler</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Bilmediğini söyler.</dt>
+            <dd>Seçili bilgi tabanlarında soruyu karşılayan belge yoksa dil modeli hiç çağrılmaz; “belge bulunamadı” der. İlgisiz bir bölümle de yanıt vermez: çok dilli aramada ölçülmüş bir ilgililik eşiğinin altındaki sorular yanıtlanamayan sorular raporuna düşer. İki tablo satırının sınırında kalan sorularda tahmin yürütmez, belge sahibine yönlendirir.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/guvenlik-mimarisi.md">Dayanak: güvenlik mimarisi</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Her yanıt dayanağıyla gelir.</dt>
+            <dd>Yanıtın dayandığı belge, bölüm ve alıntı yanıtın yanında görünür. Çalışan tek tıkla doğrular; önemli kararlarda belgeye dönmek kolaydır.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md">Dayanak: kurumsal kullanım kılavuzu</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Türkçe sorun, İngilizce belgede bulsun.</dt>
+            <dd>Çok dilli arama (BGE-M3), Türkçe bir soruyu İngilizce yazılmış prosedürlerle de eşleştirir. Yanıt sorunun dilinde gelir.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/bge-m3-staging-generation.md">Dayanak: çok dilli arama rehberi</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Departman sınırı aramadan önce uygulanır.</dt>
+            <dd>İK, Finans ve BT belgeleri ayrı bilgi tabanlarında durur; herkes yalnızca yetkili olduğu yerde arar. Arşive alınan eski sürümler yanıtlara girmez.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md">Dayanak: roller ve bilgi tabanları</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Sayıları tablodan okur.</dt>
+            <dd>“40.000 TL'lik alımı kim onaylar?” gibi sorularda tutar, tablodaki doğru satırla eşleştirilir. “Kırk bin lira” ya da İngilizce “40,000” yazımı da doğru okunur.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md">Dayanak: kurumsal kullanım kılavuzu</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Politikalar sessizce eskimez.</dt>
+            <dd>Her belgenin bir sahibi ve gözden geçirme tarihi vardır. Tarihi geçmiş bir belgeye dayanan yanıtta kaynak kartı uyarır; yöneticiler bekleyen belgeleri tek listede görür.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md#belge-sahibi-ve-gözden-geçirme">Dayanak: belge sahibi ve gözden geçirme</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Kalitesi ölçülür, tahmin edilmez.</dt>
+            <dd>Kabul soruları Kalite panelinde durur ve kullanıcıların kullandığı arama ve modelle yeniden sorulur; gece çalıştırılabilir. Her çalıştırma, belgeye gizlenmiş talimatlara karşı 9 güvenlik testini de yapar ve sonucu olduğu gibi gösterir; Güven raporu bunları PDF olarak verir. Yanıtlanamayan sorular raporu eksik bilgiyi, çalışanların 👎 ile işaretlediği yanıtlar yanlış ya da eski belgeyi gösterir.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurulum-ve-teslim-rehberi.md#3-kabul-testi-teslimden-önce">Dayanak: kabul testi</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Videolarınızı ve taranmış belgelerinizi de okur.</dt>
+            <dd>Eğitim videoları ve toplantı kayıtları dakika dakika yazıya dökülür; yanıt, söylendiği dakikayı gösterir. Kayıttan tutanak taslağı çıkarılır: kararlar, aksiyonlar ve sorumlular. YouTube videoları için indirme gerekmez: döküm ya da yapay zekâ özeti yapıştırılır. Taranmış PDF ve görseller Türkçe metin tanımayla okunur.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurumsal-kullanim-kilavuzu.md#taranmış-belgeler-ses-ve-video">Dayanak: taranmış belge, ses ve video</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Şirket hesabıyla girilir.</dt>
+            <dd>Çalışanlar ayrı bir parola yerine Microsoft Entra ID, Google Workspace ya da Keycloak hesabıyla (OpenID Connect) ya da doğrudan Active Directory kullanıcı adı ve şifresiyle girer. İşten ayrılan kişi şirket hesabı kapanınca modAI'a da giremez.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurulum-ve-teslim-rehberi.md#86-şirket-hesabıyla-giriş-sso-openid-connect">Dayanak: SSO kurulumu</a></dd>
+          </div>
+          <div class="fact">
+            <dt>Kendi sunucunuzda çalışır.</dt>
+            <dd>Belgeler, arama dizini, dil modeli ve ses modelleri şirketinizin makinesindedir. Kurulumdan sonra yanıt üretmek için internet bağlantısı gerekmez.</dd>
+            <dd><a class="source" href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurulum-ve-teslim-rehberi.md">Dayanak: kurulum ve teslim rehberi</a></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="section" id="nasil">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Kurulumdan ilk soruya dört adım.</h2>
+          <p class="lead">Ekran görüntüleri ürünün kendisinden; kurgusal Atlasnova Yazılım şirketinin demo verisiyle.</p>
+        </div>
+        <div class="steps">
+          <ol class="step-list" role="tablist" aria-label="Kurulum adımları" aria-orientation="vertical">
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="adim-1"><strong>Departmanları kurun</strong><span>Her departmana bir bilgi tabanı: İnsan Kaynakları, Finans, Bilgi Teknolojileri, Müşteri Destek.</span></button>
+              <figure class="screen step-inline"><a href="assets/img/bilgi-tabanlari-1600.webp"><img src="assets/img/bilgi-tabanlari-960.webp" width="960" height="600" loading="lazy" alt="Bilgi tabanları sayfası: İnsan Kaynakları, Finans, Bilgi Teknolojileri ve Müşteri Destek kartları."></a></figure>
+            </li>
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="adim-2"><strong>Belgeleri yükleyin</strong><span>Bir klasör seçin: belgeler, taranmış sayfalar, ses ve video kayıtları yüklenir; isterseniz içeriklerine göre doğru bilgi tabanına yerleşir.</span></button>
+              <figure class="screen step-inline"><a href="assets/img/belgeler-1600.webp"><img src="assets/img/belgeler-960.webp" width="960" height="600" loading="lazy" alt="Belgeler sayfası: dosya bırakma alanı, Klasör yükle düğmesi ve hazır durumdaki İK belgeleri."></a></figure>
+            </li>
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="adim-3"><strong>Çalışanları davet edin</strong><span>Davet bağlantısıyla, rolü ve kapsamıyla. Herkes yalnızca kendi alanını görür.</span></button>
+              <figure class="screen step-inline"><a href="assets/img/davet-1600.webp"><img src="assets/img/davet-960.webp" width="960" height="600" loading="lazy" alt="Davetler sayfası: e-posta, rol ve kapsam seçilen davet formu."></a></figure>
+            </li>
+            <li>
+              <button type="button" class="step-button" role="tab" data-step aria-controls="adim-4"><strong>Sorun</strong><span>Yazarak ya da sesle. Yanıt, kaç kaynağa dayandığıyla birlikte gelir.</span></button>
+              <figure class="screen step-inline"><a href="assets/img/konusma-1200.webp"><img src="assets/img/konusma-720.webp" width="720" height="438" loading="lazy" alt="Sesli asistanın konuşma geçmişi: İngilizce VPN sorusuna İngilizce, Türkçe izin sorusuna Türkçe yanıt; her yanıtın altında 3 kaynak."></a></figure>
+            </li>
+          </ol>
+          <div class="step-figures">
+            <figure class="screen" id="adim-1" role="tabpanel" data-step-figure><img src="assets/img/bilgi-tabanlari-1600.webp" srcset="assets/img/bilgi-tabanlari-960.webp 960w, assets/img/bilgi-tabanlari-1600.webp 1600w" sizes="(max-width: 1200px) 60vw, 700px" width="1600" height="1000" alt="Bilgi tabanları sayfası: İnsan Kaynakları, Finans, Bilgi Teknolojileri ve Müşteri Destek kartları."><figcaption>Her departmanın bilgi tabanı ayrıdır; yetkiler bilgi tabanı ve çalışma alanı düzeyinde verilir.</figcaption></figure>
+            <figure class="screen" id="adim-2" role="tabpanel" data-step-figure hidden><img src="assets/img/belgeler-1600.webp" srcset="assets/img/belgeler-960.webp 960w, assets/img/belgeler-1600.webp 1600w" sizes="(max-width: 1200px) 60vw, 700px" width="1600" height="1000" loading="lazy" alt="Belgeler sayfası: dosya bırakma alanı, Klasör yükle düğmesi ve hazır durumdaki İK belgeleri."><figcaption>Yüzlerce belgelik ilk taşıma için komut satırı aracı da var; önce deneme modunda rapor verir.</figcaption></figure>
+            <figure class="screen" id="adim-3" role="tabpanel" data-step-figure hidden><img src="assets/img/davet-1600.webp" srcset="assets/img/davet-960.webp 960w, assets/img/davet-1600.webp 1600w" sizes="(max-width: 1200px) 60vw, 700px" width="1600" height="1000" loading="lazy" alt="Davetler sayfası: e-posta, rol ve kapsam seçilen davet formu."><figcaption>Davet bağlantısı tek kullanımlıktır ve süresi dolar.</figcaption></figure>
+            <figure class="screen" id="adim-4" role="tabpanel" data-step-figure hidden><img src="assets/img/konusma-1200.webp" srcset="assets/img/konusma-720.webp 720w, assets/img/konusma-1200.webp 1200w" sizes="(max-width: 1200px) 60vw, 700px" width="1200" height="729" loading="lazy" alt="Sesli asistanın konuşma geçmişi: İngilizce VPN sorusuna İngilizce, Türkçe izin sorusuna Türkçe yanıt; her yanıtın altında 3 kaynak."><figcaption>Sorunun dili ne ise yanıtın dili de odur; belgeler Türkçe ya da İngilizce olabilir.</figcaption></figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--ink" id="ses">
+      <div class="wrap voice">
+        <img src="assets/img/robot-600.webp" width="600" height="600" loading="lazy" alt="modAI sesli asistanının robot yüzü.">
+        <div>
+          <h2>Konuşarak sorun, dinleyerek öğrenin.</h2>
+          <p class="lead">Masa başında ya da sahada aynı bilgiye kısa yol: soruyu söyleyin, yanıtı modAI'nin Türkçe sesiyle dinleyin, kaynağı ekranda görün.</p>
+          <ul class="voice-points">
+            <li>Konuşma, şirketinizin modAI sunucusunda yazıya çevrilir. Ses kaydı şirket dışına çıkmaz ve saklanmaz; isterseniz tanıma tamamen tarayıcıda da yapılır.</li>
+            <li>Yanıt, ürünle gelen Türkçe nöral sesle okunur; okuma hızı ayarlanabilir.</li>
+            <li>Göndermeden önce soru ekranda gösterilir; yanlış duyulan kelime düzeltilebilir.</li>
+            <li>Sesle anlatılan iş de talep olarak başlar: "gelecek hafta üç gün izin istiyorum" diyen çalışana izin talebi önerilir.</li>
+            <li>Görüşmeler saklanır; sayfadan çıkıp döndüğünüzde kaldığınız yerden devam edersiniz.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--white" id="senaryolar">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Şirket içinde nerede işe yarar?</h2>
+          <p class="lead">Kurum içi yapay zekâda en çok ölçülen kazanç, tekrar eden soruların ve bilgi aramanın azalmasıdır. modAI bunları şirketin kendi belgeleriyle, kaynak göstererek yapar.</p>
+        </div>
+        <dl class="facts">
+          <div class="fact"><dt>İK politika soruları</dt><dd>İzin, yan haklar, uzaktan çalışma, masraf: çalışan kendisi sorar, yanıt yönetmelikteki maddeyle gelir. İK ekibine düşen tekrar eden sorular azalır.</dd></div>
+          <div class="fact"><dt>BT yardım masası</dt><dd>VPN, parola, cihaz kaybı ve erişim adımları prosedürden okunur. Yanıtlanamayan sorular raporu hangi kılavuzun eksik olduğunu gösterir.</dd></div>
+          <div class="fact"><dt>Eğitim ve oryantasyon</dt><dd>Oryantasyon videoları ve kayıtlı eğitimler aranabilir olur; yeni çalışan "bu nerede anlatıldı?" sorusunun yanıtını dakikasıyla bulur.</dd></div>
+          <div class="fact"><dt>Müşteri destek ekipleri</dt><dd>Ürün talimatları, SLA ve eskalasyon kuralları tek yerde. Eski sürüm arşivlenince yanıtlar yalnızca güncel talimattan gelir.</dd></div>
+          <div class="fact"><dt>Finans ve satın alma</dt><dd>Onay limitleri ve harcama kuralları tablodaki doğru satırdan okunur; "40.000 TL'lik alımı kim onaylar?" gibi sorular tahminle değil, tabloyla yanıtlanır.</dd></div>
+          <div class="fact"><dt>Kalite ve denetim</dt><dd>Prosedürlerin sahibi ve gözden geçirme tarihi tutulur; süresi geçen belgeye dayanan yanıt uyarı taşır. Her yanıtın hangi belge sürümüne dayandığı izlenir; bir prosedür düzeltildiğinde ona dayanan yanıtlar bulunur.</dd></div>
+          <div class="fact"><dt>Toplantılar</dt><dd>Toplantı kaydı ya da notu yüklenir, tutanak taslağı çıkar: kararlar, aksiyonlar, sorumlular ve tarihler, söylendiği dakikayla. Taslak düzenlenip bilgi tabanına kaydedilir; "bu karar ne zaman alındı?" sorusu yanıtlanabilir.</dd></div>
+          <div class="fact"><dt>Satış ve teklif hazırlığı</dt><dd>Ürün bilgileri, indirim politikası ve sözleşme şartları tek yerde. Satış ekibi müşteriye vereceği bilgiyi politikadan, kaynağıyla okur.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="section" id="guvenlik">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Bilgi şirketinizden çıkmaz.</h2>
+          <p class="lead">Belgeler, arama dizini, dil modeli ve ses modelleri şirketinizin makinesinde çalışır. Çalışanlar tarayıcıdan bağlanır.</p>
+        </div>
+        <div class="arch" aria-label="Kurulum mimarisi">
+          <div class="arch-box">
+            <h3>Çalışanın tarayıcısı</h3>
+            <ul>
+              <li>Arayüz ve sesli asistan</li>
+              <li>Türkçe ses (EMA Lightning)</li>
+              <li>İsteğe bağlı: cihazda konuşma tanıma</li>
+            </ul>
+          </div>
+          <div class="arch-link">Şirket ağı, HTTPS</div>
+          <div class="arch-box arch-box--server">
+            <h3>Şirketinizin sunucusu</h3>
+            <ul>
+              <li>modAI: yetki, arama ve indeksleme</li>
+              <li>PostgreSQL: kullanıcılar, belgeler ve denetim kaydı</li>
+              <li>Qdrant: arama dizini; Valkey: iş kuyruğu</li>
+              <li>Ollama ve Gemma 3: yanıt üretimi</li>
+              <li>BGE-M3: çok dilli arama</li>
+              <li>Whisper Small: konuşma tanıma</li>
+            </ul>
+          </div>
+        </div>
+        <p class="arch-outside"><strong>Dış yapay zekâ servisi kullanılmaz.</strong> Belgeler ve sorular üçüncü taraflara gönderilmez.</p>
+        <ul class="controls">
+          <li><strong>Davet ve roller.</strong> Hesaplar davetle açılır; erişim rol ve kapsamla verilir.</li>
+          <li><strong>Şirket hesabıyla giriş.</strong> OpenID Connect ile Entra ID, Google Workspace ve Keycloak ya da doğrudan Active Directory (LDAP); ayrı parola yok.</li>
+          <li><strong>Departman ve belge sınırı.</strong> Arama, kullanıcının yetkili olduğu bilgi tabanlarıyla sınırlanır. Dosyanın klasör ya da SharePoint izni belgeyle gelir: kısıtlı bir belgeyi yalnızca okuyucuları bulur.</li>
+          <li><strong>Onaylı iş akışları.</strong> İzin, satın alma, masraf ve BT erişimi talepleri. Onaycı politikayla hesaplanan sayıları yan yana görür. Dört göz ilkesi, vekâlet ve hatırlatma vardır. Onaydan sonra imzalı webhook ve Teams/Slack bildirimi gider; talepler CSV raporu olarak indirilir.</li>
+          <li><strong>Bağlı kaynaklar.</strong> Dosya sunucusundaki bir klasör ya da bir SharePoint kitaplığı bilgi tabanıyla eşit kalır: yeni dosya eklenir, değişen yeni sürüm olur, silinen arşivlenir.</li>
+          <li><strong>Denetim kaydı.</strong> Belge yükleme, silme, arşiv ve yetki işlemleri kaydedilir.</li>
+          <li><strong>Yanıt izi.</strong> Her yanıtın hangi belge sürümlerine dayandığı tutulur; soru ve yanıt metni tutulmaz.</li>
+          <li><strong>Uzman onaylı yanıtlar.</strong> Bir uzmanın onayladığı yanıt aynı soruya modele sorulmadan verilir; kaynak belge değişince onay düşer.</li>
+          <li><strong>Model seçimi, sınayarak.</strong> Sunucudaki başka bir yerel model önce Kalite ve güvenlik testlerinden geçer, sonra etkinleşir; belgeler yeniden indekslenmez.</li>
+          <li><strong>Güven raporu.</strong> Kurulum, erişim, saklama, kalite ve güvenlik testleri tek sayfada; PDF olarak satın alma dosyasına eklenir.</li>
+          <li><strong>Gizli talimatlara karşı.</strong> Belgedeki görünmeyen yorumlar ve yapay zekâya hitap eden cümleler modele gitmez; Kalite sayfası 9 senaryoyla ölçer.</li>
+          <li><strong>HTTPS.</strong> Ağdan çok kullanıcılı kurulumlar için hazır HTTPS katmanı.</li>
+          <li><strong>Kurulum, yedek ve güncelleme.</strong> Tek komutla kurulum, yedek, güncelleme ve geri alma. Yedek ikinci bir diske de kopyalanır ve tek komutla geri yüklenir.</li>
+          <li><strong>modAI Kutusu.</strong> Kurulu gelen cihaz: prize ve ağa takılır, tarayıcıda etiketteki kurulum koduyla açılır. Bekçi, takılan servisi yeniden başlatır.</li>
+          <li><strong>İnternetsiz kurulum paketi.</strong> Her sürüm imajları, modelleri ve sağlama özetleriyle tek klasör olarak teslim edilir; kurulum ve güncelleme internete çıkmadan yapılır, tek komutla geri alınır.</li>
+          <li><strong>Kurumsal kimlik.</strong> Şirket hesabıyla giriş (Entra ID, Okta, Google Workspace, Keycloak) ya da Active Directory, dizin gruplarından çalışma alanı rolleri ve SCIM 2.0 ile hesap açma-kapatma: işten ayrılan kişi dizinde kapatılınca modAI'ye de giremez.</li>
+          <li><strong>Model seçimi ve lisans görünürlüğü.</strong> Yönetici makinedeki yerel modeller (Gemma, Qwen ve kendi uyarlamalarınız) arasından seçer; her model önce Kalite ve güvenlik testlerinden geçer, lisansı listede görünür.</li>
+          <li><strong>Kur ve unut.</strong> Gece yedeği kendiliğinden alınır ve diski doldurmayacak şekilde seyreltilir; disk azalınca yönetici uyarılır, kapasite kartı ne zaman büyütmek gerektiğini söyler.</li>
+          <li><strong>Ölçülmüş kapasite.</strong> 16 GB'lık bir makinede aynı anda 4 soruda yanıtların %95'i 10 saniyenin altında; yaklaşık 250 çalışana kadar rahat. Yük testi müşterinin makinesinde de çalışır.</li>
+          <li><strong>KVKK araçları.</strong> Kişisel veri dökümü, görüşme ve hesap silme yönetim panelindedir. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kvkk-veri-envanteri.md">Veri envanteri</a></li>
+          <li><strong>Saklama süreleri.</strong> Görüşmelerin süresi ayarlanır; denetim kaydındaki IP adresleri ve yedekler 6 ay sonra silinir, loglar boyutla sınırlıdır.</li>
+          <li><strong>Lisanslar.</strong> PostgreSQL, Qdrant, Valkey ve Ollama izin verici lisanslıdır. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/lisanslama.md">Lisanslama özeti</a></li>
+          <li><strong>Tedarik zinciri ve güvenlik belgesi.</strong> Her pakette bileşen listesi (SBOM, CycloneDX) bulunur; bağımlılıklar bilinen açıklara karşı taranır. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/guvenlik-mimarisi.md">Güvenlik mimarisi</a></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section--white" id="uygun">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Hangisi size uygun?</h2>
+          <p class="lead">modAI daha ucuz bir ChatGPT değil; şirket bilgisinin nerede durduğu ve nasıl kullanıldığı üzerinde kontrol.</p>
+        </div>
+        <div class="fit">
+          <div>
+            <h3>Genel amaçlı bir yapay zekâ aracı daha iyi olabilir, eğer</h3>
+            <ul>
+              <li>en güçlü bulut modellerine hemen erişmek istiyorsanız,</li>
+              <li>Google Drive ya da Confluence gibi bulut kaynaklarından hazır eşitleme istiyorsanız (modAI ağ klasörünü ve SharePoint'i eşitler; diğerleri yükleme ya da klasörle gelir),</li>
+              <li>verinin bir bulut hizmetinde işlenmesi sizin için sorun değilse.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>modAI daha uygun, eğer</h3>
+            <ul>
+              <li>şirket belgeleriniz şirket dışına çıkmamalıysa,</li>
+              <li>yanıtların belgeye dayanması ve doğrulanabilmesi gerekiyorsa,</li>
+              <li>departmanlar arası erişim sınırı önemliyse ve erişimin şirket dizininizdeki gruplardan (Active Directory, Entra ID, Okta, Keycloak) ve dosya izinlerinden gelmesini istiyorsanız,</li>
+              <li>Türkçe ve sesli kullanım istiyorsanız,</li>
+              <li>kullanıcı başı aylık abonelik yerine yıllık lisans tercih ediyorsanız.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="section" id="karsilastirma">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Bulut asistanlarıyla yan yana.</h2>
+          <p class="lead">Şirket bilgisi nerede işlenir, internet kesilince ne olur, 250 kişilik bir şirket yılda ne öder?</p>
+        </div>
+        <div class="compare-wrap">
+          <table class="compare">
+            <thead><tr><th scope="col"><span class="sr-only">Konu</span></th><th scope="col">modAI</th><th scope="col">Bulut yapay zekâ asistanları <span>ör. Microsoft 365 Copilot, ChatGPT Business</span></th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Belgeler ve sorular nerede işlenir?</th><td>Şirketinizin sunucusunda ya da modAI Kutusu'nda</td><td>Sağlayıcının bulutunda</td></tr>
+              <tr><th scope="row">İnternet kesilince</th><td>Çalışmaya devam eder</td><td>Çalışmaz</td></tr>
+              <tr><th scope="row">Fiyat modeli</th><td>Sabit yıllık lisans</td><td>Kullanıcı başına aylık abonelik</td></tr>
+              <tr><th scope="row">250 kişi, bir yıl</th><td><strong>9.900 €</strong> (Business)</td><td>60.000 $ (20 $/kişi/ay) – 90.000 $ (30 $/kişi/ay, ayrıca Microsoft 365 lisansı)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="compare-note"><strong>modAI'de kurulumla hazır gelenler:</strong> kaynak gösteren ve belge yoksa uydurmayan yanıtlar; izin, satın alma, masraf ve erişim için onaylı talepler; Türkçe sesli asistan; Active Directory, SSO ve SCIM; Kalite ölçümü ve Güven raporu; KVKK araçları.</p>
+        <p class="fine-print">Bulut fiyatları Ekim 2026 liste fiyatlarıdır (ChatGPT Business yıllık 20 $, Microsoft 365 Copilot kurumsal yıllık 30 $); vergiler hariç. Satın almadan önce sağlayıcının güncel fiyatını kontrol edin.</p>
+      </div>
+    </section>
+
+    <section class="section section--white" id="fiyat">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Fiyatlar</h2>
+          <p class="lead">Dar ve ölçülebilir bir pilotla başlayın. Gerçek belgelerinizde işe yaradığını gördükten sonra genişletin.</p>
+        </div>
+        <div class="plans">
+          <div class="plan">
+            <p class="plan-name">Pilot</p>
+            <p class="plan-price">2.900 € <span>tek seferlik</span></p>
+            <p class="plan-desc">Seçilmiş şirket belgeleri ve sınırlı bir kullanıcı grubuyla 2–4 haftalık doğrulama.</p>
+            <ul>
+              <li>30 günlük lisans, 25 kullanıcı</li>
+              <li>Şirketinizde kurulan özel pilot</li>
+              <li>1–2 bilgi tabanı, seçilmiş belgeler</li>
+              <li>Rol bazlı pilot erişimi</li>
+              <li>Yerel yapay zekâ yapılandırması</li>
+              <li>Kaynaklı yanıtlar için kabul testi</li>
+              <li>Bulgular ve yaygınlaştırma önerisi</li>
+              <li>Bedeli ilk yıl lisansından düşülür</li>
+            </ul>
+            <a class="button button--ghost" href="mailto:info@wearetheartmakers.com?subject=modAI%20Pilot">Pilot başlatın</a>
+          </div>
+          <div class="plan plan--featured">
+            <p class="plan-name">Business <small>Önerilen</small></p>
+            <p class="plan-price">9.900 € <span>yıllık</span></p>
+            <p class="plan-desc">Desteklenen, özel bir bilgi asistanı isteyen ekip ya da iş birimi için.</p>
+            <ul>
+              <li>Yıllık lisans, 250 kullanıcıya kadar</li>
+              <li>Kendi sunucunuzda üretim kurulumu</li>
+              <li>Birden fazla çalışma alanı ve bilgi tabanı</li>
+              <li>Rol bazlı kullanıcı erişimi</li>
+              <li>Kaynaklı kurumsal yanıtlar ve sesli asistan</li>
+              <li>Standart kurulum ve güncelleme rehberliği</li>
+              <li>İş destek kanalı</li>
+            </ul>
+            <a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20Business">Business için yazın</a>
+          </div>
+          <div class="plan">
+            <p class="plan-name">Enterprise</p>
+            <p class="plan-price">19.900 €+ <span>yıllık</span></p>
+            <p class="plan-desc">Özel kapsam, entegrasyon ya da kurulum desteği gerektiren geniş kurulumlar için.</p>
+            <ul>
+              <li>Business'taki her şey; kullanıcı sayısı sözleşmeye göre</li>
+              <li>Çok ekipli kurulum kapsamı</li>
+              <li>Özel altyapı planlaması</li>
+              <li>Özel iş akışı ve entegrasyon çalışması</li>
+              <li>Model ve arama yapılandırma desteği</li>
+              <li>Öncelikli kurulum desteği; özel SLA ve ticari koşullar</li>
+            </ul>
+            <a class="button button--ghost" href="mailto:info@wearetheartmakers.com?subject=modAI%20Enterprise">Enterprise için yazın</a>
+          </div>
+        </div>
+        <p class="fine-print">Fiyatlara vergiler, özel donanım ve üçüncü taraf model ya da API ücretleri dahil değildir. Özel entegrasyonlar, SAML, yüksek erişilebilirlik mimarisi, sertifikasyonlar ve müşteriye özel uyumluluk çalışmaları ticari sözleşmede açıkça kapsamlanmadıkça dahil sayılmaz. <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/COMMERCIAL_LICENSING.md">Ticari lisans koşulları</a></p>
+      </div>
+    </section>
+
+
+    <section class="section section--ink" id="satin-al">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Bugün sipariş, bugün kurulum.</h2>
+          <p class="lead">Sipariş, lisans anahtarı ve kurulum aynı gün. Yıllık lisansa geçerken yeniden kurulum yok; belgeleriniz ve ayarlarınız yerinde kalır.</p>
+        </div>
+        <ol class="buy-steps">
+          <li><strong>20 dakikalık demo</strong><span>Canlı ya da video. Kendi sorularınızı getirin.</span></li>
+          <li><strong>Pilot siparişi</strong><span>Tek sayfalık sipariş formu, e-imza. Ödeme havale ya da kartla.</span></li>
+          <li><strong>Aynı gün lisans ve paket</strong><span>Lisans anahtarı ve kurulum paketi e-postayla gelir. İsterseniz modAI Kutusu kurulu gelir.</span></li>
+          <li><strong>Bir saatlik kurulum</strong><span>Paket internetsiz kurulur, anahtar Lisans ekranına yapıştırılır. İlk bilgi tabanını ve ilk soruları birlikte yaparız.</span></li>
+          <li><strong>Yıllık lisans</strong><span>Yeni anahtar yapıştırılır, hepsi bu. Pilot bedeli ilk yıl lisansından düşülür.</span></li>
+        </ol>
+        <div class="buy-regions">
+          <div>
+            <h3>Türkiye</h3>
+            <ul>
+              <li>Fiyat Euro; fatura TL olarak, fatura günündeki TCMB döviz satış kuruyla kesilir.</li>
+              <li>e-Fatura. Ödeme havale/EFT ya da kartla ödeme bağlantısıyla.</li>
+              <li>Türkçe kurulum ve destek.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Yurt dışı</h3>
+            <ul>
+              <li>Euro fatura, banka havalesi (SWIFT).</li>
+              <li>İngilizce kurulum oturumu; yanıtlar sorunun dilinde.</li>
+              <li>Apple silicon, ARM ya da x86_64 sunucu için paket.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="buy-cta"><a class="button" href="mailto:info@wearetheartmakers.com?subject=modAI%20pilot%20sipari%C5%9Fi">Pilot siparişi verin</a> <span>info@wearetheartmakers.com · +90 505 314 9360</span></p>
+      </div>
+    </section>
+
+    <section class="section section--white" id="sss">
+      <div class="wrap">
+        <h2>Sık sorulanlar</h2>
+        <div class="faq">
+          <details>
+            <summary>Ne kadar sürede kullanmaya başlarız?</summary>
+            <p>Sipariş günü. Lisans anahtarı ve kurulum paketi aynı gün e-postayla gelir; paket internetsiz kurulur (ölçümümüzde 80 saniye) ve bir saatlik oturumda ilk bilgi tabanınızla soru sorarsınız. modAI Kutusu seçilirse cihaz kurulu gelir.</p>
+          </details>
+          <details>
+            <summary>Lisans anahtarı nasıl çalışır? İnternet gerekir mi?</summary>
+            <p>Anahtarı WATAM imzalar; kurulumunuz onu kendi içinde, internete çıkmadan doğrular. Lisans sunucusu yoktur. Anahtar lisans sahibini, paketi, bitiş tarihini ve kullanıcı sayısını taşır. Yenilemede yeni anahtar yapıştırılır; bitişten önce yöneticiler uyarılır, sonrasında 14 gün ek süre vardır.</p>
+          </details>
+          <details>
+            <summary>Kaynak kodunu veriyor musunuz?</summary>
+            <p>Hayır. modAI tescilli bir üründür; kullanım hakkı lisansla verilir. Kurulum paketi uygulamayı imajlar olarak içerir. Güvenlik incelemesi için güvenlik mimarisi belgesi, bileşen listesi (SBOM) sunarız; gerekirse gizlilik sözleşmesiyle gözetimli bir kod inceleme oturumu düzenlenebilir.</p>
+          </details>
+          <details>
+            <summary>ChatGPT, Claude ya da Copilot'un yerine mi geçer?</summary>
+            <p>Hayır. modAI şirket bilgisine dayalı yanıt katmanıdır: erişim sınırları, kurulum kontrolü ve kaynaklı yanıtlar. Genel yazım ve araştırma için bu araçlar kullanılmaya devam edilebilir.</p>
+          </details>
+          <details>
+            <summary>Hangi donanım gerekir?</summary>
+            <p>Docker ve Ollama çalıştırabilen, en az 16 GB bellekli bir Mac ya da Linux sunucu; 32 GB önerilir. Ölçümlerimiz Apple M1 Pro 16 GB üzerindedir. Dil modeli (Gemma 3 4B) yaklaşık 4–4,6 GB, çok dilli arama yaklaşık 2 GB bellek kullanır.</p>
+          </details>
+          <details>
+            <summary>İnternet bağlantısı gerekir mi?</summary>
+            <p>Hayır. Kurulum paketi modelleri de içerir; kurulum, güncelleme ve lisans doğrulaması internete çıkmadan yapılır. Arama ve yanıt üretimi şirketinizin ağı içinde çalışır; belgeler ve sorular dışarı gönderilmez.</p>
+          </details>
+          <details>
+            <summary>Hangi belgeler yüklenebilir?</summary>
+            <p>PDF, DOCX, TXT ve Markdown; DOCX tabloları korunur. Taranmış PDF ve görseller (PNG, JPG, TIFF) Türkçe ve İngilizce metin tanımayla okunur. Ses ve video kayıtları (örneğin YouTube Studio'dan indirilen şirket videoları) dakika dakika yazıya dökülür; yanıtın kaynağı söylendiği dakikayı gösterir. Hepsi şirketinizin sunucusunda işlenir.</p>
+          </details>
+          <details>
+            <summary>Eski ve yeni sürüm belgeler karışmaz mı?</summary>
+            <p>Güncellenen belge “Belgeyi değiştir” ile yeni sürüm olarak yüklenir. Eski bir politika arşive alınabilir; arşivdeki belgeler yanıtlarda kullanılmaz ve istenirse geri alınır.</p>
+          </details>
+          <details>
+            <summary>KVKK açısından nasıl değerlendirilir?</summary>
+            <p>Belgeler, sorular ve yanıtlar şirketinizin altyapısında kalır; ses kaydı yalnızca kendi sunucunuzda yazıya çevrilir ve saklanmaz. Ürünle bir veri envanteri gelir: hangi kişisel veri nerede, neden ve ne kadar süre tutulur. Erişim ve silme talepleri için kişisel veri dökümü, görüşme ve hesap silme yönetim panelindedir. Bir uyumluluk sertifikası iddia etmiyoruz.</p>
+          </details>
+          <details>
+            <summary>SSO, sertifika ya da yüksek erişilebilirlik var mı?</summary>
+            <p>Ürünle gelenler: şirket hesabıyla giriş (OpenID Connect: Microsoft Entra ID, Google Workspace, Keycloak, Okta), doğrudan Active Directory (LDAP), SCIM 2.0 ile hesap açma-kapatma ve ağ kurulumu için HTTPS. SAML ve yüksek erişilebilirlik ayrı proje olarak kapsamlanır. Otomatik devralma yoktur; ikinci bir makine sıcak beklemede tutulup dakikalar içinde devralabilir ve yedeklerin geri yüklenebildiği düzenli tatbikatla kanıtlanır. Bağımsız sızma testi planlanıyor; her sürümde otomatik yetki taraması çalışır; güvenlik önlemleri ve eksikler <a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/guvenlik-mimarisi.md">güvenlik mimarisi</a> belgesindedir. Bir güvenlik sertifikası (ISO 27001, SOC 2) iddia etmiyoruz.</p>
+          </details>
+          <details>
+            <summary>Fiyata donanım dahil mi?</summary>
+            <p>Hayır. Sunucu, GPU, depolama ve üçüncü taraf model ya da API ücretleri, proje kapsamına açıkça yazılmadıkça dahil değildir.</p>
+          </details>
+          <details>
+            <summary>Neden ücretli pilot?</summary>
+            <p>Pilot, gerçek belgelerinizle yanıt kalitesini, erişim tasarımını ve kurulum uyumunu büyük bir yaygınlaştırmadan önce ölçer. Sonuç, birlikte hazırladığımız sorulardan oluşan kabul testiyle somutlaşır.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap closing">
+        <div class="measure">
+          <h2>Kendi belgelerinizle 2–4 haftalık pilot.</h2>
+          <p class="lead">Bir departman, seçilmiş belgeler ve küçük bir kullanıcı grubu. Sonucu birlikte hazırladığımız sorularla ölçüyoruz.</p>
+        </div>
+        <a class="button" href="#satin-al">Pilot siparişi</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p><a class="wordmark" href="./">modAI<span>.</span></a><br>© 2026 WATAM — We Are The Art Makers</p>
+      <ul class="footer-links">
+        <li><a href="https://github.com/WeAreTheArtMakers/modAI-stack">GitHub</a></li>
+        <li><a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/kurulum-ve-teslim-rehberi.md">Kurulum rehberi</a></li>
+        <li><a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/docs/guides/lisanslama.md">Lisanslama</a></li>
+        <li><a href="https://github.com/WeAreTheArtMakers/modAI-stack/blob/main/COMMERCIAL_LICENSING.md">Ticari lisans</a></li>
+        <li><a href="en/" hreflang="en" lang="en">English</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script type="application/json" id="console-data">
+  [
+    {
+      "question": "Kıdemim 3 yıl, kaç gün yıllık iznim var?",
+      "answer": "3 yıl kıdeminiz varsa 16 günlük yıllık izin hakkınız vardır.",
+      "source": { "label": "Dayanak", "document": "yillik-izin-ve-devamsizlik-politikasi-v3.md, 2. Yıllık izin hakkı",
+        "text": "Yıllık izin hakkı şirketteki kıdeme göre belirlenir:",
+        "rows": [ { "cells": ["Kıdem", "Yıllık izin"] }, { "cells": ["0–5 yıl", "16 iş günü"], "match": true }, { "cells": ["5–15 yıl", "21 iş günü"] }, { "cells": ["15 yıl ve üzeri", "27 iş günü"] } ] }
+    },
+    {
+      "question": "Who approves a 40,000 TL purchase?",
+      "answer": "According to the document, a purchase of 40,000 TL requires approval from the department director and the purchasing unit.",
+      "source": { "label": "Dayanak (Türkçe belge)", "document": "satin-alma-ve-onay-limitleri.md",
+        "rows": [ { "cells": ["Tutar", "Onaylayan"] }, { "cells": ["25.000 TL'ye kadar", "Takım yöneticisi"] }, { "cells": ["25.000 TL – 150.000 TL", "Departman direktörü ve Satın Alma birimi"], "match": true }, { "cells": ["150.000 TL – 750.000 TL", "Finans Direktörü"] } ] }
+    },
+    {
+      "question": "Kıdemim tam 5 yıl, kaç gün yıllık izin hakkım var?",
+      "answer": "Belge bu soruya kesin bir yanıt vermiyor: 5 yıl, yillik-izin-ve-devamsizlik-politikasi-v3.md belgesindeki tabloda iki satırın tam sınırında. “0–5 yıl” satırında Yıllık izin: 16 iş günü; “5–15 yıl” satırında Yıllık izin: 21 iş günü. Belge, sınır değerin hangi satıra dahil olduğunu belirtmiyor. Lütfen belge sahibine doğrulatın.",
+      "source": { "label": "Dayanak (iki satır çakışıyor; model çağrılmadı)", "document": "yillik-izin-ve-devamsizlik-politikasi-v3.md, 2. Yıllık izin hakkı",
+        "rows": [ { "cells": ["Kıdem", "Yıllık izin"] }, { "cells": ["0–5 yıl", "16 iş günü"], "match": true }, { "cells": ["5–15 yıl", "21 iş günü"], "match": true } ] }
+    },
+    {
+      "question": "Şirketin 2027 maaş artış oranı ne olacak?",
+      "answer": "Şirketin 2027 maaş artışı ile ilgili herhangi bir bilgi bu belgede bulunmamaktadır. Belge, çalışan yan hakları, seyahat politikası ve izin politikası gibi konuları kapsamaktadır.",
+      "source": { "label": "Dayanak", "document": null, "none": "Seçili belgelerde bu soruyu karşılayan bir bölüm yok. Yanıt uydurulmadı." }
+    }
+  ]
+  </script>
+  <script src="assets/site.js" defer></script>
+</body>
+</html>
